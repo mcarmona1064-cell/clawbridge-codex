@@ -13,8 +13,7 @@ const MSG_COLOR = '\x1b[36m';
 const RESET = '\x1b[39m';
 const FULL_RESET = '\x1b[0m';
 
-const threshold =
-  LEVELS[(process.env.LOG_LEVEL as Level) || 'info'] ?? LEVELS.info;
+const threshold = LEVELS[(process.env.LOG_LEVEL as Level) || 'info'] ?? LEVELS.info;
 
 function formatErr(err: unknown): string {
   if (err instanceof Error) {
@@ -40,36 +39,23 @@ function ts(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(d.getMilliseconds()).padStart(3, '0')}`;
 }
 
-function log(
-  level: Level,
-  dataOrMsg: Record<string, unknown> | string,
-  msg?: string,
-): void {
+function log(level: Level, dataOrMsg: Record<string, unknown> | string, msg?: string): void {
   if (LEVELS[level] < threshold) return;
   const tag = `${COLORS[level]}${level.toUpperCase()}${level === 'fatal' ? FULL_RESET : RESET}`;
   const stream = LEVELS[level] >= LEVELS.warn ? process.stderr : process.stdout;
   if (typeof dataOrMsg === 'string') {
-    stream.write(
-      `[${ts()}] ${tag} (${process.pid}): ${MSG_COLOR}${dataOrMsg}${RESET}\n`,
-    );
+    stream.write(`[${ts()}] ${tag} (${process.pid}): ${MSG_COLOR}${dataOrMsg}${RESET}\n`);
   } else {
-    stream.write(
-      `[${ts()}] ${tag} (${process.pid}): ${MSG_COLOR}${msg}${RESET}${formatData(dataOrMsg)}\n`,
-    );
+    stream.write(`[${ts()}] ${tag} (${process.pid}): ${MSG_COLOR}${msg}${RESET}${formatData(dataOrMsg)}\n`);
   }
 }
 
 export const logger = {
-  debug: (dataOrMsg: Record<string, unknown> | string, msg?: string) =>
-    log('debug', dataOrMsg, msg),
-  info: (dataOrMsg: Record<string, unknown> | string, msg?: string) =>
-    log('info', dataOrMsg, msg),
-  warn: (dataOrMsg: Record<string, unknown> | string, msg?: string) =>
-    log('warn', dataOrMsg, msg),
-  error: (dataOrMsg: Record<string, unknown> | string, msg?: string) =>
-    log('error', dataOrMsg, msg),
-  fatal: (dataOrMsg: Record<string, unknown> | string, msg?: string) =>
-    log('fatal', dataOrMsg, msg),
+  debug: (dataOrMsg: Record<string, unknown> | string, msg?: string) => log('debug', dataOrMsg, msg),
+  info: (dataOrMsg: Record<string, unknown> | string, msg?: string) => log('info', dataOrMsg, msg),
+  warn: (dataOrMsg: Record<string, unknown> | string, msg?: string) => log('warn', dataOrMsg, msg),
+  error: (dataOrMsg: Record<string, unknown> | string, msg?: string) => log('error', dataOrMsg, msg),
+  fatal: (dataOrMsg: Record<string, unknown> | string, msg?: string) => log('fatal', dataOrMsg, msg),
 };
 
 // Route uncaught errors through logger so they get timestamps in stderr

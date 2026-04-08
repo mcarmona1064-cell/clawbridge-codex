@@ -15,20 +15,9 @@ import {
   TIMEZONE,
 } from './config.js';
 import './channels/index.js';
-import {
-  getChannelFactory,
-  getRegisteredChannelNames,
-} from './channels/registry.js';
-import {
-  ContainerOutput,
-  runContainerAgent,
-  writeGroupsSnapshot,
-  writeTasksSnapshot,
-} from './container-runner.js';
-import {
-  cleanupOrphans,
-  ensureContainerRuntimeRunning,
-} from './container-runtime.js';
+import { getChannelFactory, getRegisteredChannelNames } from './channels/registry.js';
+import { ContainerOutput, runContainerAgent, writeGroupsSnapshot, writeTasksSnapshot } from './container-runner.js';
+import { cleanupOrphans, ensureContainerRuntimeRunning } from './container-runtime.js';
 import {
   getAllChats,
   getAllRegisteredGroups,
@@ -50,17 +39,8 @@ import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
-import {
-  restoreRemoteControl,
-  startRemoteControl,
-  stopRemoteControl,
-} from './remote-control.js';
-import {
-  isSenderAllowed,
-  isTriggerAllowed,
-  loadSenderAllowlist,
-  shouldDropMessage,
-} from './sender-allowlist.js';
+import { restoreRemoteControl, startRemoteControl, stopRemoteControl } from './remote-control.js';
+import { isSenderAllowed, isTriggerAllowed, loadSenderAllowlist, shouldDropMessage } from './sender-allowlist.js';
 import { startSessionCleanup } from './session-cleanup.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
@@ -85,16 +65,10 @@ function ensureOneCLIAgent(jid: string, group: RegisteredGroup): void {
   const identifier = group.folder.toLowerCase().replace(/_/g, '-');
   onecli.ensureAgent({ name: group.name, identifier }).then(
     (res) => {
-      logger.info(
-        { jid, identifier, created: res.created },
-        'OneCLI agent ensured',
-      );
+      logger.info({ jid, identifier, created: res.created }, 'OneCLI agent ensured');
     },
     (err) => {
-      logger.debug(
-        { jid, identifier, err: String(err) },
-        'OneCLI agent ensure skipped',
-      );
+      logger.debug({ jid, identifier, err: String(err) }, 'OneCLI agent ensure skipped');
     },
   );
 }
@@ -110,10 +84,7 @@ function loadState(): void {
   }
   sessions = getAllSessions();
   registeredGroups = getAllRegisteredGroups();
-  logger.info(
-    { groupCount: Object.keys(registeredGroups).length },
-    'State loaded',
-  );
+  logger.info({ groupCount: Object.keys(registeredGroups).length }, 'State loaded');
 }
 
 /**
@@ -126,10 +97,7 @@ function getOrRecoverCursor(chatJid: string): string {
 
   const botTs = getLastBotMessageTimestamp(chatJid, ASSISTANT_NAME);
   if (botTs) {
-    logger.info(
-      { chatJid, recoveredFrom: botTs },
-      'Recovered message cursor from last bot reply',
-    );
+    logger.info({ chatJid, recoveredFrom: botTs }, 'Recovered message cursor from last bot reply');
     lastAgentTimestamp[chatJid] = botTs;
     saveState();
     return botTs;
@@ -147,10 +115,7 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
   try {
     groupDir = resolveGroupFolderPath(group.folder);
   } catch (err) {
-    logger.warn(
-      { jid, folder: group.folder, err },
-      'Rejecting group registration with invalid folder',
-    );
+    logger.warn({ jid, folder: group.folder, err }, 'Rejecting group registration with invalid folder');
     return;
   }
 
@@ -164,11 +129,7 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
   // identity and instructions from the first run.  (Fixes #1391)
   const groupMdFile = path.join(groupDir, 'CLAUDE.md');
   if (!fs.existsSync(groupMdFile)) {
-    const templateFile = path.join(
-      GROUPS_DIR,
-      group.isMain ? 'main' : 'global',
-      'CLAUDE.md',
-    );
+    const templateFile = path.join(GROUPS_DIR, group.isMain ? 'main' : 'global', 'CLAUDE.md');
     if (fs.existsSync(templateFile)) {
       let content = fs.readFileSync(templateFile, 'utf-8');
       if (ASSISTANT_NAME !== 'Andy') {
@@ -183,10 +144,7 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
   // Ensure a corresponding OneCLI agent exists (best-effort, non-blocking)
   ensureOneCLIAgent(jid, group);
 
-  logger.info(
-    { jid, name: group.name, folder: group.folder },
-    'Group registered',
-  );
+  logger.info({ jid, name: group.name, folder: group.folder }, 'Group registered');
 }
 
 /**
@@ -208,9 +166,7 @@ export function getAvailableGroups(): import('./container-runner.js').AvailableG
 }
 
 /** @internal - exported for testing */
-export function _setRegisteredGroups(
-  groups: Record<string, RegisteredGroup>,
-): void {
+export function _setRegisteredGroups(groups: Record<string, RegisteredGroup>): void {
   registeredGroups = groups;
 }
 
@@ -245,8 +201,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     const allowlistCfg = loadSenderAllowlist();
     const hasTrigger = missedMessages.some(
       (m) =>
-        triggerPattern.test(m.content.trim()) &&
-        (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+        triggerPattern.test(m.content.trim()) && (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
     );
     if (!hasTrigger) return true;
   }
@@ -256,14 +211,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
-  lastAgentTimestamp[chatJid] =
-    missedMessages[missedMessages.length - 1].timestamp;
+  lastAgentTimestamp[chatJid] = missedMessages[missedMessages.length - 1].timestamp;
   saveState();
 
-  logger.info(
-    { group: group.name, messageCount: missedMessages.length },
-    'Processing messages',
-  );
+  logger.info({ group: group.name, messageCount: missedMessages.length }, 'Processing messages');
 
   // Track idle timer for closing stdin when agent is idle
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -271,10 +222,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      logger.debug(
-        { group: group.name },
-        'Idle timeout, closing container stdin',
-      );
+      logger.debug({ group: group.name }, 'Idle timeout, closing container stdin');
       queue.closeStdin(chatJid);
     }, IDLE_TIMEOUT);
   };
@@ -286,10 +234,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const output = await runAgent(group, prompt, chatJid, async (result) => {
     // Streaming output callback — called for each agent result
     if (result.result) {
-      const raw =
-        typeof result.result === 'string'
-          ? result.result
-          : JSON.stringify(result.result);
+      const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
       logger.info({ group: group.name }, `Agent output: ${raw.length} chars`);
@@ -326,10 +271,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // Roll back cursor so retries can re-process these messages
     lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
-    logger.warn(
-      { group: group.name },
-      'Agent error, rolled back message cursor for retry',
-    );
+    logger.warn({ group: group.name }, 'Agent error, rolled back message cursor for retry');
     return false;
   }
 
@@ -364,12 +306,7 @@ async function runAgent(
 
   // Update available groups snapshot (main group only can see all groups)
   const availableGroups = getAvailableGroups();
-  writeGroupsSnapshot(
-    group.folder,
-    isMain,
-    availableGroups,
-    new Set(Object.keys(registeredGroups)),
-  );
+  writeGroupsSnapshot(group.folder, isMain, availableGroups, new Set(Object.keys(registeredGroups)));
 
   // Wrap onOutput to track session ID from streamed results
   const wrappedOnOutput = onOutput
@@ -393,8 +330,7 @@ async function runAgent(
         isMain,
         assistantName: ASSISTANT_NAME,
       },
-      (proc, containerName) =>
-        queue.registerProcess(chatJid, proc, containerName, group.folder),
+      (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
       wrappedOnOutput,
     );
 
@@ -409,11 +345,7 @@ async function runAgent(
       // deletion, or disk-full. The existing backoff in group-queue.ts
       // handles the retry; we just need to remove the broken session ID.
       const isStaleSession =
-        sessionId &&
-        output.error &&
-        /no conversation found|ENOENT.*\.jsonl|session.*not found/i.test(
-          output.error,
-        );
+        sessionId && output.error && /no conversation found|ENOENT.*\.jsonl|session.*not found/i.test(output.error);
 
       if (isStaleSession) {
         logger.warn(
@@ -424,10 +356,7 @@ async function runAgent(
         deleteSession(group.folder);
       }
 
-      logger.error(
-        { group: group.name, error: output.error },
-        'Container agent error',
-      );
+      logger.error({ group: group.name, error: output.error }, 'Container agent error');
       return 'error';
     }
 
@@ -450,11 +379,7 @@ async function startMessageLoop(): Promise<void> {
   while (true) {
     try {
       const jids = Object.keys(registeredGroups);
-      const { messages, newTimestamp } = getNewMessages(
-        jids,
-        lastTimestamp,
-        ASSISTANT_NAME,
-      );
+      const { messages, newTimestamp } = getNewMessages(jids, lastTimestamp, ASSISTANT_NAME);
 
       if (messages.length > 0) {
         logger.info({ count: messages.length }, 'New messages');
@@ -496,8 +421,7 @@ async function startMessageLoop(): Promise<void> {
             const hasTrigger = groupMessages.some(
               (m) =>
                 triggerPattern.test(m.content.trim()) &&
-                (m.is_from_me ||
-                  isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+                (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
             );
             if (!hasTrigger) continue;
           }
@@ -510,24 +434,17 @@ async function startMessageLoop(): Promise<void> {
             ASSISTANT_NAME,
             MAX_MESSAGES_PER_PROMPT,
           );
-          const messagesToSend =
-            allPending.length > 0 ? allPending : groupMessages;
+          const messagesToSend = allPending.length > 0 ? allPending : groupMessages;
           const formatted = formatMessages(messagesToSend, TIMEZONE);
 
           if (queue.sendMessage(chatJid, formatted)) {
-            logger.debug(
-              { chatJid, count: messagesToSend.length },
-              'Piped messages to active container',
-            );
-            lastAgentTimestamp[chatJid] =
-              messagesToSend[messagesToSend.length - 1].timestamp;
+            logger.debug({ chatJid, count: messagesToSend.length }, 'Piped messages to active container');
+            lastAgentTimestamp[chatJid] = messagesToSend[messagesToSend.length - 1].timestamp;
             saveState();
             // Show typing indicator while the container processes the piped message
             channel
               .setTyping?.(chatJid, true)
-              ?.catch((err) =>
-                logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
-              );
+              ?.catch((err) => logger.warn({ chatJid, err }, 'Failed to set typing indicator'));
           } else {
             // No active container — enqueue for a new one
             queue.enqueueMessageCheck(chatJid);
@@ -547,17 +464,9 @@ async function startMessageLoop(): Promise<void> {
  */
 function recoverPendingMessages(): void {
   for (const [chatJid, group] of Object.entries(registeredGroups)) {
-    const pending = getMessagesSince(
-      chatJid,
-      getOrRecoverCursor(chatJid),
-      ASSISTANT_NAME,
-      MAX_MESSAGES_PER_PROMPT,
-    );
+    const pending = getMessagesSince(chatJid, getOrRecoverCursor(chatJid), ASSISTANT_NAME, MAX_MESSAGES_PER_PROMPT);
     if (pending.length > 0) {
-      logger.info(
-        { group: group.name, pendingCount: pending.length },
-        'Recovery: found unprocessed messages',
-      );
+      logger.info({ group: group.name, pendingCount: pending.length }, 'Recovery: found unprocessed messages');
       queue.enqueueMessageCheck(chatJid);
     }
   }
@@ -593,17 +502,10 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   // Handle /remote-control and /remote-control-end commands
-  async function handleRemoteControl(
-    command: string,
-    chatJid: string,
-    msg: NewMessage,
-  ): Promise<void> {
+  async function handleRemoteControl(command: string, chatJid: string, msg: NewMessage): Promise<void> {
     const group = registeredGroups[chatJid];
     if (!group?.isMain) {
-      logger.warn(
-        { chatJid, sender: msg.sender },
-        'Remote control rejected: not main group',
-      );
+      logger.warn({ chatJid, sender: msg.sender }, 'Remote control rejected: not main group');
       return;
     }
 
@@ -611,18 +513,11 @@ async function main(): Promise<void> {
     if (!channel) return;
 
     if (command === '/remote-control') {
-      const result = await startRemoteControl(
-        msg.sender,
-        chatJid,
-        process.cwd(),
-      );
+      const result = await startRemoteControl(msg.sender, chatJid, process.cwd());
       if (result.ok) {
         await channel.sendMessage(chatJid, result.url);
       } else {
-        await channel.sendMessage(
-          chatJid,
-          `Remote Control failed: ${result.error}`,
-        );
+        await channel.sendMessage(chatJid, `Remote Control failed: ${result.error}`);
       }
     } else {
       const result = stopRemoteControl();
@@ -649,28 +544,17 @@ async function main(): Promise<void> {
       // Sender allowlist drop mode: discard messages from denied senders before storing
       if (!msg.is_from_me && !msg.is_bot_message && registeredGroups[chatJid]) {
         const cfg = loadSenderAllowlist();
-        if (
-          shouldDropMessage(chatJid, cfg) &&
-          !isSenderAllowed(chatJid, msg.sender, cfg)
-        ) {
+        if (shouldDropMessage(chatJid, cfg) && !isSenderAllowed(chatJid, msg.sender, cfg)) {
           if (cfg.logDenied) {
-            logger.debug(
-              { chatJid, sender: msg.sender },
-              'sender-allowlist: dropping message (drop mode)',
-            );
+            logger.debug({ chatJid, sender: msg.sender }, 'sender-allowlist: dropping message (drop mode)');
           }
           return;
         }
       }
       storeMessage(msg);
     },
-    onChatMetadata: (
-      chatJid: string,
-      timestamp: string,
-      name?: string,
-      channel?: string,
-      isGroup?: boolean,
-    ) => storeChatMetadata(chatJid, timestamp, name, channel, isGroup),
+    onChatMetadata: (chatJid: string, timestamp: string, name?: string, channel?: string, isGroup?: boolean) =>
+      storeChatMetadata(chatJid, timestamp, name, channel, isGroup),
     registeredGroups: () => registeredGroups,
   };
 
@@ -721,15 +605,10 @@ async function main(): Promise<void> {
     registeredGroups: () => registeredGroups,
     registerGroup,
     syncGroups: async (force: boolean) => {
-      await Promise.all(
-        channels
-          .filter((ch) => ch.syncGroups)
-          .map((ch) => ch.syncGroups!(force)),
-      );
+      await Promise.all(channels.filter((ch) => ch.syncGroups).map((ch) => ch.syncGroups!(force)));
     },
     getAvailableGroups,
-    writeGroupsSnapshot: (gf, im, ag, rj) =>
-      writeGroupsSnapshot(gf, im, ag, rj),
+    writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
     onTasksChanged: () => {
       const tasks = getAllTasks();
       const taskRows = tasks.map((t) => ({
@@ -758,9 +637,7 @@ async function main(): Promise<void> {
 
 // Guard: only run when executed directly, not when imported by tests
 const isDirectRun =
-  process.argv[1] &&
-  new URL(import.meta.url).pathname ===
-    new URL(`file://${process.argv[1]}`).pathname;
+  process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
 
 if (isDirectRun) {
   main().catch((err) => {

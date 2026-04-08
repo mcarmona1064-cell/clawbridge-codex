@@ -23,25 +23,18 @@ describe('database migrations', () => {
         );
       `);
       legacyDb
-        .prepare(
-          `INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)`,
-        )
+        .prepare(`INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)`)
         .run('tg:12345', 'Telegram DM', '2024-01-01T00:00:00.000Z');
       legacyDb
-        .prepare(
-          `INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)`,
-        )
+        .prepare(`INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)`)
         .run('tg:-10012345', 'Telegram Group', '2024-01-01T00:00:01.000Z');
       legacyDb
-        .prepare(
-          `INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)`,
-        )
+        .prepare(`INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)`)
         .run('room@g.us', 'WhatsApp Group', '2024-01-01T00:00:02.000Z');
       legacyDb.close();
 
       vi.resetModules();
-      const { initDatabase, getAllChats, _closeDatabase } =
-        await import('./db.js');
+      const { initDatabase, getAllChats, _closeDatabase } = await import('./db.js');
 
       initDatabase();
 
