@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  An AI assistant that runs agents securely in their own containers. Lightweight, built to be easily understood and completely customized for your needs.
+  ClawBridge Agent — AI agent platform for businesses. Self-hosted, multi-channel, container-isolated.
 </p>
 
 <p align="center">

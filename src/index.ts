@@ -55,7 +55,23 @@ import './modules/index.js';
 import type { ChannelAdapter, ChannelSetup } from './channels/adapter.js';
 import { initChannelAdapters, teardownChannelAdapters, getChannelAdapter } from './channels/channel-registry.js';
 
+import kleur from 'kleur';
+
+function printBanner(): void {
+  const o = kleur.yellow;
+  const w = (s: string) => kleur.white().bold(s);
+  console.log('');
+  console.log(o('  /  /  /   ●'));
+  console.log(o(' /  /  /  ●'));
+  console.log(o('/  /  /  ●'));
+  console.log('');
+  console.log(w('C L A W B R I D G E'));
+  console.log(w('  AI Agent Platform'));
+  console.log('');
+}
+
 async function main(): Promise<void> {
+  printBanner();
   log.info('ClawBridge starting');
 
   // 1. Init central DB
