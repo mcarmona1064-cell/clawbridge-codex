@@ -71,7 +71,7 @@ chmod 600 ~/.calendar-mcp/*.json
 ### Verify mount allowlist covers the path
 
 ```bash
-cat ~/.config/nanoclaw/mount-allowlist.json
+cat ~/.config/clawbridge/mount-allowlist.json
 ```
 
 `~/.calendar-mcp` must sit under an `allowedRoots` entry.
@@ -123,7 +123,7 @@ RUN --mount=type=cache,target=/root/.cache/pnpm \
 
 ### Add tools to allowlist
 
-Edit `container/agent-runner/src/providers/claude.ts`. Add `'mcp__calendar__*'` to `TOOL_ALLOWLIST` after `'mcp__nanoclaw__*'` (or after `'mcp__gmail__*'` if present).
+Edit `container/agent-runner/src/providers/claude.ts`. Add `'mcp__calendar__*'` to `TOOL_ALLOWLIST` after `'mcp__clawbridge__*'` (or after `'mcp__gmail__*'` if present).
 
 ### Rebuild the container image
 
@@ -165,14 +165,14 @@ Substitute `<user>` with `echo $HOME`. `containerPath` is relative (mount-securi
 
 ```bash
 pnpm run build
-systemctl --user restart nanoclaw   # Linux
-# launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
+systemctl --user restart clawbridge   # Linux
+# launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
 ```
 
 Kill any existing agent containers so they respawn with the new mcpServers config:
 
 ```bash
-docker ps -q --filter 'name=nanoclaw-v2-' | xargs -r docker kill
+docker ps -q --filter 'name=clawbridge-v2-' | xargs -r docker kill
 ```
 
 ## Phase 5: Verify
@@ -186,7 +186,7 @@ docker ps -q --filter 'name=nanoclaw-v2-' | xargs -r docker kill
 ### Check logs if the tool isn't working
 
 ```bash
-tail -100 logs/nanoclaw.log | grep -iE 'calendar|mcp'
+tail -100 logs/clawbridge.log | grep -iE 'calendar|mcp'
 ```
 
 Common signals:
@@ -200,7 +200,7 @@ Common signals:
 1. Delete `"calendar"` from `mcpServers` and the `.calendar-mcp` mount from `additionalMounts` in each group's `container.json`.
 2. Remove `'mcp__calendar__*'` from `TOOL_ALLOWLIST`.
 3. Remove `CALENDAR_MCP_VERSION` ARG and the calendar package from the Dockerfile install block.
-4. `pnpm run build && ./container/build.sh && systemctl --user restart nanoclaw`.
+4. `pnpm run build && ./container/build.sh && systemctl --user restart clawbridge`.
 5. Optional: `rm -rf ~/.calendar-mcp/` and `onecli apps disconnect --provider google-calendar`.
 
 ## Credits & references

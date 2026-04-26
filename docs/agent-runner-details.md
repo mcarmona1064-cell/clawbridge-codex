@@ -1,4 +1,4 @@
-# NanoClaw Agent-Runner Details
+# ClawBridge Agent-Runner Details
 
 Implementation-level details for the agent-runner inside the container. See [architecture.md](architecture.md) for the high-level design.
 
@@ -6,7 +6,7 @@ Implementation-level details for the agent-runner inside the container. See [arc
 
 The agent-runner has two layers:
 
-1. **Agent-runner core** — owns the poll loop, message formatting, DB reads/writes, MCP tool implementations, routing, status management, media handling. This is NanoClaw-specific and shared across all providers.
+1. **Agent-runner core** — owns the poll loop, message formatting, DB reads/writes, MCP tool implementations, routing, status management, media handling. This is ClawBridge-specific and shared across all providers.
 
 2. **Agent provider** — owns the SDK interaction. Takes formatted prompts, pushes them to the SDK, yields events back. Trunk ships the `claude` provider; additional providers (OpenCode, Codex, etc.) are installed by `/add-<provider>` skills from the `providers` branch.
 
@@ -115,7 +115,7 @@ class ClaudeProvider implements AgentProvider {
         mcpServers: input.mcpServers,  // already the right shape
         additionalDirectories: input.additionalDirectories,
         env: input.env,
-        allowedTools: NANOCLAW_TOOL_ALLOWLIST,
+        allowedTools: CLAWBRIDGE_TOOL_ALLOWLIST,
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         hooks: {
@@ -413,7 +413,7 @@ The agent-runner transforms messages_in rows into a prompt string. The provider 
 
 Mixed kinds (e.g., a chat message + a system response) are combined with clear delimiters. Each section is labeled by kind.
 
-**Command detection:** Messages starting with `/` are checked against a command list. Recognized commands bypass formatting and are passed raw to the provider (for Claude's slash command handling) or intercepted by the agent-runner (for NanoClaw-level commands like session reset).
+**Command detection:** Messages starting with `/` are checked against a command list. Recognized commands bypass formatting and are passed raw to the provider (for Claude's slash command handling) or intercepted by the agent-runner (for ClawBridge-level commands like session reset).
 
 ### Routing
 
@@ -447,7 +447,7 @@ pending → processing → completed
 
 ### MCP Tools
 
-The agent-runner runs an MCP server that exposes NanoClaw tools to the agent. All tools write to the session DB.
+The agent-runner runs an MCP server that exposes ClawBridge tools to the agent. All tools write to the session DB.
 
 **DB path:** The MCP server receives the session DB path via environment variable. It opens a second connection to the same SQLite file (WAL mode allows concurrent access).
 
@@ -712,7 +712,7 @@ These are ephemeral to the container's lifetime. When the container is killed an
 
 The agent-runner receives configuration via:
 
-- **Environment variables:** `AGENT_PROVIDER` (claude/codex/opencode), `NANOCLAW_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
+- **Environment variables:** `AGENT_PROVIDER` (claude/codex/opencode), `CLAWBRIDGE_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
 - **Fixed mount paths:** Session DB at `/workspace/session.db`. Agent group folder at `/workspace/agent/`. System prompt from `/workspace/agent/CLAUDE.md` and `/workspace/global/CLAUDE.md`.
 - **Optional startup config:** Some config may be passed as a JSON file at a fixed path (e.g., `/workspace/config.json`) for things like the session ID to resume, assistant name, and admin user ID. This avoids overloading environment variables.
 

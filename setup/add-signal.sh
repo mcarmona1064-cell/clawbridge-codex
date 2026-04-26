@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install the Signal adapter in an already-running NanoClaw checkout.
+# Install the Signal adapter in an already-running ClawBridge checkout.
 # Non-interactive — the operator-facing "install signal-cli" + QR scan
 # live in setup/channels/signal.ts. This script only:
 #
@@ -35,7 +35,7 @@ CHANNELS_BRANCH="${CHANNELS_REMOTE}/channels"
 emit_status() {
   local status=$1 error=${2:-}
   local already=${ADAPTER_ALREADY_INSTALLED:-false}
-  echo "=== NANOCLAW SETUP: ADD_SIGNAL ==="
+  echo "=== CLAWBRIDGE SETUP: ADD_SIGNAL ==="
   echo "STATUS: ${status}"
   echo "ADAPTER_ALREADY_INSTALLED: ${already}"
   [ -n "$error" ] && echo "ERROR: ${error}"

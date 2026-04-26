@@ -7,7 +7,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 
-const TEST_DIR = '/tmp/nanoclaw-v2-test';
+const TEST_DIR = '/tmp/clawbridge-v2-test';
 const DB_PATH = `${TEST_DIR}/session.db`;
 
 // Clean up

@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "=== NANOCLAW SETUP: INSTALL_GITHUB ==="
+echo "=== CLAWBRIDGE SETUP: INSTALL_GITHUB ==="
 
 needs_install=false
 [[ -f src/channels/github.ts ]] || needs_install=true

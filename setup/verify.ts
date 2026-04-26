@@ -99,7 +99,7 @@ export async function run(_args: string[]): Promise<void> {
     }
   } else {
     // Check for nohup PID file
-    const pidFile = path.join(projectRoot, 'nanoclaw.pid');
+    const pidFile = path.join(projectRoot, 'clawbridge.pid');
     if (fs.existsSync(pidFile)) {
       try {
         const raw = fs.readFileSync(pidFile, 'utf-8').trim();
@@ -212,7 +212,7 @@ export async function run(_args: string[]): Promise<void> {
   let mountAllowlist = 'missing';
   if (
     fs.existsSync(
-      path.join(homeDir, '.config', 'nanoclaw', 'mount-allowlist.json'),
+      path.join(homeDir, '.config', 'clawbridge', 'mount-allowlist.json'),
     )
   ) {
     mountAllowlist = 'configured';

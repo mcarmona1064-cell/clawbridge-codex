@@ -5,7 +5,7 @@ description: Use Codex (CLI + AppServer) as the full agent provider — planning
 
 # Codex agent provider
 
-NanoClaw runs agents in a long-lived **poll loop** inside the container. The backend is selected with **`AGENT_PROVIDER`** (`claude` | `opencode` | `codex` | `mock`).
+ClawBridge runs agents in a long-lived **poll loop** inside the container. The backend is selected with **`AGENT_PROVIDER`** (`claude` | `opencode` | `codex` | `mock`).
 
 Trunk ships with only the `claude` provider baked in. This skill copies the Codex provider files in from the `providers` branch, wires them into the host and container barrels, updates the Dockerfile to install the Codex CLI, and rebuilds the image.
 
@@ -122,7 +122,7 @@ OPENAI_BASE_URL=https://api.groq.com/openai/v1
 CODEX_MODEL=llama-3.3-70b-versatile
 ```
 
-Codex also ships first-class local-runner flags — `codex --oss --local-provider ollama` or `--local-provider lmstudio` — that auto-detect a local server. To use those inside NanoClaw, set `CODEX_MODEL` to a model your local runner serves and add the corresponding base URL; see the Codex CLI docs for the full `model_provider = oss` configuration.
+Codex also ships first-class local-runner flags — `codex --oss --local-provider ollama` or `--local-provider lmstudio` — that auto-detect a local server. To use those inside ClawBridge, set `CODEX_MODEL` to a model your local runner serves and add the corresponding base URL; see the Codex CLI docs for the full `model_provider = oss` configuration.
 
 **Experimental caveat:** tool-calling quality depends on the model and endpoint. Not every OpenAI-compat provider implements the full function-calling spec, and smaller models (< 30B) often struggle with multi-step tool orchestration. Test before committing.
 
@@ -132,7 +132,7 @@ Set `"provider": "codex"` in the group's **`container.json`** (`groups/<folder>/
 
 `CODEX_MODEL` applies process-wide via `.env`; if you need different models for different groups, set them via `container_config.env` on the group.
 
-Extra MCP servers still come from **`NANOCLAW_MCP_SERVERS`** / `container_config.mcpServers` on the host. The runner merges them into the same `mcpServers` object passed to all providers.
+Extra MCP servers still come from **`CLAWBRIDGE_MCP_SERVERS`** / `container_config.mcpServers` on the host. The runner merges them into the same `mcpServers` object passed to all providers.
 
 ## Operational notes
 

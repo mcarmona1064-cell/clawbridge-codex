@@ -12,7 +12,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
-const TEST_DIR = '/tmp/nanoclaw-v2-e2e';
+const TEST_DIR = '/tmp/clawbridge-v2-e2e';
 if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
 fs.mkdirSync(TEST_DIR, { recursive: true });
 

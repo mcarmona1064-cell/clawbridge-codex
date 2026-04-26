@@ -1,6 +1,6 @@
 # Running Agents on Local Ollama
 
-NanoClaw agents can be routed to a local [Ollama](https://ollama.com) instance instead of the Anthropic API. This cuts API costs to zero and keeps all inference on your hardware.
+ClawBridge agents can be routed to a local [Ollama](https://ollama.com) instance instead of the Anthropic API. This cuts API costs to zero and keeps all inference on your hardware.
 
 ## How It Works
 
@@ -22,7 +22,7 @@ Ollama exposes an Anthropic-compatible `/v1/messages` endpoint. The Claude Code 
 
 ## The OneCLI Complication
 
-NanoClaw normally runs API calls through an OneCLI HTTPS proxy that injects real credentials in place of a placeholder key. When redirecting to Ollama you need to bypass that proxy so requests go direct. Two env vars handle this:
+ClawBridge normally runs API calls through an OneCLI HTTPS proxy that injects real credentials in place of a placeholder key. When redirecting to Ollama you need to bypass that proxy so requests go direct. Two env vars handle this:
 
 - `NO_PROXY=host.docker.internal` — tells the Anthropic SDK's HTTP client to skip the proxy for that hostname
 - `no_proxy=host.docker.internal` — lowercase variant for tools that check the lowercase form
@@ -41,7 +41,7 @@ With this in place, even if the model setting drifts back to a Claude model name
 
 ## Model Selection
 
-The Claude Code CLI reads its model from `~/.claude/settings.json` inside the container, which NanoClaw bind-mounts from `data/v2-sessions/<agent-group-id>/.claude-shared/settings.json`. Set `"model": "gemma4:latest"` (or whatever Ollama model you've pulled) there. Use the exact name from `ollama list`.
+The Claude Code CLI reads its model from `~/.claude/settings.json` inside the container, which ClawBridge bind-mounts from `data/v2-sessions/<agent-group-id>/.claude-shared/settings.json`. Set `"model": "gemma4:latest"` (or whatever Ollama model you've pulled) there. Use the exact name from `ollama list`.
 
 Model selection considerations for Apple Silicon:
 

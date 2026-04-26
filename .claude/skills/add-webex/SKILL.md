@@ -9,7 +9,7 @@ Adds Cisco Webex support via the Chat SDK bridge.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Webex adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the Webex adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 

@@ -18,11 +18,11 @@ Adds WeChat support via **iLink Bot API** — the first-party Tencent API for pe
 
 - A **personal WeChat account** with the mobile app installed
 - A phone to scan the QR code for login
-- Node.js >= 20 (already required by NanoClaw)
+- Node.js >= 20 (already required by ClawBridge)
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the WeChat adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the WeChat adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 
@@ -82,18 +82,18 @@ Sync to container: `mkdir -p data/env && cp .env data/env/env`
 
 ### 2. Start the service and scan the QR
 
-Restart NanoClaw:
+Restart ClawBridge:
 
 ```bash
-systemctl --user restart nanoclaw   # Linux
+systemctl --user restart clawbridge   # Linux
 # or
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
+launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
 ```
 
 The adapter will print a **QR URL** to the logs and save it to `data/wechat/qr.txt`:
 
 ```bash
-tail -f logs/nanoclaw.log | grep WeChat
+tail -f logs/clawbridge.log | grep WeChat
 # or
 cat data/wechat/qr.txt
 ```
@@ -147,7 +147,7 @@ Have the sender message the bot again — the agent should respond.
 
 ## Operational notes
 
-- **Only one instance can use a given token at a time.** Don't run multiple NanoClaw instances pointing to the same `data/wechat/auth.json`.
+- **Only one instance can use a given token at a time.** Don't run multiple ClawBridge instances pointing to the same `data/wechat/auth.json`.
 - **Re-login on session expiry:** if you see `WeChat: session expired` in logs, delete `data/wechat/auth.json` and restart — you'll be asked to re-scan.
 - **Sync cursor persistence:** `data/wechat/sync-buf.txt` holds the long-poll cursor. Deleting it replays recent history on next start; don't delete it in normal operation.
 - **Account safety:** this uses the official Tencent API, so account bans for bot automation aren't a risk. That said, don't spam — normal rate limits still apply.
@@ -167,4 +167,4 @@ Otherwise, restart the service to pick up the new channel and wiring.
 - **supports-threads**: no (WeChat has no reply threads)
 - **typical-use**: Long-poll — the adapter holds a persistent connection to Tencent's iLink API and receives messages in real time. No webhook URL needed.
 - **default-isolation**: `shared` session mode per messaging group (DM or room). Use `strict` sender policy if you want only specific users to reach the agent; `public` opens it to anyone who messages the bot.
-- **post-install-wiring**: Use the `wire-dm.ts` helper (see the "Wire your first DM" section above) if running this skill standalone. If running as part of `bash nanoclaw.sh`, `init-first-agent.ts` handles wiring — just pass the `platform-id` and `admin-user-id` captured above.
+- **post-install-wiring**: Use the `wire-dm.ts` helper (see the "Wire your first DM" section above) if running this skill standalone. If running as part of `bash clawbridge.sh`, `init-first-agent.ts` handles wiring — just pass the `platform-id` and `admin-user-id` captured above.

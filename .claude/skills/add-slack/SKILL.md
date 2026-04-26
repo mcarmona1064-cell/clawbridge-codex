@@ -9,7 +9,7 @@ Adds Slack support via the Chat SDK bridge.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Slack adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the Slack adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 
@@ -58,7 +58,7 @@ pnpm run build
 ### Create Slack App
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App** > **From scratch**
-2. Name it (e.g., "NanoClaw") and select your workspace
+2. Name it (e.g., "ClawBridge") and select your workspace
 3. Go to **OAuth & Permissions** and add Bot Token Scopes:
    - `chat:write`, `channels:history`, `groups:history`, `im:history`, `channels:read`, `groups:read`, `users:read`, `reactions:write`
 4. Click **Install to Workspace** and copy the **Bot User OAuth Token** (`xoxb-...`)

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/nanoclaw-logo.png" alt="NanoClaw" width="400">
+  <img src="assets/clawbridge-logo.png" alt="ClawBridge" width="400">
 </p>
 
 <p align="center">
@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://nanoclaw.dev">nanoclaw.dev</a>&nbsp; • &nbsp;
-  <a href="https://docs.nanoclaw.dev">ドキュメント</a>&nbsp; • &nbsp;
+  <a href="https://clawbridge.dev">clawbridge.dev</a>&nbsp; • &nbsp;
+  <a href="https://docs.clawbridge.dev">ドキュメント</a>&nbsp; • &nbsp;
   <a href="README.md">English</a>&nbsp; • &nbsp;
   <a href="README_zh.md">中文</a>&nbsp; • &nbsp;
   <a href="https://discord.gg/VDdww8qS42"><img src="https://img.shields.io/discord/1470188214710046894?label=Discord&logo=discord&v=2" alt="Discord" valign="middle"></a>&nbsp; • &nbsp;
@@ -17,29 +17,29 @@
 
 ---
 
-## NanoClawを作った理由
+## ClawBridgeを作った理由
 
 [OpenClaw](https://github.com/openclaw/openclaw)は素晴らしいプロジェクトですが、自分が理解しきれない複雑なソフトウェアに生活へのフルアクセスを与えたまま安心して眠れるとは思えませんでした。OpenClawは約50万行のコード、53の設定ファイル、70以上の依存関係を持っています。セキュリティはアプリケーションレベル（許可リスト、ペアリングコード）であり、真のOSレベルの分離ではありません。すべてが共有メモリを持つ1つのNodeプロセスで動作します。
 
-NanoClawは同じコア機能を提供しますが、理解できる規模のコードベースで実現しています。1つのプロセスと少数のファイル。Claudeエージェントは単なるパーミッションチェックの背後ではなく、ファイルシステム分離された独自のLinuxコンテナで実行されます。
+ClawBridgeは同じコア機能を提供しますが、理解できる規模のコードベースで実現しています。1つのプロセスと少数のファイル。Claudeエージェントは単なるパーミッションチェックの背後ではなく、ファイルシステム分離された独自のLinuxコンテナで実行されます。
 
 ## クイックスタート
 
 ```bash
-git clone https://github.com/qwibitai/nanoclaw.git nanoclaw-v2
-cd nanoclaw-v2
-bash nanoclaw.sh
+git clone https://github.com/other2368-byte/clawbridge-agent.git clawbridge-v2
+cd clawbridge-v2
+bash clawbridge.sh
 ```
 
-`nanoclaw.sh`は、まっさらなマシンから、メッセージを送れる名前付きエージェントが動く状態までを一気通貫で案内します。NodeやpnpmやDockerが無ければインストールし、AnthropicクレデンシャルをOneCLIに登録し、エージェントコンテナをビルドし、最初のチャネル（Telegram、Discord、WhatsApp、またはローカルCLI）とペアリングします。途中でステップが失敗すれば自動的にClaude Codeが呼び出され、原因を診断して中断箇所から再開します。
+`clawbridge.sh`は、まっさらなマシンから、メッセージを送れる名前付きエージェントが動く状態までを一気通貫で案内します。NodeやpnpmやDockerが無ければインストールし、AnthropicクレデンシャルをOneCLIに登録し、エージェントコンテナをビルドし、最初のチャネル（Telegram、Discord、WhatsApp、またはローカルCLI）とペアリングします。途中でステップが失敗すれば自動的にClaude Codeが呼び出され、原因を診断して中断箇所から再開します。
 
 ## 設計思想
 
-**理解できる規模。** 1つのプロセス、少数のソースファイル、マイクロサービスなし。NanoClawのコードベース全体を把握したいなら、Claude Codeに説明を求めれば十分です。
+**理解できる規模。** 1つのプロセス、少数のソースファイル、マイクロサービスなし。ClawBridgeのコードベース全体を把握したいなら、Claude Codeに説明を求めれば十分です。
 
 **分離によるセキュリティ。** エージェントはLinuxコンテナで実行され、明示的にマウントされたものだけが見えます。コマンドはホストではなくコンテナ内で実行されるため、Bashアクセスも安全です。
 
-**個人ユーザー向け。** NanoClawはモノリシックなフレームワークではなく、各ユーザーのニーズに正確にフィットするソフトウェアです。肥大化するのではなく、オーダーメイドであるよう設計されています。自分のフォークを作り、Claude Codeにニーズに合わせて変更させます。
+**個人ユーザー向け。** ClawBridgeはモノリシックなフレームワークではなく、各ユーザーのニーズに正確にフィットするソフトウェアです。肥大化するのではなく、オーダーメイドであるよう設計されています。自分のフォークを作り、Claude Codeにニーズに合わせて変更させます。
 
 **カスタマイズ＝コード変更。** 設定の肥大化はありません。動作を変えたいならコードを変える。コードベースは変更しても安全な規模です。
 
@@ -47,7 +47,7 @@ bash nanoclaw.sh
 
 **機能ではなくスキル。** トランクにはレジストリとインフラのみを同梱し、個別のチャネルアダプターや代替プロバイダーは含めません。チャネル（Discord、Slack、Telegram、WhatsAppなど）は長期運用される`channels`ブランチに、代替プロバイダー（OpenCode、Ollama）は`providers`ブランチに置かれます。`/add-telegram`や`/add-opencode`などを実行すると、スキルが必要なモジュールだけを正確にフォークへコピーします。要求していない機能は一切入りません。
 
-**最高のハーネス、最高のモデル。** NanoClawはAnthropic公式のClaude Agent SDK経由でネイティブにClaude Codeを使用します。最新のClaudeモデルとClaude Codeの全ツールセット（自分のNanoClawフォークを変更・拡張する能力を含む）が手に入ります。他プロバイダーはドロップイン・オプションです。OpenAIのCodex（ChatGPTサブスクリプションまたはAPIキー）向けには`/add-codex`、OpenCode経由のOpenRouter、Google、DeepSeekなどには`/add-opencode`、ローカルのオープンウェイトモデルには`/add-ollama-provider`。プロバイダーはエージェントグループごとに設定可能です。
+**最高のハーネス、最高のモデル。** ClawBridgeはAnthropic公式のClaude Agent SDK経由でネイティブにClaude Codeを使用します。最新のClaudeモデルとClaude Codeの全ツールセット（自分のClawBridgeフォークを変更・拡張する能力を含む）が手に入ります。他プロバイダーはドロップイン・オプションです。OpenAIのCodex（ChatGPTサブスクリプションまたはAPIキー）向けには`/add-codex`、OpenCode経由のOpenRouter、Google、DeepSeekなどには`/add-opencode`、ローカルのオープンウェイトモデルには`/add-ollama-provider`。プロバイダーはエージェントグループごとに設定可能です。
 
 ## サポート機能
 
@@ -78,7 +78,7 @@ bash nanoclaw.sh
 
 ## カスタマイズ
 
-NanoClawは設定ファイルを使いません。変更したいときは、Claude Codeにやりたいことを伝えるだけです：
+ClawBridgeは設定ファイルを使いません。変更したいときは、Claude Codeにやりたいことを伝えるだけです：
 
 - 「トリガーワードを@Bobに変更して」
 - 「今後はレスポンスをもっと短く直接的にして」
@@ -144,15 +144,15 @@ Dockerはクロスプラットフォーム対応（macOS、Linux、WSL2経由の
 
 **LinuxやWindowsで実行できますか？**
 
-はい。Dockerがデフォルトのランタイムで、macOS、Linux、Windows（WSL2経由）で動作します。`bash nanoclaw.sh`を実行するだけです。
+はい。Dockerがデフォルトのランタイムで、macOS、Linux、Windows（WSL2経由）で動作します。`bash clawbridge.sh`を実行するだけです。
 
 **セキュリティは大丈夫ですか？**
 
-エージェントはアプリケーションレベルのパーミッションチェックではなく、コンテナ内で実行されます。明示的にマウントされたディレクトリのみアクセス可能です。クレデンシャルはコンテナに渡されず、アウトバウンドAPIリクエストは[OneCLI Agent Vault](https://github.com/onecli/onecli)を経由し、プロキシレベルで認証を注入し、レートリミットやアクセスポリシーをサポートします。実行するものはレビューすべきですが、コードベースは実際にレビュー可能な規模です。完全なセキュリティモデルについては[セキュリティドキュメント](https://docs.nanoclaw.dev/concepts/security)を参照してください。
+エージェントはアプリケーションレベルのパーミッションチェックではなく、コンテナ内で実行されます。明示的にマウントされたディレクトリのみアクセス可能です。クレデンシャルはコンテナに渡されず、アウトバウンドAPIリクエストは[OneCLI Agent Vault](https://github.com/onecli/onecli)を経由し、プロキシレベルで認証を注入し、レートリミットやアクセスポリシーをサポートします。実行するものはレビューすべきですが、コードベースは実際にレビュー可能な規模です。完全なセキュリティモデルについては[セキュリティドキュメント](https://docs.clawbridge.dev/concepts/security)を参照してください。
 
 **なぜ設定ファイルがないのか？**
 
-設定の肥大化を避けたいからです。すべてのユーザーがNanoClawをカスタマイズし、汎用的なシステムを設定するのではなくコードが自分の望み通りに動くようにすべきです。設定ファイルが欲しければClaudeに追加するよう伝えれば実現できます。
+設定の肥大化を避けたいからです。すべてのユーザーがClawBridgeをカスタマイズし、汎用的なシステムを設定するのではなくコードが自分の望み通りに動くようにすべきです。設定ファイルが欲しければClaudeに追加するよう伝えれば実現できます。
 
 **サードパーティやオープンソースモデルを使えますか？**
 
@@ -167,11 +167,11 @@ ANTHROPIC_AUTH_TOKEN=your-token-here
 
 **問題のデバッグ方法は？**
 
-Claude Codeに聞いてください。「スケジューラーが動いていないのはなぜ？」「最近のログには何がある？」「このメッセージに返信がなかったのはなぜ？」これがNanoClawの基盤となるAIネイティブなアプローチです。
+Claude Codeに聞いてください。「スケジューラーが動いていないのはなぜ？」「最近のログには何がある？」「このメッセージに返信がなかったのはなぜ？」これがClawBridgeの基盤となるAIネイティブなアプローチです。
 
 **セットアップがうまくいかない場合は？**
 
-ステップが失敗した場合、`nanoclaw.sh`は診断と再開のためにClaude Codeへ制御を渡します。それでも解決しなければ、`claude`を実行して`/debug`を呼び出してください。他のユーザーにも影響しそうな問題をClaudeが特定した場合は、該当のセットアップステップまたはスキルにPRを送ってください。
+ステップが失敗した場合、`clawbridge.sh`は診断と再開のためにClaude Codeへ制御を渡します。それでも解決しなければ、`claude`を実行して`/debug`を呼び出してください。他のユーザーにも影響しそうな問題をClaudeが特定した場合は、該当のセットアップステップまたはスキルにPRを送ってください。
 
 **どのような変更がコードベースに受け入れられますか？**
 
@@ -187,7 +187,7 @@ Claude Codeに聞いてください。「スケジューラーが動いていな
 
 ## 変更履歴
 
-破壊的変更については[CHANGELOG.md](CHANGELOG.md)を、完全なリリース履歴はドキュメントサイトの[full release history](https://docs.nanoclaw.dev/changelog)を参照してください。
+破壊的変更については[CHANGELOG.md](CHANGELOG.md)を、完全なリリース履歴はドキュメントサイトの[full release history](https://docs.clawbridge.dev/changelog)を参照してください。
 
 ## ライセンス
 

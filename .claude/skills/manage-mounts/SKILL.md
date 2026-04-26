@@ -5,12 +5,12 @@ description: Configure which host directories agent containers can access. View,
 
 # Manage Mounts
 
-Configure which host directories NanoClaw agent containers can access. The mount allowlist lives at `~/.config/nanoclaw/mount-allowlist.json`.
+Configure which host directories ClawBridge agent containers can access. The mount allowlist lives at `~/.config/clawbridge/mount-allowlist.json`.
 
 ## Show Current Config
 
 ```bash
-cat ~/.config/nanoclaw/mount-allowlist.json 2>/dev/null || echo "No mount allowlist configured"
+cat ~/.config/clawbridge/mount-allowlist.json 2>/dev/null || echo "No mount allowlist configured"
 ```
 
 Show the current config to the user in a readable format: which directories are allowed, whether non-main agents are read-only.
@@ -43,5 +43,5 @@ npx tsx setup/index.ts --step mounts --force -- --empty
 
 Restart the service so containers pick up the new config:
 
-- macOS: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`
-- Linux: `systemctl --user restart nanoclaw`
+- macOS: `launchctl kickstart -k gui/$(id -u)/com.clawbridge`
+- Linux: `systemctl --user restart clawbridge`

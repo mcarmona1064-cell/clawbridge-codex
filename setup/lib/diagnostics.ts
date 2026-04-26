@@ -4,7 +4,7 @@
  * uses in setup/lib/diagnostics.sh) so events from the bash and node
  * halves of a single install join into one funnel.
  *
- * Honors NANOCLAW_NO_DIAGNOSTICS=1.
+ * Honors CLAWBRIDGE_NO_DIAGNOSTICS=1.
  */
 import { randomUUID } from 'crypto';
 import fs from 'fs';
@@ -42,7 +42,7 @@ export function emit(
   event: string,
   props: Record<string, string | number | boolean | undefined> = {},
 ): void {
-  if (process.env.NANOCLAW_NO_DIAGNOSTICS === '1') return;
+  if (process.env.CLAWBRIDGE_NO_DIAGNOSTICS === '1') return;
 
   const cleaned: Record<string, unknown> = { platform: process.platform };
   for (const [k, v] of Object.entries(props)) {

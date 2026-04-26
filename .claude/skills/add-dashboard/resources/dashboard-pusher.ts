@@ -1,5 +1,5 @@
 /**
- * Dashboard pusher — collects NanoClaw state and POSTs a JSON
+ * Dashboard pusher — collects ClawBridge state and POSTs a JSON
  * snapshot to the dashboard's /api/ingest endpoint every interval.
  */
 import fs from 'fs';
@@ -78,7 +78,7 @@ function postJson(config: PusherConfig, urlPath: string, data: unknown): void {
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 function startLogTail(config: PusherConfig): void {
-  const logFile = path.resolve(process.cwd(), 'logs', 'nanoclaw.log');
+  const logFile = path.resolve(process.cwd(), 'logs', 'clawbridge.log');
   if (!fs.existsSync(logFile)) return;
 
   // Send last 200 lines as backfill

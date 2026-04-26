@@ -9,7 +9,7 @@
 # and `sudo systemctl start docker` are already in the allowlist.
 set -euo pipefail
 
-echo "=== NANOCLAW SETUP: INSTALL_DOCKER ==="
+echo "=== CLAWBRIDGE SETUP: INSTALL_DOCKER ==="
 
 if command -v docker >/dev/null 2>&1; then
   echo "STATUS: already-installed"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# NanoClaw — end-to-end setup entry point.
+# ClawBridge — end-to-end setup entry point.
 #
 # Runs two parts from the user's perspective as one continuous flow:
 #   - bash-side: install the basics (Node + pnpm + native modules) under a
@@ -16,7 +16,7 @@
 #   3. Raw per-step log  — logs/setup-steps/NN-name.log (full verbatim output)
 #
 # Config via env — passed through unchanged:
-#   NANOCLAW_SKIP  comma-separated setup:auto step names to skip
+#   CLAWBRIDGE_SKIP  comma-separated setup:auto step names to skip
 #   SECRET_NAME    OneCLI secret name (default: Anthropic)
 #   HOST_PATTERN   OneCLI host pattern (default: api.anthropic.com)
 
@@ -49,7 +49,7 @@ write_header() {
   commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
   {
     echo "## ${ts} · setup:auto started"
-    echo "  invocation: nanoclaw.sh"
+    echo "  invocation: clawbridge.sh"
     echo "  user: $(whoami)"
     echo "  cwd: ${PROJECT_ROOT}"
     echo "  branch: ${branch}"
@@ -129,7 +129,7 @@ rm -f  "$PROGRESS_LOG"
 mkdir -p "$STEPS_DIR" "$LOGS_DIR"
 write_header
 
-# NanoClaw wordmark + subtitle — setup:auto will see NANOCLAW_BOOTSTRAPPED=1
+# ClawBridge wordmark + subtitle — setup:auto will see CLAWBRIDGE_BOOTSTRAPPED=1
 # and skip printing these again, so the flow stays visually continuous.
 printf '\n  %s%s\n' "$(bold 'Nano')" "$(brand_bold 'Claw')"
 printf '  %s\n\n' "$(dim 'Setting up your personal AI assistant')"
@@ -142,7 +142,7 @@ printf '  %s\n\n' "$(dim 'Setting up your personal AI assistant')"
 # brew's own interactive sudo/CLT prompts stay readable.
 if [ "$(uname -s)" = "Darwin" ] && ! command -v brew >/dev/null 2>&1; then
   printf '  %s\n' \
-    "$(dim "Homebrew isn't installed. NanoClaw uses it to install Node and Docker on your Mac.")"
+    "$(dim "Homebrew isn't installed. ClawBridge uses it to install Node and Docker on your Mac.")"
   printf '  %s\n\n' \
     "$(dim "This also installs Apple's Command Line Tools, which can take 5-10 minutes.")"
   read -r -p "  $(bold 'Install Homebrew now?') [Y/n] " BREW_ANS </dev/tty
@@ -169,14 +169,14 @@ if [ "$(uname -s)" = "Darwin" ] && ! command -v brew >/dev/null 2>&1; then
       if ! command -v brew >/dev/null 2>&1; then
         printf '\n  %s %s\n' "$(red '✗')" "Homebrew install didn't complete."
         printf '  %s\n\n' \
-          "$(dim 'Install manually from https://brew.sh and re-run: bash nanoclaw.sh')"
+          "$(dim 'Install manually from https://brew.sh and re-run: bash clawbridge.sh')"
         exit 1
       fi
       printf '\n'
       ;;
     *)
       printf '\n  %s\n\n' \
-        "$(dim 'NanoClaw needs Homebrew. Install it from https://brew.sh and re-run.')"
+        "$(dim 'ClawBridge needs Homebrew. Install it from https://brew.sh and re-run.')"
       exit 1
       ;;
   esac
@@ -190,16 +190,16 @@ BOOTSTRAP_START=$(date +%s)
 
 # One-line "why" that teaches a differentiator while the user waits.
 printf '%s  %s\n' "$(gray '│')" \
-  "$(dim "NanoClaw is small and runs entirely on your machine. Yours to modify.")"
+  "$(dim "ClawBridge is small and runs entirely on your machine. Yours to modify.")"
 spinner_start "$BOOTSTRAP_LABEL"
 
 # Run in the background so we can tick elapsed time. Capture exit code via
 # a tmpfile (subshell $? is lost after the while loop finishes).
-BOOTSTRAP_EXIT_FILE=$(mktemp -t nanoclaw-bootstrap-exit.XXXXXX)
+BOOTSTRAP_EXIT_FILE=$(mktemp -t clawbridge-bootstrap-exit.XXXXXX)
 (
   # setup.sh's legacy `log()` writes to a file; point it at the raw log
   # so its verbose entries land alongside the stdout we're capturing.
-  export NANOCLAW_BOOTSTRAP_LOG="$BOOTSTRAP_RAW"
+  export CLAWBRIDGE_BOOTSTRAP_LOG="$BOOTSTRAP_RAW"
   if bash setup.sh > "$BOOTSTRAP_RAW" 2>&1; then
     echo 0 > "$BOOTSTRAP_EXIT_FILE"
   else
@@ -240,10 +240,10 @@ fi
 
 # ─── hand off to setup:auto ────────────────────────────────────────────
 
-# NANOCLAW_BOOTSTRAPPED=1 tells setup/auto.ts to skip the wordmark (we
+# CLAWBRIDGE_BOOTSTRAPPED=1 tells setup/auto.ts to skip the wordmark (we
 # already printed it) and to append to the progression log rather than
 # wipe it.
-export NANOCLAW_BOOTSTRAPPED=1
+export CLAWBRIDGE_BOOTSTRAPPED=1
 
 # setup.sh may have just installed pnpm via npm into a prefix that's not on
 # our PATH (custom `npm config set prefix`, or the default prefix missing
@@ -256,7 +256,7 @@ if ! command -v pnpm >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
   fi
 fi
 
-# --silent suppresses pnpm's `> nanoclaw@2.0.0 setup:auto / > tsx setup/auto.ts`
+# --silent suppresses pnpm's `> clawbridge@2.0.0 setup:auto / > tsx setup/auto.ts`
 # preamble so the flow continues visually from "Basics installed" straight
 # into setup:auto's spinner. exec so signals (Ctrl-C) propagate directly.
 exec pnpm --silent run setup:auto

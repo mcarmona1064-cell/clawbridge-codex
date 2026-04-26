@@ -17,20 +17,20 @@ const PROJECT_ROOT = process.cwd();
 const HOME_DIR = process.env.HOME || os.homedir();
 
 // Mount security: allowlist stored OUTSIDE project root, never mounted into containers
-export const MOUNT_ALLOWLIST_PATH = path.join(HOME_DIR, '.config', 'nanoclaw', 'mount-allowlist.json');
-export const SENDER_ALLOWLIST_PATH = path.join(HOME_DIR, '.config', 'nanoclaw', 'sender-allowlist.json');
+export const MOUNT_ALLOWLIST_PATH = path.join(HOME_DIR, '.config', 'clawbridge', 'mount-allowlist.json');
+export const SENDER_ALLOWLIST_PATH = path.join(HOME_DIR, '.config', 'clawbridge', 'sender-allowlist.json');
 export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
 export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 
 // Per-checkout image tag so two installs on the same host don't share
-// `nanoclaw-agent:latest` and clobber each other on rebuild.
+// `clawbridge-agent:latest` and clobber each other on rebuild.
 export const CONTAINER_IMAGE_BASE = process.env.CONTAINER_IMAGE_BASE || getContainerImageBase(PROJECT_ROOT);
 export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || getDefaultContainerImage(PROJECT_ROOT);
 // Install slug — stamped onto every spawned container via --label so
 // cleanupOrphans only reaps containers from this install, not peers.
 export const INSTALL_SLUG = getInstallSlug(PROJECT_ROOT);
-export const CONTAINER_INSTALL_LABEL = `nanoclaw-install=${INSTALL_SLUG}`;
+export const CONTAINER_INSTALL_LABEL = `clawbridge-install=${INSTALL_SLUG}`;
 export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10);
 export const CONTAINER_MAX_OUTPUT_SIZE = parseInt(process.env.CONTAINER_MAX_OUTPUT_SIZE || '10485760', 10); // 10MB default
 export const ONECLI_URL = process.env.ONECLI_URL || envConfig.ONECLI_URL;

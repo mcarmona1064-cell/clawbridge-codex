@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 
 import { migrateMessagesInTable } from './session-db.js';
 
-const TEST_DIR = '/tmp/nanoclaw-session-db-test';
+const TEST_DIR = '/tmp/clawbridge-session-db-test';
 const DB_PATH = path.join(TEST_DIR, 'inbound.db');
 
 afterEach(() => {

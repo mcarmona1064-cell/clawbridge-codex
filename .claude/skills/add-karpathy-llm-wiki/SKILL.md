@@ -1,11 +1,11 @@
 ---
 name: add-karpathy-llm-wiki
-description: Add a persistent wiki knowledge base to a NanoClaw group. Based on Karpathy's LLM Wiki pattern. Triggers on "add wiki", "wiki", "knowledge base", "llm wiki", "karpathy wiki".
+description: Add a persistent wiki knowledge base to a ClawBridge group. Based on Karpathy's LLM Wiki pattern. Triggers on "add wiki", "wiki", "knowledge base", "llm wiki", "karpathy wiki".
 ---
 
 # Add Karpathy LLM Wiki
 
-Set up a persistent wiki knowledge base on NanoClaw, based on Karpathy's LLM Wiki pattern.
+Set up a persistent wiki knowledge base on ClawBridge, based on Karpathy's LLM Wiki pattern.
 
 ## Step 1: Read the pattern
 
@@ -71,7 +71,7 @@ AskUserQuestion: "Want periodic wiki health checks?"
 2. **Monthly**
 3. **Skip** — lint manually
 
-If yes, create a NanoClaw scheduled task that runs in the wiki group. This is NOT a Claude Code cron job — it's a NanoClaw group task that runs in the agent container. Insert it into the SQLite database:
+If yes, create a ClawBridge scheduled task that runs in the wiki group. This is NOT a Claude Code cron job — it's a ClawBridge group task that runs in the agent container. Insert it into the SQLite database:
 
 ```bash
 pnpm exec tsx -e "
@@ -103,8 +103,8 @@ Use the group's `folder` and `chat_jid` from the registered groups table. Cron e
 ```bash
 pnpm run build
 ./container/build.sh
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-# Linux: systemctl --user restart nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.clawbridge  # macOS
+# Linux: systemctl --user restart clawbridge
 ```
 
 Tell the user to test by sending a source to the wiki group.

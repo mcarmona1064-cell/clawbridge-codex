@@ -29,7 +29,7 @@ Inbound messages are labeled with `from="name"` so you can tell which destinatio
 
 ### Mid-turn updates
 
-Use the `mcp__nanoclaw__send_message` tool to send a message mid-work (before your final output). If you have one destination, `to` is optional; with multiple, specify it. Pace your updates to the length of the work:
+Use the `mcp__clawbridge__send_message` tool to send a message mid-work (before your final output). If you have one destination, `to` is optional; with multiple, specify it. Pace your updates to the length of the work:
 
 - **Short work (a few seconds, ≤2 quick tool calls):** Don't narrate. Just do it and put the result in your final response.
 - **Longer work (many tool calls, web searches, installs, sub-agents):** Send a short acknowledgment right away ("On it — checking the logs now") so the user knows you got the message.
@@ -126,7 +126,7 @@ request_rebuild({ reason: "Add memory MCP server" })
 
 ## Task Scripts
 
-For any recurring task, use `schedule_task`. This is the scheduling path — tasks persist across sessions and restarts, and support the pre-task `script` hook described below. Other scheduling tools you might discover (e.g. `CronCreate`, `ScheduleWakeup`) are session-scoped SDK builtins and won't behave the way NanoClaw users expect, so stick with `schedule_task`.
+For any recurring task, use `schedule_task`. This is the scheduling path — tasks persist across sessions and restarts, and support the pre-task `script` hook described below. Other scheduling tools you might discover (e.g. `CronCreate`, `ScheduleWakeup`) are session-scoped SDK builtins and won't behave the way ClawBridge users expect, so stick with `schedule_task`.
 
 To inspect or change existing tasks, use `list_tasks` (returns one row per series with the stable id) and `update_task` / `cancel_task` / `pause_task` / `resume_task`. Prefer `update_task` over cancel + reschedule — it preserves the series id the user already knows.
 

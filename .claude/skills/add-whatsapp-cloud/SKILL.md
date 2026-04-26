@@ -5,11 +5,11 @@ description: Add WhatsApp Business Cloud API channel via Chat SDK. Official Meta
 
 # Add WhatsApp Cloud API Channel
 
-Connect NanoClaw to WhatsApp via the official Meta WhatsApp Business Cloud API.
+Connect ClawBridge to WhatsApp via the official Meta WhatsApp Business Cloud API.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the WhatsApp Cloud adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the WhatsApp Cloud adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 

@@ -21,10 +21,10 @@ vi.mock('./container-runner.js', () => ({
 
 vi.mock('./config.js', async () => {
   const actual = await vi.importActual<typeof import('./config.js')>('./config.js');
-  return { ...actual, DATA_DIR: '/tmp/nanoclaw-test-delivery' };
+  return { ...actual, DATA_DIR: '/tmp/clawbridge-test-delivery' };
 });
 
-const TEST_DIR = '/tmp/nanoclaw-test-delivery';
+const TEST_DIR = '/tmp/clawbridge-test-delivery';
 
 import { initTestDb, closeDb, runMigrations, createAgentGroup, createMessagingGroup } from './db/index.js';
 import { resolveSession, outboundDbPath } from './session-manager.js';

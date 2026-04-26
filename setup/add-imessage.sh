@@ -29,7 +29,7 @@ emit_status() {
   local status=$1 error=${2:-}
   local already=${ADAPTER_ALREADY_INSTALLED:-false}
   local mode=${IMESSAGE_LOCAL:-}
-  echo "=== NANOCLAW SETUP: ADD_IMESSAGE ==="
+  echo "=== CLAWBRIDGE SETUP: ADD_IMESSAGE ==="
   echo "STATUS: ${status}"
   echo "ADAPTER_VERSION: ${ADAPTER_VERSION}"
   echo "ADAPTER_ALREADY_INSTALLED: ${already}"

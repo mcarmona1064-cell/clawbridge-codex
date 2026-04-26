@@ -24,7 +24,7 @@ async function runScript(script: string, args: object): Promise<SkillResult> {
   return new Promise((resolve) => {
     const proc = spawn('pnpm', ['exec', 'tsx', scriptPath], {
       cwd: process.cwd(),
-      env: { ...process.env, NANOCLAW_ROOT: process.cwd() },
+      env: { ...process.env, CLAWBRIDGE_ROOT: process.cwd() },
       stdio: ['pipe', 'pipe', 'pipe']
     });
 

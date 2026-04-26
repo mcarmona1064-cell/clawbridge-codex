@@ -1,6 +1,6 @@
 /**
  * Extract a channel credential from an OpenClaw configuration and write it
- * directly to the NanoClaw .env file.
+ * directly to the ClawBridge .env file.
  *
  * Usage: pnpm exec tsx .claude/skills/migrate-from-openclaw/scripts/extract-channel-credentials.ts \
  *          --channel telegram --state-dir ~/.openclaw --write-env .env
@@ -17,7 +17,7 @@
  * the target .env file so the agent never sees raw secrets.
  *
  * Emits a status block on stdout:
- *   === NANOCLAW MIGRATE: CREDENTIAL ===
+ *   === CLAWBRIDGE MIGRATE: CREDENTIAL ===
  *   ...
  *   === END ===
  */
@@ -76,7 +76,7 @@ function parseDotenv(filePath: string): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 function emitStatus(fields: Record<string, string | number | boolean>): void {
-  const lines = ['=== NANOCLAW MIGRATE: CREDENTIAL ==='];
+  const lines = ['=== CLAWBRIDGE MIGRATE: CREDENTIAL ==='];
   for (const [key, value] of Object.entries(fields)) {
     lines.push(`${key}: ${value}`);
   }
@@ -172,7 +172,7 @@ function resolveSecretInput(
 interface ChannelCredentialSpec {
   // Fields to look for in the channel config
   fields: string[];
-  // Corresponding NanoClaw env var names
+  // Corresponding ClawBridge env var names
   envVars: string[];
 }
 
@@ -293,7 +293,7 @@ function main(): void {
 
   // WhatsApp special case: no token, auth-state based.
   // OpenClaw stores Baileys auth at <stateDir>/credentials/whatsapp/<accountId>/
-  // using useMultiFileAuthState (same as NanoClaw). The files are directly compatible.
+  // using useMultiFileAuthState (same as ClawBridge). The files are directly compatible.
   if (channel === 'whatsapp') {
     const authPaths = [
       path.join(stateDir, 'credentials', 'whatsapp', 'default'),
@@ -341,7 +341,7 @@ function main(): void {
     emitStatus({
       CHANNEL: channel,
       HAS_CREDENTIAL: false,
-      NOTE: `Channel "${channel}" is not supported by NanoClaw. Supported: telegram, discord, slack, whatsapp.`,
+      NOTE: `Channel "${channel}" is not supported by ClawBridge. Supported: telegram, discord, slack, whatsapp.`,
     });
     return;
   }
@@ -444,7 +444,7 @@ function main(): void {
     HAS_CREDENTIAL: !!primary.resolved,
     CREDENTIAL_SOURCE: primary.source,
     CREDENTIAL_MASKED: primary.masked || 'none',
-    NANOCLAW_ENV_VAR: primary.envVar,
+    CLAWBRIDGE_ENV_VAR: primary.envVar,
   };
 
   if (writeEnv && written > 0) {
@@ -463,7 +463,7 @@ function main(): void {
       fields[`HAS_CREDENTIAL${suffix}`] = !!extra.resolved;
       fields[`CREDENTIAL_SOURCE${suffix}`] = extra.source;
       fields[`CREDENTIAL_MASKED${suffix}`] = extra.masked || 'none';
-      fields[`NANOCLAW_ENV_VAR${suffix}`] = extra.envVar;
+      fields[`CLAWBRIDGE_ENV_VAR${suffix}`] = extra.envVar;
       if (extra.note) {
         fields[`NOTE${suffix}`] = extra.note;
       }

@@ -1,6 +1,6 @@
 ---
 name: add-emacs
-description: Add Emacs as a channel. Opens an interactive chat buffer and org-mode integration so you can talk to NanoClaw from within Emacs (Doom, Spacemacs, or vanilla). Local HTTP bridge — no bot token or external service needed.
+description: Add Emacs as a channel. Opens an interactive chat buffer and org-mode integration so you can talk to ClawBridge from within Emacs (Doom, Spacemacs, or vanilla). Local HTTP bridge — no bot token or external service needed.
 ---
 
 # Add Emacs Channel
@@ -10,21 +10,21 @@ Adds Emacs support via a local HTTP bridge. Works with Doom Emacs, Spacemacs, an
 ## What you can do with this
 
 - **Ask while coding** — open the chat buffer (`C-c n c` / `SPC N c`), ask about a function or error without leaving Emacs
-- **Code review** — select a region and send it with `nanoclaw-org-send`; the response appears as a child heading inline in your org file
+- **Code review** — select a region and send it with `clawbridge-org-send`; the response appears as a child heading inline in your org file
 - **Meeting notes** — send an org agenda entry; get a summary or action item list back as a child node
 - **Draft writing** — send org prose; receive revisions or continuations in place
 - **Research capture** — ask a question directly in your org notes; the answer lands exactly where you need it
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Emacs adapter and the Lisp client in from the `channels` branch. Native HTTP bridge — no Chat SDK, no adapter package.
+ClawBridge doesn't ship channels in trunk. This skill copies the Emacs adapter and the Lisp client in from the `channels` branch. Native HTTP bridge — no Chat SDK, no adapter package.
 
 ### Pre-flight (idempotent)
 
 Skip to **Enable** if all of these are already in place:
 
 - `src/channels/emacs.ts` exists
-- `emacs/nanoclaw.el` exists
+- `emacs/clawbridge.el` exists
 - `src/channels/index.ts` contains `import './emacs.js';`
 
 Otherwise continue. Every step below is safe to re-run.
@@ -41,7 +41,7 @@ git fetch origin channels
 mkdir -p emacs
 git show origin/channels:src/channels/emacs.ts      > src/channels/emacs.ts
 git show origin/channels:src/channels/emacs.test.ts > src/channels/emacs.test.ts
-git show origin/channels:emacs/nanoclaw.el          > emacs/nanoclaw.el
+git show origin/channels:emacs/clawbridge.el          > emacs/clawbridge.el
 ```
 
 ### 3. Append the self-registration import
@@ -101,7 +101,7 @@ pnpm exec tsx setup/index.ts --step register -- \
 
 ## Configure Emacs
 
-`nanoclaw.el` needs only Emacs 27.1+ builtins (`url`, `json`, `org`) — no package manager.
+`clawbridge.el` needs only Emacs 27.1+ builtins (`url`, `json`, `org`) — no package manager.
 
 AskUserQuestion: Which Emacs distribution are you using?
 - **Doom Emacs** — `config.el` with `map!` keybindings
@@ -111,13 +111,13 @@ AskUserQuestion: Which Emacs distribution are you using?
 **Doom Emacs** — add to `~/.config/doom/config.el` (or `~/.doom.d/config.el`):
 
 ```elisp
-;; NanoClaw — personal AI assistant channel
-(load (expand-file-name "~/src/nanoclaw/emacs/nanoclaw.el"))
+;; ClawBridge — personal AI assistant channel
+(load (expand-file-name "~/src/clawbridge/emacs/clawbridge.el"))
 
 (map! :leader
-      :prefix ("N" . "NanoClaw")
-      :desc "Chat buffer"  "c" #'nanoclaw-chat
-      :desc "Send org"     "o" #'nanoclaw-org-send)
+      :prefix ("N" . "ClawBridge")
+      :desc "Chat buffer"  "c" #'clawbridge-chat
+      :desc "Send org"     "o" #'clawbridge-org-send)
 ```
 
 Reload: `M-x doom/reload`
@@ -125,11 +125,11 @@ Reload: `M-x doom/reload`
 **Spacemacs** — add to `dotspacemacs/user-config` in `~/.spacemacs`:
 
 ```elisp
-;; NanoClaw — personal AI assistant channel
-(load-file "~/src/nanoclaw/emacs/nanoclaw.el")
+;; ClawBridge — personal AI assistant channel
+(load-file "~/src/clawbridge/emacs/clawbridge.el")
 
-(spacemacs/set-leader-keys "aNc" #'nanoclaw-chat)
-(spacemacs/set-leader-keys "aNo" #'nanoclaw-org-send)
+(spacemacs/set-leader-keys "aNc" #'clawbridge-chat)
+(spacemacs/set-leader-keys "aNo" #'clawbridge-org-send)
 ```
 
 Reload: `M-x dotspacemacs/sync-configuration-layers` or restart Emacs.
@@ -137,35 +137,35 @@ Reload: `M-x dotspacemacs/sync-configuration-layers` or restart Emacs.
 **Vanilla Emacs** — add to `~/.emacs.d/init.el`:
 
 ```elisp
-;; NanoClaw — personal AI assistant channel
-(load-file "~/src/nanoclaw/emacs/nanoclaw.el")
+;; ClawBridge — personal AI assistant channel
+(load-file "~/src/clawbridge/emacs/clawbridge.el")
 
-(global-set-key (kbd "C-c n c") #'nanoclaw-chat)
-(global-set-key (kbd "C-c n o") #'nanoclaw-org-send)
+(global-set-key (kbd "C-c n c") #'clawbridge-chat)
+(global-set-key (kbd "C-c n o") #'clawbridge-org-send)
 ```
 
 Reload: `M-x eval-buffer` or restart Emacs.
 
-Replace `~/src/nanoclaw/emacs/nanoclaw.el` with your actual NanoClaw checkout path.
+Replace `~/src/clawbridge/emacs/clawbridge.el` with your actual ClawBridge checkout path.
 
 If `EMACS_AUTH_TOKEN` is set, also add (any distribution):
 
 ```elisp
-(setq nanoclaw-auth-token "<your-token>")
+(setq clawbridge-auth-token "<your-token>")
 ```
 
 If you changed `EMACS_CHANNEL_PORT` from the default:
 
 ```elisp
-(setq nanoclaw-port <your-port>)
+(setq clawbridge-port <your-port>)
 ```
 
-## Restart NanoClaw
+## Restart ClawBridge
 
 ```bash
 pnpm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
-# systemctl --user restart nanoclaw                # Linux
+launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
+# systemctl --user restart clawbridge                # Linux
 ```
 
 ## Verify
@@ -194,7 +194,7 @@ Tell the user:
 
 ### Log line
 
-`tail -f logs/nanoclaw.log` should show `Emacs channel listening` at startup.
+`tail -f logs/clawbridge.log` should show `Emacs channel listening` at startup.
 
 ## Channel Info
 
@@ -207,8 +207,8 @@ Tell the user:
 
 ### Features
 
-- Interactive chat buffer (`nanoclaw-chat`) with markdown → org-mode rendering
-- Org integration (`nanoclaw-org-send`) — sends the current subtree or region; reply lands as a child heading
+- Interactive chat buffer (`clawbridge-chat`) with markdown → org-mode rendering
+- Org integration (`clawbridge-org-send`) — sends the current subtree or region; reply lands as a child heading
 - Optional bearer-token auth for the local endpoint
 - Single-user: the adapter exposes exactly one messaging group per host
 
@@ -222,16 +222,16 @@ Not applicable (design): multi-user channels, threads, cold DM initiation, typin
 Error: listen EADDRINUSE: address already in use :::8766
 ```
 
-Either a stale NanoClaw is running or another app has the port. Kill stale process or change port:
+Either a stale ClawBridge is running or another app has the port. Kill stale process or change port:
 
 ```bash
 lsof -ti :8766 | xargs kill -9
-# or set EMACS_CHANNEL_PORT in .env and mirror in Emacs config (nanoclaw-port)
+# or set EMACS_CHANNEL_PORT in .env and mirror in Emacs config (clawbridge-port)
 ```
 
 ### Adapter not starting
 
-If `grep "Emacs channel listening" logs/nanoclaw.log` returns nothing, check that `EMACS_ENABLED=true` is in `.env` and that the adapter import is present:
+If `grep "Emacs channel listening" logs/clawbridge.log` returns nothing, check that `EMACS_ENABLED=true` is in `.env` and that the adapter import is present:
 
 ```bash
 grep -q '^EMACS_ENABLED=true' .env && echo "enabled" || echo "not enabled"
@@ -240,31 +240,31 @@ grep -q "import './emacs.js'" src/channels/index.ts && echo "imported" || echo "
 
 ### No response from agent
 
-1. NanoClaw running: `launchctl list | grep nanoclaw` (macOS) / `systemctl --user status nanoclaw` (Linux)
+1. ClawBridge running: `launchctl list | grep clawbridge` (macOS) / `systemctl --user status clawbridge` (Linux)
 2. Messaging group wired: `sqlite3 data/v2.db "SELECT mg.platform_id, ag.folder FROM messaging_groups mg JOIN messaging_group_agents mga ON mg.id = mga.messaging_group_id JOIN agent_groups ag ON ag.id = mga.agent_group_id WHERE mg.channel_type = 'emacs'"`
-3. Logs show inbound: `grep 'channel_type=emacs\|Emacs' logs/nanoclaw.log | tail -20`
+3. Logs show inbound: `grep 'channel_type=emacs\|Emacs' logs/clawbridge.log | tail -20`
 
 If no messaging group row exists, run the `register` command above.
 
 ### Auth token mismatch (401 Unauthorized)
 
 ```elisp
-M-x describe-variable RET nanoclaw-auth-token RET
+M-x describe-variable RET clawbridge-auth-token RET
 ```
 
 Must match `EMACS_AUTH_TOKEN` in `.env`. If you didn't set one server-side, clear it in Emacs too:
 
 ```elisp
-(setq nanoclaw-auth-token nil)
+(setq clawbridge-auth-token nil)
 ```
 
-### nanoclaw.el not loading
+### clawbridge.el not loading
 
 ```bash
-ls ~/src/nanoclaw/emacs/nanoclaw.el
+ls ~/src/clawbridge/emacs/clawbridge.el
 ```
 
-If NanoClaw is cloned elsewhere, update the `load`/`load-file` path in your Emacs config.
+If ClawBridge is cloned elsewhere, update the `load`/`load-file` path in your Emacs config.
 
 ## Agent Formatting
 
@@ -283,14 +283,14 @@ If an agent outputs org-mode directly, markers get double-converted and render i
 ## Removal
 
 ```bash
-rm src/channels/emacs.ts src/channels/emacs.test.ts emacs/nanoclaw.el
+rm src/channels/emacs.ts src/channels/emacs.test.ts emacs/clawbridge.el
 # Remove the `import './emacs.js';` line from src/channels/index.ts
 # Remove EMACS_* lines from .env
 pnpm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
-# systemctl --user restart nanoclaw                # Linux
+launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
+# systemctl --user restart clawbridge                # Linux
 
-# Remove the NanoClaw block from your Emacs config
+# Remove the ClawBridge block from your Emacs config
 # Optionally clean up the messaging group:
 sqlite3 data/v2.db "DELETE FROM messaging_group_agents WHERE messaging_group_id IN (SELECT id FROM messaging_groups WHERE channel_type='emacs'); DELETE FROM messaging_groups WHERE channel_type='emacs';"
 ```

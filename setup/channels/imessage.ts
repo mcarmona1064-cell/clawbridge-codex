@@ -225,7 +225,7 @@ async function collectRemoteCreds(): Promise<RemoteCreds> {
   p.note(
     [
       "Photon is a separate service that owns an iMessage account and",
-      "exposes it over HTTP. NanoClaw will talk to it via its API.",
+      "exposes it over HTTP. ClawBridge will talk to it via its API.",
       '',
       '  1. Set up a Photon server: https://photon.im',
       '  2. Copy the server URL and API key from your Photon dashboard',
@@ -296,7 +296,7 @@ async function askOperatorHandle(): Promise<string> {
 }
 
 async function resolveAgentName(): Promise<string> {
-  const preset = process.env.NANOCLAW_AGENT_NAME?.trim();
+  const preset = process.env.CLAWBRIDGE_AGENT_NAME?.trim();
   if (preset) {
     setupLog.userInput('agent_name', preset);
     return preset;

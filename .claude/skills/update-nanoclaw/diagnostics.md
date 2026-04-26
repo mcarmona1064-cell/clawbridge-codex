@@ -10,7 +10,7 @@ node -p "process.versions.node.split('.')[0]"
 git log -1 --format=%ci HEAD@{1} 2>/dev/null || echo "unknown"
 ```
 
-Write `/tmp/nanoclaw-diagnostics.json`. No paths, usernames, hostnames, or IP addresses.
+Write `/tmp/clawbridge-diagnostics.json`. No paths, usernames, hostnames, or IP addresses.
 
 ```json
 {
@@ -19,7 +19,7 @@ Write `/tmp/nanoclaw-diagnostics.json`. No paths, usernames, hostnames, or IP ad
   "distinct_id": "<uuid>",
   "properties": {
     "success": true,
-    "nanoclaw_version": "1.2.21",
+    "clawbridge_version": "1.2.21",
     "os_platform": "darwin",
     "arch": "arm64",
     "node_major_version": 22,
@@ -36,13 +36,13 @@ Show the entire JSON to the user and ask via AskUserQuestion: **Yes** / **No** /
 
 **Yes**:
 ```bash
-curl -s -X POST https://us.i.posthog.com/capture/ -H 'Content-Type: application/json' -d @/tmp/nanoclaw-diagnostics.json
-rm /tmp/nanoclaw-diagnostics.json
+curl -s -X POST https://us.i.posthog.com/capture/ -H 'Content-Type: application/json' -d @/tmp/clawbridge-diagnostics.json
+rm /tmp/clawbridge-diagnostics.json
 ```
 
-**No**: `rm /tmp/nanoclaw-diagnostics.json`
+**No**: `rm /tmp/clawbridge-diagnostics.json`
 
 **Never ask again**:
-1. Replace contents of `.claude/skills/update-nanoclaw/diagnostics.md` with `# Diagnostics — opted out`
-2. Remove the `## Diagnostics` section from `.claude/skills/update-nanoclaw/SKILL.md`
-3. `rm /tmp/nanoclaw-diagnostics.json`
+1. Replace contents of `.claude/skills/update-clawbridge/diagnostics.md` with `# Diagnostics — opted out`
+2. Remove the `## Diagnostics` section from `.claude/skills/update-clawbridge/SKILL.md`
+3. `rm /tmp/clawbridge-diagnostics.json`

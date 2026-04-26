@@ -1,5 +1,5 @@
 /**
- * Atomic Chat MCP Server for NanoClaw
+ * Atomic Chat MCP Server for ClawBridge
  * Exposes local Atomic Chat models (OpenAI-compatible, /v1) as tools for the container agent.
  * Uses host.docker.internal to reach the host's Atomic Chat desktop app from Docker.
  */

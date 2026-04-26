@@ -51,7 +51,7 @@ Edit `container/agent-runner/src/index.ts`. Find the `mcpServers` object that cu
 
 ```ts
   const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }> = {
-    nanoclaw: {
+    clawbridge: {
       command: 'bun',
       args: ['run', mcpServerPath],
       env: {},
@@ -59,11 +59,11 @@ Edit `container/agent-runner/src/index.ts`. Find the `mcpServers` object that cu
   };
 ```
 
-Add an `atomic_chat` entry alongside `nanoclaw`:
+Add an `atomic_chat` entry alongside `clawbridge`:
 
 ```ts
   const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }> = {
-    nanoclaw: {
+    clawbridge: {
       command: 'bun',
       args: ['run', mcpServerPath],
       env: {},
@@ -81,10 +81,10 @@ Add an `atomic_chat` entry alongside `nanoclaw`:
 
 ### Add the tool glob to the allowlist
 
-Edit `container/agent-runner/src/providers/claude.ts`. Find `'mcp__nanoclaw__*',` in the `TOOL_ALLOWLIST` array and add `'mcp__atomic_chat__*',` on the following line:
+Edit `container/agent-runner/src/providers/claude.ts`. Find `'mcp__clawbridge__*',` in the `TOOL_ALLOWLIST` array and add `'mcp__atomic_chat__*',` on the following line:
 
 ```ts
-  'mcp__nanoclaw__*',
+  'mcp__clawbridge__*',
   'mcp__atomic_chat__*',
 ];
 ```
@@ -183,8 +183,8 @@ ATOMIC_CHAT_API_KEY=sk-...
 ### Restart the service
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-# Linux: systemctl --user restart nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.clawbridge  # macOS
+# Linux: systemctl --user restart clawbridge
 ```
 
 ## Phase 4: Verify
@@ -200,7 +200,7 @@ Tell the user:
 ### Check logs if needed
 
 ```bash
-tail -f logs/nanoclaw.log | grep -i atomic
+tail -f logs/clawbridge.log | grep -i atomic
 ```
 
 Look for:

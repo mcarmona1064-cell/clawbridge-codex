@@ -1,4 +1,4 @@
-# NanoClaw Architecture Diagram
+# ClawBridge Architecture Diagram
 
 ## System Overview
 

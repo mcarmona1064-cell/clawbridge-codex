@@ -8,7 +8,7 @@
  * checks cron jobs, MCP servers, and channel credentials.
  *
  * Emits a status block on stdout:
- *   === NANOCLAW MIGRATE: DISCOVERY ===
+ *   === CLAWBRIDGE MIGRATE: DISCOVERY ===
  *   ...
  *   === END ===
  */
@@ -42,7 +42,7 @@ function parseJson5(text: string): unknown {
 // ---------------------------------------------------------------------------
 
 function emitStatus(fields: Record<string, string | number | boolean>): void {
-  const lines = ['=== NANOCLAW MIGRATE: DISCOVERY ==='];
+  const lines = ['=== CLAWBRIDGE MIGRATE: DISCOVERY ==='];
   for (const [key, value] of Object.entries(fields)) {
     lines.push(`${key}: ${value}`);
   }
@@ -418,11 +418,11 @@ interface GroupInfo {
 }
 
 /**
- * Map OpenClaw session key channel:kind:id to NanoClaw JID format.
+ * Map OpenClaw session key channel:kind:id to ClawBridge JID format.
  * OpenClaw keys: "whatsapp:group:120...@g.us", "telegram:group:-10012345"
- * NanoClaw JIDs: "120...@g.us", "tg:-10012345", "dc:12345", "slack:C12345"
+ * ClawBridge JIDs: "120...@g.us", "tg:-10012345", "dc:12345", "slack:C12345"
  */
-function toNanoClawJid(channel: string, id: string): string {
+function toClawBridgeJid(channel: string, id: string): string {
   switch (channel) {
     case 'whatsapp':
       return id; // Already in JID format (120...@g.us)
@@ -672,11 +672,11 @@ function main(): void {
     .map((c) => c.name)
     .join(',');
 
-  // Format groups as "channel:id(name)" — also include NanoClaw JID mapping
+  // Format groups as "channel:id(name)" — also include ClawBridge JID mapping
   const groupList = groups
     .map(
       (g) =>
-        `${g.channel}:${g.id}(${g.name})=>${toNanoClawJid(g.channel, g.id)}`,
+        `${g.channel}:${g.id}(${g.name})=>${toClawBridgeJid(g.channel, g.id)}`,
     )
     .join('|');
 

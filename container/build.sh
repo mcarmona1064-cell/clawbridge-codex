@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the NanoClaw agent container image.
+# Build the ClawBridge agent container image.
 #
 # Reads one optional build flag from ../.env:
 #   INSTALL_CJK_FONTS=true   — add Chinese/Japanese/Korean fonts (~200MB)
@@ -12,8 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-# Derive the image name from the project root so two NanoClaw installs on the
-# same host don't overwrite each other's `nanoclaw-agent:latest` tag. Matches
+# Derive the image name from the project root so two ClawBridge installs on the
+# same host don't overwrite each other's `clawbridge-agent:latest` tag. Matches
 # setup/lib/install-slug.sh + src/install-slug.ts.
 # shellcheck source=../setup/lib/install-slug.sh
 source "$PROJECT_ROOT/setup/lib/install-slug.sh"
@@ -32,7 +32,7 @@ if [ "${INSTALL_CJK_FONTS:-false}" = "true" ]; then
     BUILD_ARGS+=(--build-arg INSTALL_CJK_FONTS=true)
 fi
 
-echo "Building NanoClaw agent container image..."
+echo "Building ClawBridge agent container image..."
 echo "Image: ${IMAGE_NAME}:${TAG}"
 
 ${CONTAINER_RUNTIME} build "${BUILD_ARGS[@]}" -t "${IMAGE_NAME}:${TAG}" .

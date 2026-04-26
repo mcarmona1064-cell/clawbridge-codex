@@ -353,7 +353,7 @@ function readAuthedPhone(): string {
 
 async function restartService(): Promise<void> {
   const s = p.spinner();
-  s.start('Restarting NanoClaw so it sees your WhatsApp credentials…');
+  s.start('Restarting ClawBridge so it sees your WhatsApp credentials…');
   const start = Date.now();
   const platform = process.platform;
   try {
@@ -380,7 +380,7 @@ async function restartService(): Promise<void> {
     // welcome DM hits the delivery path.
     await new Promise((r) => setTimeout(r, 5000));
     const elapsed = Math.round((Date.now() - start) / 1000);
-    s.stop(`NanoClaw restarted. ${k.dim(`(${elapsed}s)`)}`);
+    s.stop(`ClawBridge restarted. ${k.dim(`(${elapsed}s)`)}`);
     setupLog.step('whatsapp-restart', 'success', Date.now() - start, {
       PLATFORM: platform,
     });
@@ -455,7 +455,7 @@ function writeAssistantHasOwnNumber(): void {
 }
 
 async function resolveAgentName(): Promise<string> {
-  const preset = process.env.NANOCLAW_AGENT_NAME?.trim();
+  const preset = process.env.CLAWBRIDGE_AGENT_NAME?.trim();
   if (preset) {
     setupLog.userInput('agent_name', preset);
     return preset;

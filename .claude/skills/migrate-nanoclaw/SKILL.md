@@ -1,11 +1,11 @@
 ---
-name: migrate-nanoclaw
+name: migrate-clawbridge
 description: Extracts user customizations from a fork, generates a replayable migration guide, and upgrades to upstream by reapplying customizations on a clean base. Replaces merge-based upgrades with intent-based migration.
 ---
 
 # Context
 
-NanoClaw users fork the repo and customize it — changing config values, editing source files, modifying personas, adding skills. When upstream ships updates or refactors, `git merge` produces painful conflicts because the same core files were changed on both sides.
+ClawBridge users fork the repo and customize it — changing config values, editing source files, modifying personas, adding skills. When upstream ships updates or refactors, `git merge` produces painful conflicts because the same core files were changed on both sides.
 
 This skill extracts the user's customizations into a migration guide — capturing both the intent (what they want) and the implementation details (how they did it, with code snippets, API calls, and specific configurations). On upgrade, it checks out clean upstream in a worktree, then reapplies customizations using the guide. No merge conflicts because there's nothing to merge.
 
@@ -34,7 +34,7 @@ Two phases: **Extract** (build the migration guide) and **Upgrade** (use it). If
 
 Run `git status --porcelain`. If non-empty, offer to stash or commit for them (AskUserQuestion: "Stash changes" / "Commit changes" / "I'll handle it"). If they want to commit, stage and commit with a descriptive message. If they want to stash, run `git stash push -m "pre-migration stash"`.
 
-Check remotes with `git remote -v`. If `upstream` is missing, ask for the URL (default: `https://github.com/qwibitai/nanoclaw.git`), add it, then `git fetch upstream --prune`.
+Check remotes with `git remote -v`. If `upstream` is missing, ask for the URL (default: `https://github.com/other2368-byte/clawbridge-agent.git`), add it, then `git fetch upstream --prune`.
 
 Detect upstream branch: check `git branch -r | grep upstream/` for `main` or `master`. Store as UPSTREAM_BRANCH.
 
@@ -52,17 +52,17 @@ git diff --stat $BASE..HEAD | tail -1                   # insertions/deletions
 git diff --name-only $BASE..upstream/$UPSTREAM_BRANCH | wc -l  # upstream changed files
 ```
 
-Check for existing guide: `.nanoclaw-migrations/guide.md` or `.nanoclaw-migrations/index.md`.
+Check for existing guide: `.clawbridge-migrations/guide.md` or `.clawbridge-migrations/index.md`.
 
 **Determine the tier based on the total diff from base:**
 
-### Tier 1: Lightweight — suggest `/update-nanoclaw` instead
+### Tier 1: Lightweight — suggest `/update-clawbridge` instead
 
 Conditions (any of):
 - Very few upstream changes (< ~5 commits) AND few user changes (< ~3 changed files)
 - User recently updated/migrated (merge-base is close to upstream HEAD)
 
-Tell the user the scope is small and suggest `/update-nanoclaw` might be simpler. Let them choose.
+Tell the user the scope is small and suggest `/update-clawbridge` might be simpler. Let them choose.
 
 ### Tier 2: Standard
 
@@ -83,7 +83,7 @@ Use the full process: multiple sub-agents in parallel, directory-based guide, mi
 **Now combine the scope assessment with initial user input in one interaction.** Present the scope summary (how many commits, files, which tier) and ask (AskUserQuestion):
 
 For Tier 1:
-- **Use /update-nanoclaw** — simpler merge-based approach
+- **Use /update-clawbridge** — simpler merge-based approach
 - **Proceed with full migration** — continue
 
 For Tier 2/3 (with or without existing guide):
@@ -109,7 +109,7 @@ If the user chose to update an existing guide rather than re-extract:
 
 Spawn a haiku sub-agent (Agent tool, model: haiku) for initial exploration:
 
-> Explore this NanoClaw fork to identify all changes from the upstream base. Run these commands and report back:
+> Explore this ClawBridge fork to identify all changes from the upstream base. Run these commands and report back:
 >
 > 1. `git diff --name-only $BASE..HEAD` — all changed files
 > 2. `git log --oneline $BASE..HEAD` — all commits (look for skill branch merges like `Merge branch 'skill/*'`)
@@ -182,7 +182,7 @@ Present the plan to the user for review before proceeding to the guide.
 
 ## 1.7 Write the migration guide
 
-**Storage:** `.nanoclaw-migrations/guide.md` for Tier 2. `.nanoclaw-migrations/` directory with `index.md` and section files for Tier 3.
+**Storage:** `.clawbridge-migrations/guide.md` for Tier 2. `.clawbridge-migrations/` directory with `index.md` and section files for Tier 3.
 
 **Verification:** After writing the guide, read it back and verify:
 - Every referenced file path exists in the current codebase
@@ -194,7 +194,7 @@ The guide is structured markdown that a fresh Claude session can follow to repro
 Structure:
 
 ```markdown
-# NanoClaw Migration Guide
+# ClawBridge Migration Guide
 
 Generated: <timestamp>
 Base: <BASE hash>
@@ -299,7 +299,7 @@ Example entries at different detail levels:
 
 After writing, offer to commit for the user:
 ```bash
-git add .nanoclaw-migrations/
+git add .clawbridge-migrations/
 git commit -m "chore: save migration guide"
 ```
 
@@ -406,7 +406,7 @@ If testing live:
 
 1. Stop the service (do this directly):
    ```bash
-   launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist 2>/dev/null || true
+   launchctl unload ~/Library/LaunchAgents/com.clawbridge.plist 2>/dev/null || true
    ```
 
 2. Symlink data into the worktree:
@@ -438,7 +438,7 @@ WORKTREE_PATH=$(cd "$PROJECT_ROOT/.upgrade-worktree" && pwd)
 UPGRADE_COMMIT=$(git -C "$WORKTREE_PATH" rev-parse HEAD)
 
 # 2. Copy the migration guide out of the worktree before removing it
-cp -r "$WORKTREE_PATH/.nanoclaw-migrations" /tmp/nanoclaw-migrations-backup 2>/dev/null || true
+cp -r "$WORKTREE_PATH/.clawbridge-migrations" /tmp/clawbridge-migrations-backup 2>/dev/null || true
 
 # 3. Remove the worktree
 git worktree remove "$WORKTREE_PATH" --force
@@ -447,13 +447,13 @@ git worktree remove "$WORKTREE_PATH" --force
 git reset --hard $UPGRADE_COMMIT
 
 # 5. Restore the migration guide and update its hashes
-cp -r /tmp/nanoclaw-migrations-backup/* .nanoclaw-migrations/ 2>/dev/null || true
-rm -rf /tmp/nanoclaw-migrations-backup
+cp -r /tmp/clawbridge-migrations-backup/* .clawbridge-migrations/ 2>/dev/null || true
+rm -rf /tmp/clawbridge-migrations-backup
 ```
 
 Update the guide's header hashes to reflect the new state. Offer to commit:
 ```bash
-git add .nanoclaw-migrations/
+git add .clawbridge-migrations/
 git commit -m "chore: upgrade to upstream $(git rev-parse --short upstream/$UPSTREAM_BRANCH)"
 ```
 
@@ -465,7 +465,7 @@ Run `npm install && pnpm run build` in the main tree to confirm.
 
 Restart the service:
 ```bash
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl load ~/Library/LaunchAgents/com.clawbridge.plist
 ```
 
 Show summary:
@@ -480,5 +480,5 @@ Offer to pop the stash if one was created in preflight: `git stash pop`
 
 ## Diagnostics
 
-1. Use the Read tool to read `.claude/skills/migrate-nanoclaw/diagnostics.md`.
+1. Use the Read tool to read `.claude/skills/migrate-clawbridge/diagnostics.md`.
 2. Follow every step in that file before finishing.

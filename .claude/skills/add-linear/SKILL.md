@@ -12,8 +12,8 @@ Adds Linear support via the Chat SDK bridge. The agent participates in issue com
 **Recommended:** Create a Linear **OAuth application** so the agent posts as an app identity, not as you. This prevents the adapter from filtering your own comments as self-messages.
 
 1. Go to [Linear Settings > API > OAuth Applications](https://linear.app/settings/api/applications/new)
-2. Create an app (e.g. "NanoClaw Bot")
-   - Developer URL: your repo URL (e.g. `https://github.com/your-org/nanoclaw`)
+2. Create an app (e.g. "ClawBridge Bot")
+   - Developer URL: your repo URL (e.g. `https://github.com/your-org/clawbridge`)
    - Callback URL: `http://localhost`
 3. After creating, click the app and enable **Client credentials** under grant types
 4. Copy the **Client ID** and **Client Secret**
@@ -22,7 +22,7 @@ Adds Linear support via the Chat SDK bridge. The agent participates in issue com
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Linear adapter in from the `channels` branch and patches the Chat SDK bridge to support catch-all message forwarding (Linear OAuth apps can't be @-mentioned).
+ClawBridge doesn't ship channels in trunk. This skill copies the Linear adapter in from the `channels` branch and patches the Chat SDK bridge to support catch-all message forwarding (Linear OAuth apps can't be @-mentioned).
 
 ### Pre-flight (idempotent)
 
@@ -101,7 +101,7 @@ pnpm run build
 ### 1. Set up a webhook
 
 1. Go to **Linear Settings** > **API** > **Webhooks** > **New webhook**
-2. Label: `NanoClaw`
+2. Label: `ClawBridge`
 3. URL: `https://your-domain/webhook/linear` (the shared webhook server, default port 3000)
 4. Team: select the team you want to monitor
 5. Events: check **Comment**
@@ -122,7 +122,7 @@ LINEAR_CLIENT_SECRET=your-client-secret
 # LINEAR_API_KEY=lin_api_...
 
 LINEAR_WEBHOOK_SECRET=your-webhook-signing-secret
-LINEAR_BOT_USERNAME=NanoClaw Bot
+LINEAR_BOT_USERNAME=ClawBridge Bot
 LINEAR_TEAM_KEY=ENG
 ```
 
@@ -156,7 +156,7 @@ The `platform_id` must be `linear:<TEAM_KEY>` matching the `LINEAR_TEAM_KEY` env
 
 If you're in the middle of `/setup`, return to the setup flow now.
 
-Otherwise, restart the service (`systemctl --user restart nanoclaw` or `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`) to pick up the new channel.
+Otherwise, restart the service (`systemctl --user restart clawbridge` or `launchctl kickstart -k gui/$(id -u)/com.clawbridge`) to pick up the new channel.
 
 ## Channel Info
 

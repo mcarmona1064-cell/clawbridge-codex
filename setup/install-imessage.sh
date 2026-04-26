@@ -12,7 +12,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "=== NANOCLAW SETUP: INSTALL_IMESSAGE ==="
+echo "=== CLAWBRIDGE SETUP: INSTALL_IMESSAGE ==="
 
 needs_install=false
 [[ -f src/channels/imessage.ts ]] || needs_install=true

@@ -1,11 +1,11 @@
 ---
 name: add-vercel
-description: Add Vercel deployment capability to NanoClaw agents. Installs the Vercel CLI in agent containers and sets up OneCLI credential injection for api.vercel.com. Use when the user wants agents to deploy web applications to Vercel.
+description: Add Vercel deployment capability to ClawBridge agents. Installs the Vercel CLI in agent containers and sets up OneCLI credential injection for api.vercel.com. Use when the user wants agents to deploy web applications to Vercel.
 ---
 
 # Add Vercel
 
-This skill gives NanoClaw agents the ability to deploy web applications to Vercel. It installs the Vercel CLI in agent containers and configures OneCLI to inject Vercel credentials automatically.
+This skill gives ClawBridge agents the ability to deploy web applications to Vercel. It installs the Vercel CLI in agent containers and configures OneCLI to inject Vercel credentials automatically.
 
 **Principle:** Do the work — don't tell the user to do it. Only ask for their input when it genuinely requires manual action (pasting a token).
 
@@ -61,7 +61,7 @@ The agent needs a Vercel personal access token. Tell the user:
 
 > I need your Vercel personal access token. Go to https://vercel.com/account/tokens and create one with these settings:
 >
-> - **Token name:** `nanoclaw` (or any name you'll recognize)
+> - **Token name:** `clawbridge` (or any name you'll recognize)
 > - **Scope:** "Full Account" — the agent needs to create projects, deploy, and manage domains
 > - **Expiration:** "No expiration" recommended (avoids credential rotation), or pick a date if your security policy requires it
 >
@@ -133,7 +133,7 @@ done
 Stop all running agent containers so they pick up the new skills on next wake:
 
 ```bash
-docker ps --format "{{.ID}} {{.Names}}" | grep nanoclaw-v2 | awk '{print $1}' | xargs -r docker stop
+docker ps --format "{{.ID}} {{.Names}}" | grep clawbridge-v2 | awk '{print $1}' | xargs -r docker stop
 ```
 
 ## Done

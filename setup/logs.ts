@@ -17,7 +17,7 @@
  *     { RUNTIME: 'docker', BUILD_OK: terminal.fields.BUILD_OK },
  *     rawLog);
  *
- * nanoclaw.sh emits the bootstrap entry directly via a bash helper so
+ * clawbridge.sh emits the bootstrap entry directly via a bash helper so
  * the format stays consistent without needing IPC between bash and tsx.
  */
 import fs from 'fs';
@@ -31,7 +31,7 @@ export const progressLogPath = PROGRESS_LOG;
 export const stepsDir = STEPS_DIR;
 
 // Track steps that finished cleanly in this run. Used by fail() to build
-// a NANOCLAW_SKIP list when re-executing after a Claude-assisted fix, so
+// a CLAWBRIDGE_SKIP list when re-executing after a Claude-assisted fix, so
 // the retry picks up at the failing step instead of redoing every step
 // before it.
 const completedInRun = new Set<string>();
@@ -40,7 +40,7 @@ export function completedStepNames(): string[] {
   return [...completedInRun];
 }
 
-/** Wipe prior logs and write a header. Called once per fresh run (by nanoclaw.sh or as a fallback by auto.ts if invoked standalone). */
+/** Wipe prior logs and write a header. Called once per fresh run (by clawbridge.sh or as a fallback by auto.ts if invoked standalone). */
 export function reset(meta: Record<string, string>): void {
   if (fs.existsSync(STEPS_DIR)) {
     fs.rmSync(STEPS_DIR, { recursive: true, force: true });
@@ -118,7 +118,7 @@ export function abort(stepName: string, error: string): void {
 /**
  * Return the next raw-log path for a given step name. Numbering is derived
  * from the count of existing NN-*.log files in STEPS_DIR, so bootstrap's
- * pre-existing 01-bootstrap.log (written by nanoclaw.sh before this module
+ * pre-existing 01-bootstrap.log (written by clawbridge.sh before this module
  * is loaded) counts toward the sequence.
  */
 export function stepRawLog(name: string): string {

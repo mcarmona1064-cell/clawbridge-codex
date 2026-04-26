@@ -1,5 +1,5 @@
 /**
- * NanoClaw Agent Runner v2
+ * ClawBridge Agent Runner v2
  *
  * Runs inside a container. All IO goes through the session DB.
  * No stdin, no stdout markers, no IPC files.
@@ -72,9 +72,9 @@ async function main(): Promise<void> {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const mcpServerPath = path.join(__dirname, 'mcp-tools', 'index.ts');
 
-  // Build MCP servers config: nanoclaw built-in + any from container.json
+  // Build MCP servers config: clawbridge built-in + any from container.json
   const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }> = {
-    nanoclaw: {
+    clawbridge: {
       command: 'bun',
       args: ['run', mcpServerPath],
       env: {},

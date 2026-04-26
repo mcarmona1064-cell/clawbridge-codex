@@ -7,12 +7,12 @@
  * `setup/lib/theme.ts`; Telegram's full flow in `setup/channels/telegram.ts`.
  *
  * Config via env:
- *   NANOCLAW_DISPLAY_NAME  how the agents address the operator — skips the
+ *   CLAWBRIDGE_DISPLAY_NAME  how the agents address the operator — skips the
  *                          prompt. Defaults to $USER.
- *   NANOCLAW_AGENT_NAME    messaging-channel agent name (consumed by the
+ *   CLAWBRIDGE_AGENT_NAME    messaging-channel agent name (consumed by the
  *                          channel flow). The CLI scratch agent is always
  *                          "Terminal Agent".
- *   NANOCLAW_SKIP          comma-separated step names to skip
+ *   CLAWBRIDGE_SKIP          comma-separated step names to skip
  *                          (environment|container|onecli|auth|mounts|
  *                           service|cli-agent|timezone|channel|verify|
  *                           first-chat)
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   phEmit('auto_started');
 
   const skip = new Set(
-    (process.env.NANOCLAW_SKIP ?? '')
+    (process.env.CLAWBRIDGE_SKIP ?? '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
@@ -155,7 +155,7 @@ async function main(): Promise<void> {
             },
             {
               value: 'fresh',
-              label: 'Install a fresh instance for NanoClaw',
+              label: 'Install a fresh instance for ClawBridge',
               hint: 'reinstalls onecli; other apps may need to reconnect',
             },
           ],
@@ -213,19 +213,19 @@ async function main(): Promise<void> {
 
   if (!skip.has('service')) {
     const res = await runQuietStep('service', {
-      running: 'Starting NanoClaw in the background…',
-      done: 'NanoClaw is running.',
+      running: 'Starting ClawBridge in the background…',
+      done: 'ClawBridge is running.',
     });
     if (!res.ok) {
       await fail(
         'service',
-        "Couldn't start NanoClaw.",
-        'See logs/nanoclaw.error.log for details.',
+        "Couldn't start ClawBridge.",
+        'See logs/clawbridge.error.log for details.',
       );
     }
     if (res.terminal?.fields.DOCKER_GROUP_STALE === 'true') {
       p.log.warn(
-        "NanoClaw's permissions need a tweak before it can reach Docker.",
+        "ClawBridge's permissions need a tweak before it can reach Docker.",
       );
       p.log.message(
         '  sudo setfacl -m u:$(whoami):rw /var/run/docker.sock\n' +
@@ -238,7 +238,7 @@ async function main(): Promise<void> {
   const needsDisplayName = !skip.has('cli-agent') || !skip.has('channel');
   if (needsDisplayName) {
     const fallback = process.env.USER?.trim() || 'Operator';
-    const preset = process.env.NANOCLAW_DISPLAY_NAME?.trim();
+    const preset = process.env.CLAWBRIDGE_DISPLAY_NAME?.trim();
     displayName = preset || (await askDisplayName(fallback));
   }
 
@@ -293,7 +293,7 @@ async function main(): Promise<void> {
           stepName: 'cli-agent',
           msg:
             ping === 'socket_error'
-              ? "NanoClaw service isn't listening on its CLI socket."
+              ? "ClawBridge service isn't listening on its CLI socket."
               : "No reply from the assistant within 30 seconds.",
           hint:
             ping === 'socket_error'
@@ -352,7 +352,7 @@ async function main(): Promise<void> {
         notes.push(
           wrapForGutter(
             [
-              '• Your NanoClaw service is running from a different folder on this machine.',
+              '• Your ClawBridge service is running from a different folder on this machine.',
               '  Point it at this checkout with:',
               `    launchctl bootout gui/$(id -u)/${label}`,
               `    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${label}.plist`,
@@ -365,7 +365,7 @@ async function main(): Promise<void> {
         if (agentPing && agentPing !== 'ok' && agentPing !== 'skipped') {
           notes.push(
             "• Your assistant didn't reply to a test message. " +
-              'Check `logs/nanoclaw.log` for clues, then try `pnpm run chat hi`.',
+              'Check `logs/clawbridge.log` for clues, then try `pnpm run chat hi`.',
           );
         }
       }
@@ -400,7 +400,7 @@ async function main(): Promise<void> {
 
   const rows: [string, string][] = [
     ['Chat in the terminal:', 'pnpm run chat hi'],
-    ["See what's happening:", 'tail -f logs/nanoclaw.log'],
+    ["See what's happening:", 'tail -f logs/clawbridge.log'],
     ['Open Claude Code:', 'claude'],
   ];
   const labelWidth = Math.max(...rows.map(([l]) => l.length));
@@ -413,7 +413,7 @@ async function main(): Promise<void> {
   // caveat doesn't land after the user's already looked away at their phone.
   p.note(
     wrapForGutter(
-      "NanoClaw runs on this machine. It's only reachable while this computer is on and connected to the internet. For always-on availability, run it on a cloud VM — or keep this machine awake.",
+      "ClawBridge runs on this machine. It's only reachable while this computer is on and connected to the internet. For always-on availability, run it on a cloud VM — or keep this machine awake.",
       6,
     ),
     'Heads up',
@@ -492,7 +492,7 @@ async function confirmAssistantResponds(): Promise<PingResult> {
   } else {
     const msg =
       result === 'socket_error'
-        ? "Couldn't reach the NanoClaw service."
+        ? "Couldn't reach the ClawBridge service."
         : "Your assistant didn't reply in time.";
     s.stop(`${k.bold(fitToWidth(msg, suffix))}${k.dim(suffix)}`, 1);
   }
@@ -504,7 +504,7 @@ function renderPingFailureNote(result: PingResult): void {
     result === 'socket_error'
       ? [
           wrapForGutter(
-            "The NanoClaw service isn't listening on its local socket. Try restarting it, then chat with `pnpm run chat hi`:",
+            "The ClawBridge service isn't listening on its local socket. Try restarting it, then chat with `pnpm run chat hi`:",
             6,
           ),
           '',
@@ -512,7 +512,7 @@ function renderPingFailureNote(result: PingResult): void {
           `  Linux:  systemctl --user restart ${getSystemdUnit()}`,
         ].join('\n')
       : wrapForGutter(
-          'No reply from your assistant within 30 seconds. Check `logs/nanoclaw.log` for clues, then try `pnpm run chat hi`.',
+          'No reply from your assistant within 30 seconds. Check `logs/clawbridge.log` for clues, then try `pnpm run chat hi`.',
           6,
         );
   p.note(body, 'Skipping the first chat');
@@ -563,7 +563,7 @@ async function runFirstChat(): Promise<void> {
 
 function sendChatMessage(message: string): Promise<void> {
   return new Promise((resolve) => {
-    // `pnpm --silent` suppresses the `> nanoclaw@… chat` preamble so the
+    // `pnpm --silent` suppresses the `> clawbridge@… chat` preamble so the
     // agent's reply reads as a clean block under the prompt. Splitting on
     // whitespace mirrors `pnpm run chat hello world` — chat.ts joins argv
     // with spaces on the far side.
@@ -936,7 +936,7 @@ function runInheritScript(cmd: string, args: string[]): Promise<number> {
  * so the rest of the run inherits the docker group without a re-login.
  */
 function maybeReexecUnderSg(): void {
-  if (process.env.NANOCLAW_REEXEC_SG === '1') return;
+  if (process.env.CLAWBRIDGE_REEXEC_SG === '1') return;
   if (process.platform !== 'linux') return;
   const info = spawnSync('docker', ['info'], { encoding: 'utf-8' });
   if (info.status === 0) return;
@@ -947,7 +947,7 @@ function maybeReexecUnderSg(): void {
   p.log.warn('Docker socket not accessible in current group. Re-executing under `sg docker`.');
   const res = spawnSync('sg', ['docker', '-c', 'pnpm run setup:auto'], {
     stdio: 'inherit',
-    env: { ...process.env, NANOCLAW_REEXEC_SG: '1' },
+    env: { ...process.env, CLAWBRIDGE_REEXEC_SG: '1' },
   });
   process.exit(res.status ?? 1);
 }
@@ -955,7 +955,7 @@ function maybeReexecUnderSg(): void {
 // ─── intro + progression-log init ──────────────────────────────────────
 
 function printIntro(): void {
-  const isReexec = process.env.NANOCLAW_REEXEC_SG === '1';
+  const isReexec = process.env.CLAWBRIDGE_REEXEC_SG === '1';
   const wordmark = `${k.bold('Nano')}${brandBold('Claw')}`;
 
   if (isReexec) {
@@ -966,20 +966,20 @@ function printIntro(): void {
   }
 
   // Always include the wordmark inside the clack intro line. When bash ran
-  // first (NANOCLAW_BOOTSTRAPPED=1) it already printed its own wordmark
+  // first (CLAWBRIDGE_BOOTSTRAPPED=1) it already printed its own wordmark
   // above us; the small repeat is worth it to keep the brand anchored at
   // the visible top of the clack session once the bash output scrolls away.
   p.intro(`${wordmark}  ${k.dim("Let's get you set up.")}`);
 }
 
 /**
- * Bootstrap (nanoclaw.sh) normally initializes logs/setup.log and writes
+ * Bootstrap (clawbridge.sh) normally initializes logs/setup.log and writes
  * the bootstrap entry before we even boot. If someone runs `pnpm run
  * setup:auto` directly, start a fresh progression log here so we don't
  * append to a stale one from a previous run.
  */
 function initProgressionLog(): void {
-  if (process.env.NANOCLAW_BOOTSTRAPPED === '1') return;
+  if (process.env.CLAWBRIDGE_BOOTSTRAPPED === '1') return;
   let commit = '';
   try {
     commit = spawnSync('git', ['rev-parse', '--short', 'HEAD'], {

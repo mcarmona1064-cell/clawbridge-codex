@@ -13,7 +13,7 @@ You need a **dedicated GitHub bot account** (not your personal account). The ada
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the GitHub adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the GitHub adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 
@@ -136,7 +136,7 @@ Use `per-thread` session mode so each PR/issue gets its own agent session.
 
 If you're in the middle of `/setup`, return to the setup flow now.
 
-Otherwise, restart the service (`systemctl --user restart nanoclaw` or `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`) to pick up the new channel.
+Otherwise, restart the service (`systemctl --user restart clawbridge` or `launchctl kickstart -k gui/$(id -u)/com.clawbridge`) to pick up the new channel.
 
 ## Channel Info
 

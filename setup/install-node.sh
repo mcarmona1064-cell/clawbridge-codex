@@ -8,7 +8,7 @@
 # it. Pure bash by design — runs before Node exists on the host.
 set -euo pipefail
 
-echo "=== NANOCLAW SETUP: INSTALL_NODE ==="
+echo "=== CLAWBRIDGE SETUP: INSTALL_NODE ==="
 
 if command -v node >/dev/null 2>&1; then
   echo "STATUS: already-installed"

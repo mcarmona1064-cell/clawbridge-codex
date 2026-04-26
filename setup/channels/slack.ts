@@ -228,7 +228,7 @@ function showPostInstallChecklist(info: WorkspaceInfo): void {
         `The Slack adapter is installed and your creds are saved. ${info.teamName} still needs two things before it can talk to you:`,
         '',
         '  1. A public URL so Slack can deliver events.',
-        '     NanoClaw serves a webhook on port 3000 by default — expose it',
+        '     ClawBridge serves a webhook on port 3000 by default — expose it',
         '     via ngrok, Cloudflare Tunnel, or a reverse proxy on a VPS.',
         '',
         '  2. In your Slack app → Event Subscriptions:',

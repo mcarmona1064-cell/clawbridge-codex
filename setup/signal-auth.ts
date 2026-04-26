@@ -33,7 +33,7 @@ import { spawn, spawnSync } from 'child_process';
 import { emitStatus } from './status.js';
 
 const LINK_TIMEOUT_MS = 180_000;
-const DEFAULT_DEVICE_NAME = 'NanoClaw';
+const DEFAULT_DEVICE_NAME = 'ClawBridge';
 
 interface SignalAccount {
   account?: string;

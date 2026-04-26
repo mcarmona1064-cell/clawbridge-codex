@@ -1,17 +1,17 @@
 # Changelog
 
-All notable changes to NanoClaw will be documented in this file.
+All notable changes to ClawBridge will be documented in this file.
 
-For detailed release notes, see the [full changelog on the documentation site](https://docs.nanoclaw.dev/changelog).
+For detailed release notes, see the [full changelog on the documentation site](https://docs.clawbridge.dev/changelog).
 
 ## [2.0.0] - 2026-04-22
 
-Major version. NanoClaw v2 is a substantial architectural rewrite. Existing forks should run `/migrate-nanoclaw` (clean-base replay of customizations) or `/update-nanoclaw` (selective cherry-pick) before resuming work.
+Major version. ClawBridge v2 is a substantial architectural rewrite. Existing forks should run `/migrate-clawbridge` (clean-base replay of customizations) or `/update-clawbridge` (selective cherry-pick) before resuming work.
 
 - [BREAKING] **New entity model.** Users, roles (owner/admin), messaging groups, and agent groups are now tracked as separate entities, wired via `messaging_group_agents`. Privilege is user-level instead of channel-level, so the old "main channel = admin" concept is retired. See [docs/architecture.md](docs/architecture.md) and [docs/isolation-model.md](docs/isolation-model.md).
 - [BREAKING] **Two-DB session split.** Each session now has `inbound.db` (host writes, container reads) and `outbound.db` (container writes, host reads) with exactly one writer each. Replaces the single shared session DB and eliminates cross-mount SQLite contention. See [docs/db-session.md](docs/db-session.md).
-- [BREAKING] **Install flow replaced.** `bash nanoclaw.sh` is the new default: a scripted installer that hands off to Claude Code for error recovery and guided decisions. The `/setup` Claude-guided skill still works as an alternative.
-- [BREAKING] **Channels moved to the `channels` branch.** Trunk no longer ships Discord, Slack, Telegram, WhatsApp, iMessage, Teams, Linear, GitHub, WeChat, Matrix, Google Chat, Webex, Resend, or WhatsApp Cloud. Install them per fork via `/add-<channel>` skills, which copy from the `channels` branch. `/update-nanoclaw` will re-install the channels your fork had.
+- [BREAKING] **Install flow replaced.** `bash clawbridge.sh` is the new default: a scripted installer that hands off to Claude Code for error recovery and guided decisions. The `/setup` Claude-guided skill still works as an alternative.
+- [BREAKING] **Channels moved to the `channels` branch.** Trunk no longer ships Discord, Slack, Telegram, WhatsApp, iMessage, Teams, Linear, GitHub, WeChat, Matrix, Google Chat, Webex, Resend, or WhatsApp Cloud. Install them per fork via `/add-<channel>` skills, which copy from the `channels` branch. `/update-clawbridge` will re-install the channels your fork had.
 - [BREAKING] **Alternative providers moved to the `providers` branch.** OpenCode, Codex, and Ollama install via `/add-opencode`, `/add-codex`, `/add-ollama-provider`. Claude remains the default provider baked into trunk.
 - [BREAKING] **Three-level channel isolation.** Wire channels to their own agent (separate agent groups), share an agent with independent conversations (`session_mode: 'shared'`), or merge channels into one shared session (`session_mode: 'agent-shared'`). Chosen per channel via `/manage-channels`.
 - [BREAKING] **Apple Container removed from default setup.** Still available as an opt-in via `/convert-to-apple-container`.
@@ -21,7 +21,7 @@ Major version. NanoClaw v2 is a substantial architectural rewrite. Existing fork
 
 ## [1.2.36] - 2026-03-26
 
-- [BREAKING] Replaced pino logger with built-in logger. WhatsApp users must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix: `git fetch whatsapp main && git merge whatsapp/main`. If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/qwibitai/nanoclaw-whatsapp.git`.
+- [BREAKING] Replaced pino logger with built-in logger. WhatsApp users must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix: `git fetch whatsapp main && git merge whatsapp/main`. If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/other2368-byte/clawbridge-agent-whatsapp.git`.
 
 ## [1.2.35] - 2026-03-26
 
@@ -141,7 +141,7 @@ Major version. NanoClaw v2 is a substantial architectural rewrite. Existing fork
 ## [1.1.4] - 2026-03-01
 
 - Added third-party model support
-- Added `/update-nanoclaw` skill for syncing with upstream
+- Added `/update-clawbridge` skill for syncing with upstream
 
 ## [1.1.3] - 2026-02-25
 

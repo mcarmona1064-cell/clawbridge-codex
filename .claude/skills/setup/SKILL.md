@@ -1,10 +1,10 @@
 ---
 name: setup
-description: Run initial NanoClaw setup. Use when user wants to install NanoClaw, configure it, or go through first-time setup. Triggers on "setup", "install", "configure nanoclaw", or first-time setup requests.
+description: Run initial ClawBridge setup. Use when user wants to install ClawBridge, configure it, or go through first-time setup. Triggers on "setup", "install", "configure clawbridge", or first-time setup requests.
 ---
 
-# NanoClaw Setup
+# ClawBridge Setup
 
-Tell the user to run `bash nanoclaw.sh` in their terminal. That script handles the full end-to-end setup — dependencies, container image, OneCLI vault, Anthropic credential, service, first agent, and optional channel wiring.
+Tell the user to run `bash clawbridge.sh` in their terminal. That script handles the full end-to-end setup — dependencies, container image, OneCLI vault, Anthropic credential, service, first agent, and optional channel wiring.
 
 If they hit an error partway through, it will offer Claude-assisted recovery inline — no need to come back here.

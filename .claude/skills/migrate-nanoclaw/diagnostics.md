@@ -9,7 +9,7 @@ uname -m
 node -p "process.versions.node.split('.')[0]"
 ```
 
-Write `/tmp/nanoclaw-diagnostics.json`. No paths, usernames, hostnames, or IP addresses.
+Write `/tmp/clawbridge-diagnostics.json`. No paths, usernames, hostnames, or IP addresses.
 
 ```json
 {
@@ -18,7 +18,7 @@ Write `/tmp/nanoclaw-diagnostics.json`. No paths, usernames, hostnames, or IP ad
   "distinct_id": "<uuid>",
   "properties": {
     "success": true,
-    "nanoclaw_version": "1.2.43",
+    "clawbridge_version": "1.2.43",
     "os_platform": "darwin",
     "arch": "arm64",
     "node_major_version": 22,
@@ -38,14 +38,14 @@ Show the entire JSON to the user and ask via AskUserQuestion: **Yes** / **No** /
 
 **Yes**:
 ```bash
-curl -s -X POST https://us.i.posthog.com/capture/ -H 'Content-Type: application/json' -d @/tmp/nanoclaw-diagnostics.json
-rm /tmp/nanoclaw-diagnostics.json
+curl -s -X POST https://us.i.posthog.com/capture/ -H 'Content-Type: application/json' -d @/tmp/clawbridge-diagnostics.json
+rm /tmp/clawbridge-diagnostics.json
 ```
 
-**No**: `rm /tmp/nanoclaw-diagnostics.json`
+**No**: `rm /tmp/clawbridge-diagnostics.json`
 
 **Never ask again**:
-1. Replace contents of `.claude/skills/update-nanoclaw/diagnostics.md` with `# Diagnostics — opted out`
-2. Replace contents of `.claude/skills/migrate-nanoclaw/diagnostics.md` with `# Diagnostics — opted out`
+1. Replace contents of `.claude/skills/update-clawbridge/diagnostics.md` with `# Diagnostics — opted out`
+2. Replace contents of `.claude/skills/migrate-clawbridge/diagnostics.md` with `# Diagnostics — opted out`
 3. Remove the diagnostics sections from each corresponding SKILL.md
-4. `rm /tmp/nanoclaw-diagnostics.json`
+4. `rm /tmp/clawbridge-diagnostics.json`

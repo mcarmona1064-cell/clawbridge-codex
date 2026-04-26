@@ -69,7 +69,7 @@ chmod 600 ~/.gmail-mcp/gcp-oauth.keys.json ~/.gmail-mcp/credentials.json
 ### Verify mount allowlist covers the path
 
 ```bash
-cat ~/.config/nanoclaw/mount-allowlist.json
+cat ~/.config/clawbridge/mount-allowlist.json
 ```
 
 `~/.gmail-mcp` must sit under an `allowedRoots` entry (e.g. `/home/<user>`). If it doesn't, tell the user to run `/manage-mounts` first or add their home directory.
@@ -131,7 +131,7 @@ Pinned version matters — `minimumReleaseAge` in `pnpm-workspace.yaml` gates tr
 
 ### Add tools to allowlist
 
-Edit `container/agent-runner/src/providers/claude.ts`. Find `'mcp__nanoclaw__*',` in `TOOL_ALLOWLIST` and add `'mcp__gmail__*',` after it.
+Edit `container/agent-runner/src/providers/claude.ts`. Find `'mcp__clawbridge__*',` in `TOOL_ALLOWLIST` and add `'mcp__gmail__*',` after it.
 
 ### Rebuild the container image
 
@@ -177,8 +177,8 @@ Substitute `<user>` with the host user's home (use `echo $HOME`, don't assume `~
 
 ```bash
 pnpm run build
-systemctl --user restart nanoclaw  # Linux
-# launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
+systemctl --user restart clawbridge  # Linux
+# launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
 ```
 
 ## Phase 5: Verify
@@ -194,14 +194,14 @@ Tell the user:
 ### Check logs if the tool isn't working
 
 ```bash
-tail -100 logs/nanoclaw.log logs/nanoclaw.error.log | grep -iE 'gmail|mcp'
+tail -100 logs/clawbridge.log logs/clawbridge.error.log | grep -iE 'gmail|mcp'
 # Per-container logs — session-scoped:
 ls data/v2-sessions/*/stderr.log | head
 ```
 
 Common signals:
 - `command not found: gmail-mcp` → image wasn't rebuilt or PATH doesn't include `/pnpm` (should — `ENV PATH="$PNPM_HOME:$PATH"` in Dockerfile).
-- `ENOENT: no such file or directory, open '/workspace/extra/.gmail-mcp/credentials.json'` → mount is missing. Check `~/.config/nanoclaw/mount-allowlist.json` includes a parent of `~/.gmail-mcp`.
+- `ENOENT: no such file or directory, open '/workspace/extra/.gmail-mcp/credentials.json'` → mount is missing. Check `~/.config/clawbridge/mount-allowlist.json` includes a parent of `~/.gmail-mcp`.
 - `401 Unauthorized` from `gmail.googleapis.com` → OneCLI isn't injecting. Check the agent's secret mode (`onecli agents secrets --id <agent-id>`) and that the Gmail app is connected (`onecli apps get --provider gmail`).
 - Agent says "I don't have Gmail tools" → `mcp__gmail__*` wasn't added to `TOOL_ALLOWLIST`, or the agent-runner wasn't rebuilt (image cache — run `./container/build.sh` again with `--no-cache` if suspicious).
 
@@ -210,7 +210,7 @@ Common signals:
 1. Delete the `"gmail"` entry from `mcpServers` and the `.gmail-mcp` entry from `additionalMounts` in each group's `container.json`.
 2. Remove `'mcp__gmail__*'` from `TOOL_ALLOWLIST` in `container/agent-runner/src/providers/claude.ts`.
 3. Remove the `GMAIL_MCP_VERSION` ARG and the `pnpm install -g @gongrzhe/server-gmail-autoauth-mcp` block from `container/Dockerfile`.
-4. `pnpm run build && ./container/build.sh && systemctl --user restart nanoclaw`.
+4. `pnpm run build && ./container/build.sh && systemctl --user restart clawbridge`.
 5. (Optional) `rm -rf ~/.gmail-mcp/` if no other host-side tool needs the stubs.
 6. (Optional) Disconnect Gmail in OneCLI: `onecli apps disconnect --provider gmail`.
 
@@ -225,5 +225,5 @@ Common signals:
 - **MCP server:** [`@gongrzhe/server-gmail-autoauth-mcp`](https://github.com/GongRzhe/Gmail-MCP-Server) by GongRzhe — MIT-licensed.
 - **OneCLI credential stubs:** pattern documented at `https://onecli.sh/docs/guides/credential-stubs/gmail.md`.
 - **Skill pattern:** modeled on [`add-atomic-chat-tool`](../add-atomic-chat-tool/SKILL.md) and [`add-vercel`](../add-vercel/SKILL.md).
-- **Addresses:** [issue #1500](https://github.com/qwibitai/nanoclaw/issues/1500) (proxy Gmail/Calendar OAuth tokens through credential proxy) for the Gmail side.
-- **Related PRs:** [#1810](https://github.com/qwibitai/nanoclaw/pull/1810) (pre-install Gmail/Notion MCP) overlaps on the "install the MCP server in the image" idea but bundles many unrelated changes; this skill is the focused OneCLI-native version.
+- **Addresses:** [issue #1500](https://github.com/other2368-byte/clawbridge-agent/issues/1500) (proxy Gmail/Calendar OAuth tokens through credential proxy) for the Gmail side.
+- **Related PRs:** [#1810](https://github.com/other2368-byte/clawbridge-agent/pull/1810) (pre-install Gmail/Notion MCP) overlaps on the "install the MCP server in the image" idea but bundles many unrelated changes; this skill is the focused OneCLI-native version.

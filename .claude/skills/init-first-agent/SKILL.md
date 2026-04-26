@@ -1,17 +1,17 @@
 ---
 name: init-first-agent
-description: Walk the operator through creating the first NanoClaw agent for a DM channel — resolve the operator's channel identity, wire the DM messaging group to a new agent, and trigger a welcome DM via the normal delivery path. Use after channel credentials are configured and the service is running.
+description: Walk the operator through creating the first ClawBridge agent for a DM channel — resolve the operator's channel identity, wire the DM messaging group to a new agent, and trigger a welcome DM via the normal delivery path. Use after channel credentials are configured and the service is running.
 ---
 
 # Init First Agent
 
-Stand up the first NanoClaw agent for a channel and verify end-to-end delivery by having the agent DM the operator. Everything the skill does is idempotent — rerunning is safe.
+Stand up the first ClawBridge agent for a channel and verify end-to-end delivery by having the agent DM the operator. Everything the skill does is idempotent — rerunning is safe.
 
 ## Prerequisites
 
-- **Service running.** Check: `launchctl list | grep nanoclaw` (macOS) or `systemctl --user status nanoclaw` (Linux). If stopped, tell the user to run `/setup` first.
+- **Service running.** Check: `launchctl list | grep clawbridge` (macOS) or `systemctl --user status clawbridge` (Linux). If stopped, tell the user to run `/setup` first.
 - **Target channel installed.** At least one `/add-<channel>` skill has run, credentials are in `.env`, and the adapter is uncommented in `src/channels/index.ts`.
-- **Adapter connected.** Tail `logs/nanoclaw.log` — look for a recent `channel setup` / `adapter connected` line for the target channel.
+- **Adapter connected.** Tail `logs/clawbridge.log` — look for a recent `channel setup` / `adapter connected` line for the target channel.
 
 ## 1. Pick the channel
 
@@ -57,7 +57,7 @@ Wait for the user's confirmation. Then look up the most recent DM messaging grou
 sqlite3 data/v2.db "SELECT id, platform_id, name, created_at FROM messaging_groups WHERE channel_type='${CHANNEL}' AND is_group=0 ORDER BY created_at DESC LIMIT 5"
 ```
 
-Show the top rows to the user and confirm which `platform_id` is theirs (usually the most recent). Record as `PLATFORM_ID`. If none appeared, check `logs/nanoclaw.log` for `unknown_sender` drops — the adapter might be rejecting inbound due to connection or permission issues.
+Show the top rows to the user and confirm which `platform_id` is theirs (usually the most recent). Record as `PLATFORM_ID`. If none appeared, check `logs/clawbridge.log` for `unknown_sender` drops — the adapter might be rejecting inbound due to connection or permission issues.
 
 ### 3b. Telegram pair-code path (if the user prefers not to DM first)
 
@@ -104,14 +104,14 @@ Wait for the user's reply. If they confirm receipt, the skill is done.
 If they say it didn't arrive, then diagnose using the DB directly (no waiting loops required — the message either delivered or it didn't):
 
 - `sqlite3 data/v2-sessions/<agent-group-id>/sessions/<session-id>/outbound.db "SELECT id, status, created_at FROM messages_out ORDER BY created_at DESC LIMIT 5"` — check for stuck `pending` rows. Replace `<agent-group-id>` and `<session-id>` with the values from the script's output.
-- `grep -E 'Unauthorized channel destination|container.*exited|error' logs/nanoclaw.log | tail -20` — look for ACL rejections or container crashes.
+- `grep -E 'Unauthorized channel destination|container.*exited|error' logs/clawbridge.log | tail -20` — look for ACL rejections or container crashes.
 - `ls data/v2-sessions/<agent-group-id>/sessions/*/outbound.db` — confirm the session exists.
 
 ## Troubleshooting
 
 **"Missing required args"** — the script wants `--channel`, `--user-id`, `--platform-id`, `--display-name` at minimum. Re-check the command you assembled.
 
-**No `messaging_groups` row appears after the user DMs (step 3a)** — the router silently drops messages from unknown senders under `strict` policy but still creates the `messaging_groups` row. If the row is missing entirely, the adapter isn't receiving the inbound message. Check `logs/nanoclaw.log` for adapter errors (auth, gateway disconnect, rate limit).
+**No `messaging_groups` row appears after the user DMs (step 3a)** — the router silently drops messages from unknown senders under `strict` policy but still creates the `messaging_groups` row. If the row is missing entirely, the adapter isn't receiving the inbound message. Check `logs/clawbridge.log` for adapter errors (auth, gateway disconnect, rate limit).
 
 **Owner already exists** — `hasAnyOwner()` returned true, so the grant is skipped silently. That's fine; the script still creates the agent and wiring. Reassigning ownership needs a separate flow (not this skill).
 

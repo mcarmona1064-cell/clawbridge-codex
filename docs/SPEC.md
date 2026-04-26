@@ -1,4 +1,4 @@
-# NanoClaw Specification
+# ClawBridge Specification
 
 A personal Claude assistant with multi-channel support, persistent memory per conversation, scheduled tasks, and container-isolated agent execution.
 
@@ -64,7 +64,7 @@ A personal Claude assistant with multi-channel support, persistent memory per co
 │  │    • Read, Write, Edit, Glob, Grep (file operations)           │    │
 │  │    • WebSearch, WebFetch (internet access)                     │    │
 │  │    • agent-browser (browser automation)                        │    │
-│  │    • mcp__nanoclaw__* (scheduler tools via IPC)                │    │
+│  │    • mcp__clawbridge__* (scheduler tools via IPC)                │    │
 │  │                                                                │    │
 │  └──────────────────────────────────────────────────────────────┘    │
 │                                                                       │
@@ -239,7 +239,7 @@ See existing skills (`/add-whatsapp`, `/add-telegram`, `/add-slack`, `/add-disco
 ## Folder Structure
 
 ```
-nanoclaw/
+clawbridge/
 ├── CLAUDE.md                      # Project context for Claude Code
 ├── docs/
 │   ├── SPEC.md                    # This specification document
@@ -314,12 +314,12 @@ nanoclaw/
 │   └── ipc/                       # Container IPC (messages/, tasks/)
 │
 ├── logs/                          # Runtime logs (gitignored)
-│   ├── nanoclaw.log               # Host stdout
-│   └── nanoclaw.error.log         # Host stderr
+│   ├── clawbridge.log               # Host stdout
+│   └── clawbridge.error.log         # Host stderr
 │   # Note: Per-container logs are in groups/{folder}/logs/container-*.log
 │
 └── launchd/
-    └── com.nanoclaw.plist         # macOS service configuration
+    └── com.clawbridge.plist         # macOS service configuration
 ```
 
 ---
@@ -340,7 +340,7 @@ export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 
 // Container configuration
-export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
+export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || 'clawbridge-agent:latest';
 export const CONTAINER_TIMEOUT = parseInt(process.env.CONTAINER_TIMEOUT || '1800000', 10); // 30min default
 export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min — keep container alive after last result
 export const MAX_CONCURRENT_CONTAINERS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5);
@@ -411,7 +411,7 @@ Or edit the default in `src/config.ts`. This changes:
 ### Placeholder Values in launchd
 
 Files with `{{PLACEHOLDER}}` values need to be configured:
-- `{{PROJECT_ROOT}}` - Absolute path to your nanoclaw installation
+- `{{PROJECT_ROOT}}` - Absolute path to your clawbridge installation
 - `{{NODE_PATH}}` - Path to node binary (detected via `which node`)
 - `{{HOME}}` - User's home directory
 
@@ -419,7 +419,7 @@ Files with `{{PLACEHOLDER}}` values need to be configured:
 
 ## Memory System
 
-NanoClaw uses a hierarchical memory system based on CLAUDE.md files.
+ClawBridge uses a hierarchical memory system based on CLAUDE.md files.
 
 ### Memory Hierarchy
 
@@ -495,7 +495,7 @@ Sessions enable conversation continuity - Claude remembers what you talked about
    ├── cwd: groups/{group-name}/
    ├── prompt: conversation history + current message
    ├── resume: session_id (for continuity)
-   └── mcpServers: nanoclaw (scheduler)
+   └── mcpServers: clawbridge (scheduler)
    │
    ▼
 8. Claude processes message:
@@ -552,7 +552,7 @@ This allows the agent to understand the conversation context even if it wasn't m
 
 ## Scheduled Tasks
 
-NanoClaw has a built-in scheduler that runs tasks as full agents in their group's context.
+ClawBridge has a built-in scheduler that runs tasks as full agents in their group's context.
 
 ### How Scheduling Works
 
@@ -574,7 +574,7 @@ NanoClaw has a built-in scheduler that runs tasks as full agents in their group'
 ```
 User: @Andy remind me every Monday at 9am to review the weekly metrics
 
-Claude: [calls mcp__nanoclaw__schedule_task]
+Claude: [calls mcp__clawbridge__schedule_task]
         {
           "prompt": "Send a reminder to review weekly metrics. Be encouraging!",
           "schedule_type": "cron",
@@ -589,7 +589,7 @@ Claude: Done! I'll remind you every Monday at 9am.
 ```
 User: @Andy at 5pm today, send me a summary of today's emails
 
-Claude: [calls mcp__nanoclaw__schedule_task]
+Claude: [calls mcp__clawbridge__schedule_task]
         {
           "prompt": "Search for today's emails, summarize the important ones, and send the summary to the group.",
           "schedule_type": "once",
@@ -613,9 +613,9 @@ From main channel:
 
 ## MCP Servers
 
-### NanoClaw MCP (built-in)
+### ClawBridge MCP (built-in)
 
-The `nanoclaw` MCP server is created dynamically per agent call with the current group's context.
+The `clawbridge` MCP server is created dynamically per agent call with the current group's context.
 
 **Available Tools:**
 | Tool | Purpose |
@@ -633,12 +633,12 @@ The `nanoclaw` MCP server is created dynamically per agent call with the current
 
 ## Deployment
 
-NanoClaw runs as a single macOS launchd service.
+ClawBridge runs as a single macOS launchd service.
 
 ### Startup Sequence
 
-When NanoClaw starts, it:
-1. **Ensures container runtime is running** - Automatically starts it if needed; kills orphaned NanoClaw containers from previous runs
+When ClawBridge starts, it:
+1. **Ensures container runtime is running** - Automatically starts it if needed; kills orphaned ClawBridge containers from previous runs
 2. Initializes the SQLite database (migrates from JSON files if they exist)
 3. Loads state from SQLite (registered groups, sessions, router state)
 4. **Connects channels** — loops through registered channels, instantiates those with credentials, calls `connect()` on each
@@ -649,16 +649,16 @@ When NanoClaw starts, it:
    - Recovers any unprocessed messages from before shutdown
    - Starts the message polling loop
 
-### Service: com.nanoclaw
+### Service: com.clawbridge
 
-**launchd/com.nanoclaw.plist:**
+**launchd/com.clawbridge.plist:**
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.nanoclaw</string>
+    <string>com.clawbridge</string>
     <key>ProgramArguments</key>
     <array>
         <string>{{NODE_PATH}}</string>
@@ -680,9 +680,9 @@ When NanoClaw starts, it:
         <string>Andy</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>{{PROJECT_ROOT}}/logs/nanoclaw.log</string>
+    <string>{{PROJECT_ROOT}}/logs/clawbridge.log</string>
     <key>StandardErrorPath</key>
-    <string>{{PROJECT_ROOT}}/logs/nanoclaw.error.log</string>
+    <string>{{PROJECT_ROOT}}/logs/clawbridge.error.log</string>
 </dict>
 </plist>
 ```
@@ -691,19 +691,19 @@ When NanoClaw starts, it:
 
 ```bash
 # Install service
-cp launchd/com.nanoclaw.plist ~/Library/LaunchAgents/
+cp launchd/com.clawbridge.plist ~/Library/LaunchAgents/
 
 # Start service
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl load ~/Library/LaunchAgents/com.clawbridge.plist
 
 # Stop service
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl unload ~/Library/LaunchAgents/com.clawbridge.plist
 
 # Check status
-launchctl list | grep nanoclaw
+launchctl list | grep clawbridge
 
 # View logs
-tail -f logs/nanoclaw.log
+tail -f logs/clawbridge.log
 ```
 
 ---
@@ -759,8 +759,8 @@ chmod 700 groups/
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No response to messages | Service not running | Check `launchctl list | grep nanoclaw` |
-| "Claude Code process exited with code 1" | Container runtime failed to start | Check logs; NanoClaw auto-starts container runtime but may fail |
+| No response to messages | Service not running | Check `launchctl list | grep clawbridge` |
+| "Claude Code process exited with code 1" | Container runtime failed to start | Check logs; ClawBridge auto-starts container runtime but may fail |
 | "Claude Code process exited with code 1" | Session mount path wrong | Ensure mount is to `/home/node/.claude/` not `/root/.claude/` |
 | Session not continuing | Session ID not saved | Check SQLite: `sqlite3 store/messages.db "SELECT * FROM sessions"` |
 | Session not continuing | Mount path mismatch | Container user is `node` with HOME=/home/node; sessions must be at `/home/node/.claude/` |
@@ -769,8 +769,8 @@ chmod 700 groups/
 
 ### Log Location
 
-- `logs/nanoclaw.log` - stdout
-- `logs/nanoclaw.error.log` - stderr
+- `logs/clawbridge.log` - stdout
+- `logs/clawbridge.error.log` - stderr
 
 ### Debug Mode
 

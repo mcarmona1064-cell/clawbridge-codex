@@ -1,7 +1,7 @@
 /**
- * NanoClaw brand palette for the terminal.
+ * ClawBridge brand palette for the terminal.
  *
- * Colors pulled from assets/nanoclaw-logo.png:
+ * Colors pulled from assets/clawbridge-logo.png:
  *   brand cyan  ≈ #2BB7CE  — the "Claw" wordmark + mascot body
  *   brand navy  ≈ #171B3B  — the dark logo background + outlines
  *

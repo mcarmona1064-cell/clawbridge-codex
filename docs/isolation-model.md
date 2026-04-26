@@ -1,6 +1,6 @@
 # Channel Isolation Model
 
-NanoClaw decouples messaging channels from agent groups. When you connect a channel (Discord, Telegram, Slack, GitHub, etc.), you decide how it relates to your existing agents. There are three isolation levels.
+ClawBridge decouples messaging channels from agent groups. When you connect a channel (Discord, Telegram, Slack, GitHub, etc.), you decide how it relates to your existing agents. There are three isolation levels.
 
 ## The Three Levels
 

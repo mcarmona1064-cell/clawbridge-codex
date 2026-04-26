@@ -9,7 +9,7 @@ Adds Telegram bot support via the Chat SDK bridge.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Telegram adapter, its formatting/pairing helpers, their tests, and the `pair-telegram` setup step in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the Telegram adapter, its formatting/pairing helpers, their tests, and the `pair-telegram` setup step in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 
@@ -73,8 +73,8 @@ pnpm run build
 
 1. Open Telegram and search for `@BotFather`
 2. Send `/newbot` and follow the prompts:
-   - Bot name: Something friendly (e.g., "NanoClaw Assistant")
-   - Bot username: Must end with "bot" (e.g., "nanoclaw_bot")
+   - Bot name: Something friendly (e.g., "ClawBridge Assistant")
+   - Bot username: Must end with "bot" (e.g., "clawbridge_bot")
 3. Copy the bot token (looks like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
 
 **Important for group chats**: By default, Telegram bots only see @mentions and commands in groups. To let the bot see all messages:

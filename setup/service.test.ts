@@ -42,9 +42,9 @@ function generatePlist(
         <string>${homeDir}</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>${projectRoot}/logs/nanoclaw.log</string>
+    <string>${projectRoot}/logs/clawbridge.log</string>
     <key>StandardErrorPath</key>
-    <string>${projectRoot}/logs/nanoclaw.error.log</string>
+    <string>${projectRoot}/logs/clawbridge.error.log</string>
 </dict>
 </plist>`;
 }
@@ -56,7 +56,7 @@ function generateSystemdUnit(
   isSystem: boolean,
 ): string {
   return `[Unit]
-Description=NanoClaw Personal Assistant
+Description=ClawBridge Personal Assistant
 After=network.target
 
 [Service]
@@ -68,8 +68,8 @@ RestartSec=5
 KillMode=process
 Environment=HOME=${homeDir}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:${homeDir}/.local/bin
-StandardOutput=append:${projectRoot}/logs/nanoclaw.log
-StandardError=append:${projectRoot}/logs/nanoclaw.error.log
+StandardOutput=append:${projectRoot}/logs/clawbridge.log
+StandardError=append:${projectRoot}/logs/clawbridge.error.log
 
 [Install]
 WantedBy=${isSystem ? 'multi-user.target' : 'default.target'}`;
@@ -77,16 +77,16 @@ WantedBy=${isSystem ? 'multi-user.target' : 'default.target'}`;
 
 describe('plist generation', () => {
   it('contains the slug-scoped label', () => {
-    const projectRoot = '/home/user/nanoclaw';
+    const projectRoot = '/home/user/clawbridge';
     const plist = generatePlist('/usr/local/bin/node', projectRoot, '/home/user');
     expect(plist).toContain(`<string>${getLaunchdLabel(projectRoot)}</string>`);
-    expect(plist).toMatch(/<string>com\.nanoclaw-v2-[0-9a-f]{8}<\/string>/);
+    expect(plist).toMatch(/<string>com\.clawbridge-v2-[0-9a-f]{8}<\/string>/);
   });
 
   it('uses the correct node path', () => {
     const plist = generatePlist(
       '/opt/node/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
     );
     expect(plist).toContain('<string>/opt/node/bin/node</string>');
@@ -95,20 +95,20 @@ describe('plist generation', () => {
   it('points to dist/index.js', () => {
     const plist = generatePlist(
       '/usr/local/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
     );
-    expect(plist).toContain('/home/user/nanoclaw/dist/index.js');
+    expect(plist).toContain('/home/user/clawbridge/dist/index.js');
   });
 
   it('sets log paths', () => {
     const plist = generatePlist(
       '/usr/local/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
     );
-    expect(plist).toContain('nanoclaw.log');
-    expect(plist).toContain('nanoclaw.error.log');
+    expect(plist).toContain('clawbridge.log');
+    expect(plist).toContain('clawbridge.error.log');
   });
 });
 
@@ -116,7 +116,7 @@ describe('systemd unit generation', () => {
   it('user unit uses default.target', () => {
     const unit = generateSystemdUnit(
       '/usr/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
       false,
     );
@@ -126,7 +126,7 @@ describe('systemd unit generation', () => {
   it('system unit uses multi-user.target', () => {
     const unit = generateSystemdUnit(
       '/usr/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
       true,
     );
@@ -136,7 +136,7 @@ describe('systemd unit generation', () => {
   it('contains restart policy', () => {
     const unit = generateSystemdUnit(
       '/usr/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
       false,
     );
@@ -147,7 +147,7 @@ describe('systemd unit generation', () => {
   it('uses KillMode=process to preserve detached children', () => {
     const unit = generateSystemdUnit(
       '/usr/bin/node',
-      '/home/user/nanoclaw',
+      '/home/user/clawbridge',
       '/home/user',
       false,
     );
@@ -157,32 +157,32 @@ describe('systemd unit generation', () => {
   it('sets correct ExecStart', () => {
     const unit = generateSystemdUnit(
       '/usr/bin/node',
-      '/srv/nanoclaw',
+      '/srv/clawbridge',
       '/home/user',
       false,
     );
     expect(unit).toContain(
-      'ExecStart=/usr/bin/node /srv/nanoclaw/dist/index.js',
+      'ExecStart=/usr/bin/node /srv/clawbridge/dist/index.js',
     );
   });
 });
 
 describe('WSL nohup fallback', () => {
   it('generates a valid wrapper script', () => {
-    const projectRoot = '/home/user/nanoclaw';
+    const projectRoot = '/home/user/clawbridge';
     const nodePath = '/usr/bin/node';
-    const pidFile = path.join(projectRoot, 'nanoclaw.pid');
+    const pidFile = path.join(projectRoot, 'clawbridge.pid');
 
     // Simulate what service.ts generates
     const wrapper = `#!/bin/bash
 set -euo pipefail
 cd ${JSON.stringify(projectRoot)}
-nohup ${JSON.stringify(nodePath)} ${JSON.stringify(projectRoot)}/dist/index.js >> ${JSON.stringify(projectRoot)}/logs/nanoclaw.log 2>> ${JSON.stringify(projectRoot)}/logs/nanoclaw.error.log &
+nohup ${JSON.stringify(nodePath)} ${JSON.stringify(projectRoot)}/dist/index.js >> ${JSON.stringify(projectRoot)}/logs/clawbridge.log 2>> ${JSON.stringify(projectRoot)}/logs/clawbridge.error.log &
 echo $! > ${JSON.stringify(pidFile)}`;
 
     expect(wrapper).toContain('#!/bin/bash');
     expect(wrapper).toContain('nohup');
     expect(wrapper).toContain(nodePath);
-    expect(wrapper).toContain('nanoclaw.pid');
+    expect(wrapper).toContain('clawbridge.pid');
   });
 });

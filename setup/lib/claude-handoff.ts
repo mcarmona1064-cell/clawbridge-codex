@@ -105,7 +105,7 @@ export async function offerClaudeHandoff(ctx: HandoffContext): Promise<boolean> 
  * Sentinel returned by `validateWithHelpEscape` when the user types `?`.
  * The caller compares against this to decide whether to trigger a handoff.
  */
-export const HELP_ESCAPE_SENTINEL = '__NANOCLAW_HELP_ESCAPE__';
+export const HELP_ESCAPE_SENTINEL = '__CLAWBRIDGE_HELP_ESCAPE__';
 
 /**
  * Wrap a clack `validate` callback so typing `?` short-circuits validation
@@ -155,7 +155,7 @@ function isClaudeUsable(): boolean {
 
 function buildSystemPrompt(ctx: HandoffContext): string {
   const lines: string[] = [
-    `The user is running NanoClaw's interactive \`setup:auto\` flow to wire the ${ctx.channel} channel.`,
+    `The user is running ClawBridge's interactive \`setup:auto\` flow to wire the ${ctx.channel} channel.`,
     `They got stuck at the step: "${ctx.step}" (${ctx.stepDescription}) and asked for help.`,
     '',
     "Your job: help them complete this specific step and get back to setup.",

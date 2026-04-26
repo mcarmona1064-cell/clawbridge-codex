@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "=== NANOCLAW SETUP: INSTALL_WHATSAPP_CLOUD ==="
+echo "=== CLAWBRIDGE SETUP: INSTALL_WHATSAPP_CLOUD ==="
 
 needs_install=false
 [[ -f src/channels/whatsapp-cloud.ts ]] || needs_install=true

@@ -1,5 +1,5 @@
 /**
- * Init the first (or Nth) NanoClaw v2 agent for a DM channel.
+ * Init the first (or Nth) ClawBridge v2 agent for a DM channel.
  *
  * Wires a real DM channel (discord, telegram, etc.) to a new agent group,
  * then hands a welcome message to the running service via the CLI socket
@@ -206,7 +206,7 @@ async function main(): Promise<void> {
   initGroupFilesystem(ag, {
     instructions:
       `# ${args.agentName}\n\n` +
-      `You are ${args.agentName}, a personal NanoClaw agent for ${args.displayName}. ` +
+      `You are ${args.agentName}, a personal ClawBridge agent for ${args.displayName}. ` +
       'When the user first reaches out (or you receive a system welcome prompt), introduce yourself briefly and invite them to chat. Keep replies concise.',
   });
 
@@ -341,7 +341,7 @@ async function sendWelcomeViaCliSocket(
     socket.once('error', (err) =>
       settle(
         new Error(
-          `CLI socket at ${sockPath} not reachable: ${err.message}. Is the NanoClaw service running?`,
+          `CLI socket at ${sockPath} not reachable: ${err.message}. Is the ClawBridge service running?`,
         ),
       ),
     );

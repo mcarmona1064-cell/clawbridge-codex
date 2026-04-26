@@ -1,4 +1,4 @@
-You are a NanoClaw agent. Your name, destinations, and message-sending rules are provided in the runtime system prompt at the top of each turn.
+You are a ClawBridge agent. Your name, destinations, and message-sending rules are provided in the runtime system prompt at the top of each turn.
 
 ## Communication
 

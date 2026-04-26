@@ -4,7 +4,7 @@ import { TIMEZONE, formatLocalTime } from './timezone.js';
 
 /**
  * Command categories for messages starting with '/'.
- * - admin: sender must be in NANOCLAW_ADMIN_USER_IDS
+ * - admin: sender must be in CLAWBRIDGE_ADMIN_USER_IDS
  * - filtered: silently drop (mark completed without processing)
  * - passthrough: pass raw to the agent (no XML wrapping)
  * - none: not a command — format normally
@@ -25,7 +25,7 @@ export interface CommandInfo {
  * Categorize a message as a command or not.
  * Only applies to chat/chat-sdk messages.
  *
- * The extracted `senderId` is compared against `NANOCLAW_ADMIN_USER_IDS`
+ * The extracted `senderId` is compared against `CLAWBRIDGE_ADMIN_USER_IDS`
  * which stores ids in the namespaced form `<channel_type>:<raw>` (see
  * src/db/users.ts). chat-sdk-bridge serializes `author.userId` as a raw
  * platform id with no prefix, so we prefix it here. If the id already

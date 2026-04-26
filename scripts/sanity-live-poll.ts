@@ -22,7 +22,7 @@
  * Keep this around. It ran for ~20 minutes once to map the failure modes
  * and it takes about 60s to run — cheap insurance.
  *
- * Requires: Docker Desktop running, nanoclaw-agent:latest image built.
+ * Requires: Docker Desktop running, clawbridge-agent:latest image built.
  */
 
 import { spawn, spawnSync } from "node:child_process";
@@ -30,7 +30,7 @@ import { join } from "node:path";
 import { mkdirSync, rmSync } from "node:fs";
 import Database from "better-sqlite3";
 
-const dbDir = join("/tmp", `nanoclaw-live-${Date.now()}`);
+const dbDir = join("/tmp", `clawbridge-live-${Date.now()}`);
 mkdirSync(dbDir, { recursive: true });
 spawnSync("chmod", ["777", dbDir]);
 const dbPath = join(dbDir, "live.db");
@@ -53,7 +53,7 @@ for (const journalMode of ["DELETE", "WAL"]) {
     "run", "--rm", "-w", "/app",
     "-v", `${dbDir}:/workspace`,
     "--entrypoint", "node",
-    "nanoclaw-agent:latest",
+    "clawbridge-agent:latest",
     "-e",
     `const Database = require('better-sqlite3');
      const db = new Database('/workspace/live.db', { readonly: true });

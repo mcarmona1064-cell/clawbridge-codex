@@ -2,7 +2,7 @@
 
 **If you are reading this because you just ran `git pull`, `git merge`, `git fetch && git merge`, or any equivalent to bring in upstream changes — and you see merge conflicts or a large diff involving this file — HALT IMMEDIATELY.**
 
-This is NanoClaw v2, a ground-up rewrite with breaking changes throughout. It cannot be merged into an existing v1 install. Attempting to resolve the conflicts by hand, run builds, or "fix" anything will corrupt the user's install and burn tokens for no result.
+This is ClawBridge v2, a ground-up rewrite with breaking changes throughout. It cannot be merged into an existing v1 install. Attempting to resolve the conflicts by hand, run builds, or "fix" anything will corrupt the user's install and burn tokens for no result.
 
 **Do this instead:**
 1. Abort the merge: `git merge --abort` (or `git reset --hard ORIG_HEAD` if the merge already completed).
@@ -13,7 +13,7 @@ If you are a fresh install (you ran `git clone`, not `git pull`) and there are n
 
 ---
 
-# NanoClaw
+# ClawBridge
 
 Personal Claude assistant. See [README.md](README.md) for philosophy and setup. Architecture lives in `docs/`.
 
@@ -130,7 +130,7 @@ If you've just enabled `mode all`, no container restart is needed — the gatewa
 Approval-gating credentialed actions is a **two-sided** flow:
 
 - **Server-side** (OneCLI gateway): decides *when* to hold a request and emit a pending approval. As of `onecli@1.3.0`, the CLI does **not** expose this — `rules create --action` only accepts `block` or `rate_limit`, and `secrets create` has no approval flag. Approval policies must be configured via the OneCLI web UI at `http://127.0.0.1:10254`. If/when the CLI grows an `approve` action, this section needs updating.
-- **Host-side** (nanoclaw): receives pending approvals and routes them to a human. `src/modules/approvals/onecli-approvals.ts` registers a callback via `onecli.configureManualApproval(cb)` (long-polls `GET /api/approvals/pending`). The callback uses `pickApprover` + `pickApprovalDelivery` from `src/modules/approvals/primitive.ts` to DM an approver. Approvers are resolved from the `user_roles` table — preference order: scoped admins for the agent group → global admins → owners. There is no env var like `NANOCLAW_ADMIN_USER_IDS`; roles are persisted in the central DB only.
+- **Host-side** (clawbridge): receives pending approvals and routes them to a human. `src/modules/approvals/onecli-approvals.ts` registers a callback via `onecli.configureManualApproval(cb)` (long-polls `GET /api/approvals/pending`). The callback uses `pickApprover` + `pickApprovalDelivery` from `src/modules/approvals/primitive.ts` to DM an approver. Approvers are resolved from the `user_roles` table — preference order: scoped admins for the agent group → global admins → owners. There is no env var like `CLAWBRIDGE_ADMIN_USER_IDS`; roles are persisted in the central DB only.
 
 If approvals are configured server-side but the host callback isn't running (or throws), every credentialed call hangs until the gateway times out. Conversely, if the gateway has no rule asking for approval, the host callback never fires regardless of how it's wired.
 
@@ -140,7 +140,7 @@ Four types of skills. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full taxono
 
 - **Channel/provider install skills** — copy the relevant module(s) in from the `channels` or `providers` branch, wire imports, install pinned deps (e.g. `/add-discord`, `/add-slack`, `/add-whatsapp`, `/add-opencode`).
 - **Utility skills** — ship code files alongside `SKILL.md` (e.g. `/claw`).
-- **Operational skills** — instruction-only workflows (`/setup`, `/debug`, `/customize`, `/init-first-agent`, `/manage-channels`, `/init-onecli`, `/update-nanoclaw`).
+- **Operational skills** — instruction-only workflows (`/setup`, `/debug`, `/customize`, `/init-first-agent`, `/manage-channels`, `/init-onecli`, `/update-clawbridge`).
 - **Container skills** — loaded inside agent containers at runtime (`container/skills/`: `welcome`, `self-customize`, `agent-browser`, `slack-formatting`).
 
 | Skill | When to Use |
@@ -150,7 +150,7 @@ Four types of skills. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full taxono
 | `/manage-channels` | Wire channels to agent groups with isolation level decisions |
 | `/customize` | Adding channels, integrations, behavior changes |
 | `/debug` | Container issues, logs, troubleshooting |
-| `/update-nanoclaw` | Bring upstream updates into a customized install |
+| `/update-clawbridge` | Bring upstream updates into a customized install |
 | `/init-onecli` | Install OneCLI Agent Vault and migrate `.env` credentials |
 
 ## Contributing
@@ -165,7 +165,7 @@ Run commands directly — don't tell the user to run them.
 # Host (Node + pnpm)
 pnpm run dev          # Host with hot reload
 pnpm run build        # Compile host TypeScript (src/)
-./container/build.sh  # Rebuild agent container image (nanoclaw-agent:latest)
+./container/build.sh  # Rebuild agent container image (clawbridge-agent:latest)
 pnpm test             # Host tests (vitest)
 
 # Agent-runner (Bun — separate package tree under container/agent-runner/)
@@ -178,15 +178,15 @@ Container typecheck is a separate tsconfig — if you edit `container/agent-runn
 Service management:
 ```bash
 # macOS (launchd)
-launchctl load   ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # restart
+launchctl load   ~/Library/LaunchAgents/com.clawbridge.plist
+launchctl unload ~/Library/LaunchAgents/com.clawbridge.plist
+launchctl kickstart -k gui/$(id -u)/com.clawbridge  # restart
 
 # Linux (systemd)
-systemctl --user start|stop|restart nanoclaw
+systemctl --user start|stop|restart clawbridge
 ```
 
-Host logs: `logs/nanoclaw.log` (normal) and `logs/nanoclaw.error.log` (errors only — some delivery/approval failures only show up here).
+Host logs: `logs/clawbridge.log` (normal) and `logs/clawbridge.error.log` (errors only — some delivery/approval failures only show up here).
 
 ## Supply Chain Security (pnpm)
 
@@ -240,8 +240,8 @@ grep -q '^INSTALL_CJK_FONTS=' .env && sed -i.bak 's/^INSTALL_CJK_FONTS=.*/INSTAL
 
 # Rebuild and restart so new sessions pick up the new image
 ./container/build.sh
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
-# systemctl --user restart nanoclaw                # Linux
+launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
+# systemctl --user restart clawbridge                # Linux
 ```
 
 `container/build.sh` reads `INSTALL_CJK_FONTS` from `.env` and passes it through as a Docker build-arg. Without CJK fonts, Chromium-rendered screenshots and PDFs containing CJK text show tofu (empty rectangles) instead of characters.

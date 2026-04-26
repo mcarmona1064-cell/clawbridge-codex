@@ -23,7 +23,7 @@ import Database from 'better-sqlite3';
 import path from 'node:path';
 import readline from 'node:readline';
 
-const DB_PATH = process.env.NANOCLAW_DB_PATH ?? path.join(process.cwd(), 'data', 'v2.db');
+const DB_PATH = process.env.CLAWBRIDGE_DB_PATH ?? path.join(process.cwd(), 'data', 'v2.db');
 
 type SenderPolicy = 'public' | 'strict' | 'request_approval';
 

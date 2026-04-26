@@ -326,7 +326,7 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
  *                      (`agent_group.name`) is irrelevant — users address
  *                      the bot via its platform username (@botname on
  *                      Telegram, user-id mention on Slack/Discord), not
- *                      via the agent's NanoClaw-side display name. If a
+ *                      via the agent's ClawBridge-side display name. If a
  *                      user wants to disambiguate between multiple agents
  *                      wired to one chat, use engage_mode='pattern' with
  *                      the disambiguator as the regex.

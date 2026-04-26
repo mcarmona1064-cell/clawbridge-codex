@@ -31,7 +31,7 @@ CHANNELS_BRANCH="${CHANNELS_REMOTE}/channels"
 emit_status() {
   local status=$1 error=${2:-}
   local already=${ADAPTER_ALREADY_INSTALLED:-false}
-  echo "=== NANOCLAW SETUP: ADD_WHATSAPP ==="
+  echo "=== CLAWBRIDGE SETUP: ADD_WHATSAPP ==="
   echo "STATUS: ${status}"
   echo "ADAPTER_ALREADY_INSTALLED: ${already}"
   [ -n "$error" ] && echo "ERROR: ${error}"

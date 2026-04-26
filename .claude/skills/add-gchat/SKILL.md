@@ -9,7 +9,7 @@ Adds Google Chat support via the Chat SDK bridge.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Google Chat adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the Google Chat adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 

@@ -28,7 +28,7 @@ emit_status() {
   local status=$1 error=${2:-}
   local already=${ADAPTER_ALREADY_INSTALLED:-false}
   local username=${BOT_USERNAME:-}
-  echo "=== NANOCLAW SETUP: ADD_TELEGRAM ==="
+  echo "=== CLAWBRIDGE SETUP: ADD_TELEGRAM ==="
   echo "STATUS: ${status}"
   echo "ADAPTER_VERSION: ${ADAPTER_VERSION}"
   echo "ADAPTER_ALREADY_INSTALLED: ${already}"

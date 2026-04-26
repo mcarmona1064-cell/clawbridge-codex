@@ -2,7 +2,7 @@
  * Shared "who's connecting this channel?" prompt used by the channel setup
  * drivers before they hand off to scripts/init-first-agent.ts.
  *
- * Default: owner. Self-hosted NanoClaw is almost always a single-operator
+ * Default: owner. Self-hosted ClawBridge is almost always a single-operator
  * deployment, and granting the same human owner status on every channel
  * they wire up matches what you'd want 99% of the time. The prompt
  * surfaces admin/member for the edge cases (shared instance, collaborators

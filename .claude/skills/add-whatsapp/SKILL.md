@@ -9,7 +9,7 @@ Adds WhatsApp support via the native Baileys adapter (no Chat SDK bridge).
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the native WhatsApp (Baileys) adapter and its `whatsapp-auth` setup step in from the `channels` branch. No Chat SDK bridge.
+ClawBridge doesn't ship channels in trunk. This skill copies the native WhatsApp (Baileys) adapter and its `whatsapp-auth` setup step in from the `channels` branch. No Chat SDK bridge.
 
 ### Pre-flight (idempotent)
 
@@ -247,18 +247,18 @@ rm -rf store/auth/ && pnpm exec tsx setup/index.ts --step whatsapp-auth -- --met
 Signal sessions corrupted from rapid restarts. Clear sessions:
 
 ```bash
-systemctl --user stop nanoclaw
+systemctl --user stop clawbridge
 rm store/auth/session-*.json
-systemctl --user start nanoclaw
+systemctl --user start clawbridge
 ```
 
 ### Bot not responding
 
 1. Auth exists: `test -f store/auth/creds.json`
-2. Connected: `grep "Connected to WhatsApp" logs/nanoclaw.log | tail -1`
+2. Connected: `grep "Connected to WhatsApp" logs/clawbridge.log | tail -1`
 3. Channel wired: `sqlite3 data/v2.db "SELECT mg.platform_id, mg.name FROM messaging_groups mg JOIN messaging_group_agents mga ON mg.id=mga.messaging_group_id WHERE mg.channel_type='whatsapp'"`
-4. Service running: `systemctl --user status nanoclaw`
+4. Service running: `systemctl --user status clawbridge`
 
 ### "conflict" disconnection
 
-Two instances connected with same credentials. Ensure only one NanoClaw process is running.
+Two instances connected with same credentials. Ensure only one ClawBridge process is running.

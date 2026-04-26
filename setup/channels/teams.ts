@@ -1,7 +1,7 @@
 /**
  * Microsoft Teams channel flow for setup:auto.
  *
- * Teams is the most complex channel NanoClaw supports — the Slack/Discord
+ * Teams is the most complex channel ClawBridge supports — the Slack/Discord
  * "paste a token" shortcut doesn't exist. The operator has to walk through
  * ~7 Azure portal steps (app registration, client secret, Azure Bot
  * resource, messaging endpoint, Teams channel enable, manifest, sideload).
@@ -21,7 +21,7 @@
  *   - Wait-for-first-DM to capture the auto-generated Teams platformId.
  *     Unlike Discord/Telegram, the Teams platform_id is only discoverable
  *     after the first inbound activity. The driver installs the adapter and
- *     stops there; the operator DMs the bot, NanoClaw auto-creates the
+ *     stops there; the operator DMs the bot, ClawBridge auto-creates the
  *     messaging group, and they wire an agent via `/manage-channels`.
  */
 import os from 'os';
@@ -178,7 +178,7 @@ async function stepAppRegistration(args: {
   p.note(
     [
       `1. In ${AZURE_PORTAL_URL}, search "App registrations" → "New registration"`,
-      '2. Name it (e.g. "NanoClaw")',
+      '2. Name it (e.g. "ClawBridge")',
       '3. Supported account types: Single tenant (your org only) OR',
       '   Multi tenant (any Microsoft 365 tenant can add the bot)',
       '4. Click Register',
@@ -263,7 +263,7 @@ async function stepClientSecret(args: {
     [
       `1. In your app registration, open "Certificates & secrets"`,
       '2. Click "New client secret"',
-      '     Description: nanoclaw',
+      '     Description: clawbridge',
       '     Expires: 180 days (recommended) or longer',
       '3. Click Add',
       '4. ' + k.yellow('COPY THE VALUE NOW — Azure only shows it once'),
@@ -322,8 +322,8 @@ async function stepAzureBot(args: {
       : '';
   const cliCommand =
     `az bot create \\\n` +
-    `  --resource-group nanoclaw-rg \\\n` +
-    `  --name nanoclaw-bot \\\n` +
+    `  --resource-group clawbridge-rg \\\n` +
+    `  --name clawbridge-bot \\\n` +
     `  --app-type ${args.collected.appType} \\\n` +
     `  --appid ${args.collected.appId} \\\n` +
     `  ${tenantFlag}--endpoint "${endpoint}"`;
@@ -332,7 +332,7 @@ async function stepAzureBot(args: {
     [
       `In ${AZURE_PORTAL_URL}, search "Azure Bot" → Create.`,
       '',
-      '  • Bot handle: unique name, e.g. nanoclaw-bot',
+      '  • Bot handle: unique name, e.g. clawbridge-bot',
       `  • Type of App: ${args.collected.appType}`,
       '  • Creation type: Use existing app registration',
       `  • App ID: ${args.collected.appId ?? '<pending>'}`,
@@ -371,7 +371,7 @@ async function stepEnableTeamsChannel(args: {
       '2. Click Microsoft Teams → Accept terms → Apply',
       '',
       k.dim('CLI alternative:'),
-      k.dim('  az bot msteams create --resource-group nanoclaw-rg --name nanoclaw-bot'),
+      k.dim('  az bot msteams create --resource-group clawbridge-rg --name clawbridge-bot'),
     ].join('\n'),
     'Step 4 of 6 — Enable Teams channel on the bot',
   );
@@ -398,7 +398,7 @@ async function stepGenerateManifest(args: {
     );
   }
   const shortName =
-    process.env.NANOCLAW_AGENT_NAME?.trim() || 'NanoClaw';
+    process.env.CLAWBRIDGE_AGENT_NAME?.trim() || 'ClawBridge';
 
   const s = p.spinner();
   s.start('Generating your Teams app package…');
@@ -406,7 +406,7 @@ async function stepGenerateManifest(args: {
     const result = buildTeamsAppPackage({
       appId: args.collected.appId!,
       shortName,
-      longDescription: `${shortName} personal assistant powered by NanoClaw.`,
+      longDescription: `${shortName} personal assistant powered by ClawBridge.`,
       websiteUrl: args.collected.publicUrl!,
       outDir: MANIFEST_DIR,
     });
@@ -505,7 +505,7 @@ async function finishWithHandoff(
     [
       'The Teams adapter is live and the service is running.',
       '',
-      "One thing left: your Teams bot's platform ID (which NanoClaw needs",
+      "One thing left: your Teams bot's platform ID (which ClawBridge needs",
       'to wire to an agent group) only becomes known after you DM the bot',
       'for the first time. Claude can walk you through that interactively —',
       'watch the logs for your first inbound, find the auto-created',
@@ -534,7 +534,7 @@ async function finishWithHandoff(
       [
         '  1. Find your bot in Teams (search by name, or via the sideloaded',
         '     app) and send it a message ("hi" is fine)',
-        '  2. Tail ' + k.cyan('logs/nanoclaw.log') + ' for the inbound; the router',
+        '  2. Tail ' + k.cyan('logs/clawbridge.log') + ' for the inbound; the router',
         '     auto-creates a row in ' + k.cyan('messaging_groups') + ' in data/v2.db',
         '  3. Run ' + k.cyan('scripts/init-first-agent.ts') + ' with --channel teams,',
         '     the discovered platform_id, and your AAD user id, OR use',
@@ -556,7 +556,7 @@ async function finishWithHandoff(
       'scripts/init-first-agent.ts',
       'src/router.ts',
       'src/db/messaging-groups.ts',
-      'logs/nanoclaw.log',
+      'logs/clawbridge.log',
       '.claude/skills/manage-channels/SKILL.md',
     ],
   });

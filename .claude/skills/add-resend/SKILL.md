@@ -5,11 +5,11 @@ description: Add Resend (email) channel integration via Chat SDK.
 
 # Add Resend Email Channel
 
-Connect NanoClaw to email via Resend for async email conversations.
+Connect ClawBridge to email via Resend for async email conversations.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Resend adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the Resend adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 
@@ -71,7 +71,7 @@ Add to `.env`:
 ```bash
 RESEND_API_KEY=re_...
 RESEND_FROM_ADDRESS=bot@yourdomain.com
-RESEND_FROM_NAME=NanoClaw
+RESEND_FROM_NAME=ClawBridge
 RESEND_WEBHOOK_SECRET=your-webhook-secret
 ```
 

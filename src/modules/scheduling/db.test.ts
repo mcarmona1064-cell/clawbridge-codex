@@ -20,7 +20,7 @@ import {
   type RecurringMessage,
 } from './db.js';
 
-const TEST_DIR = '/tmp/nanoclaw-scheduling-db-test';
+const TEST_DIR = '/tmp/clawbridge-scheduling-db-test';
 const DB_PATH = path.join(TEST_DIR, 'inbound.db');
 
 function freshDb() {

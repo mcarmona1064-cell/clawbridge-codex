@@ -77,9 +77,9 @@ function renderManifest(opts: ManifestOptions): string {
     manifestVersion: MANIFEST_VERSION,
     version: '1.0.0',
     id: opts.appId,
-    packageName: 'com.nanoclaw.bot',
+    packageName: 'com.clawbridge.bot',
     developer: {
-      name: 'NanoClaw',
+      name: 'ClawBridge',
       websiteUrl: opts.websiteUrl,
       privacyUrl: opts.websiteUrl,
       termsOfUseUrl: opts.websiteUrl,

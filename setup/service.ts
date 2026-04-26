@@ -55,13 +55,13 @@ export async function run(_args: string[]): Promise<void> {
   fs.mkdirSync(path.join(projectRoot, 'logs'), { recursive: true });
 
   // Peer preflight — a crash-looping peer install (most often the legacy v1
-  // `com.nanoclaw` plist) will keep trashing this install's containers on
+  // `com.clawbridge` plist) will keep trashing this install's containers on
   // every respawn via its own cleanupOrphans. Detect and unload any peer
   // that's unhealthy before we install our service. Healthy peers are left
   // alone now that container reaping is install-label-scoped.
   const peerReport = cleanupUnhealthyPeers(projectRoot);
   if (peerReport.unloaded.length > 0) {
-    log.warn('Unloaded unhealthy peer NanoClaw services', {
+    log.warn('Unloaded unhealthy peer ClawBridge services', {
       count: peerReport.unloaded.length,
       labels: peerReport.unloaded.map((p) => p.label),
     });
@@ -89,7 +89,7 @@ function setupLaunchd(
   nodePath: string,
   homeDir: string,
 ): void {
-  // Per-checkout service label so multiple NanoClaw installs can coexist
+  // Per-checkout service label so multiple ClawBridge installs can coexist
   // without clobbering each other's plist.
   const label = getLaunchdLabel(projectRoot);
   const plistPath = path.join(
@@ -125,9 +125,9 @@ function setupLaunchd(
         <string>${homeDir}</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>${projectRoot}/logs/nanoclaw.log</string>
+    <string>${projectRoot}/logs/clawbridge.log</string>
     <key>StandardErrorPath</key>
-    <string>${projectRoot}/logs/nanoclaw.error.log</string>
+    <string>${projectRoot}/logs/clawbridge.error.log</string>
 </dict>
 </plist>`;
 
@@ -197,7 +197,7 @@ function setupLinux(
 }
 
 /**
- * Kill any orphaned nanoclaw node processes left from previous runs or debugging.
+ * Kill any orphaned clawbridge node processes left from previous runs or debugging.
  * Prevents connection conflicts when two instances connect to the same channel simultaneously.
  */
 function killOrphanedProcesses(projectRoot: string): void {
@@ -205,7 +205,7 @@ function killOrphanedProcesses(projectRoot: string): void {
     execSync(`pkill -f '${projectRoot}/dist/index\\.js' || true`, {
       stdio: 'ignore',
     });
-    log.info('Stopped any orphaned nanoclaw processes');
+    log.info('Stopped any orphaned clawbridge processes');
   } catch {
     // pkill not available or no orphans
   }
@@ -273,7 +273,7 @@ function setupSystemd(
   }
 
   const unit = `[Unit]
-Description=NanoClaw Personal Assistant
+Description=ClawBridge Personal Assistant
 After=network.target
 
 [Service]
@@ -285,8 +285,8 @@ RestartSec=5
 KillMode=process
 Environment=HOME=${homeDir}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:${homeDir}/.local/bin
-StandardOutput=append:${projectRoot}/logs/nanoclaw.log
-StandardError=append:${projectRoot}/logs/nanoclaw.error.log
+StandardOutput=append:${projectRoot}/logs/clawbridge.log
+StandardError=append:${projectRoot}/logs/clawbridge.error.log
 
 [Install]
 WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
@@ -324,7 +324,7 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
     }
   }
 
-  // Kill orphaned nanoclaw processes to avoid channel connection conflicts
+  // Kill orphaned clawbridge processes to avoid channel connection conflicts
   killOrphanedProcesses(projectRoot);
 
   // Enable lingering so the user service survives SSH logout.
@@ -395,12 +395,12 @@ function setupNohupFallback(
 ): void {
   log.warn('No systemd detected — generating nohup wrapper script');
 
-  const wrapperPath = path.join(projectRoot, 'start-nanoclaw.sh');
-  const pidFile = path.join(projectRoot, 'nanoclaw.pid');
+  const wrapperPath = path.join(projectRoot, 'start-clawbridge.sh');
+  const pidFile = path.join(projectRoot, 'clawbridge.pid');
 
   const lines = [
     '#!/bin/bash',
-    '# start-nanoclaw.sh — Start NanoClaw without systemd',
+    '# start-clawbridge.sh — Start ClawBridge without systemd',
     `# To stop: kill \\$(cat ${pidFile})`,
     '',
     'set -euo pipefail',
@@ -411,20 +411,20 @@ function setupNohupFallback(
     `if [ -f ${JSON.stringify(pidFile)} ]; then`,
     `  OLD_PID=$(cat ${JSON.stringify(pidFile)} 2>/dev/null || echo "")`,
     '  if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then',
-    '    echo "Stopping existing NanoClaw (PID $OLD_PID)..."',
+    '    echo "Stopping existing ClawBridge (PID $OLD_PID)..."',
     '    kill "$OLD_PID" 2>/dev/null || true',
     '    sleep 2',
     '  fi',
     'fi',
     '',
-    'echo "Starting NanoClaw..."',
+    'echo "Starting ClawBridge..."',
     `nohup ${JSON.stringify(nodePath)} ${JSON.stringify(projectRoot + '/dist/index.js')} \\`,
-    `  >> ${JSON.stringify(projectRoot + '/logs/nanoclaw.log')} \\`,
-    `  2>> ${JSON.stringify(projectRoot + '/logs/nanoclaw.error.log')} &`,
+    `  >> ${JSON.stringify(projectRoot + '/logs/clawbridge.log')} \\`,
+    `  2>> ${JSON.stringify(projectRoot + '/logs/clawbridge.error.log')} &`,
     '',
     `echo $! > ${JSON.stringify(pidFile)}`,
-    'echo "NanoClaw started (PID $!)"',
-    `echo "Logs: tail -f ${projectRoot}/logs/nanoclaw.log"`,
+    'echo "ClawBridge started (PID $!)"',
+    `echo "Logs: tail -f ${projectRoot}/logs/clawbridge.log"`,
   ];
   const wrapper = lines.join('\n') + '\n';
 

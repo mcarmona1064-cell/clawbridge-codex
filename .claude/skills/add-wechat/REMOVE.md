@@ -43,7 +43,7 @@ DELETE FROM messaging_groups WHERE channel_type = 'wechat';
 
 ```bash
 pnpm run build
-systemctl --user restart nanoclaw   # Linux
+systemctl --user restart clawbridge   # Linux
 # or
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
+launchctl kickstart -k gui/$(id -u)/com.clawbridge   # macOS
 ```

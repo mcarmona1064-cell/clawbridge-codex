@@ -164,7 +164,7 @@ probe_service_status() {
       command_exists systemctl || { echo "not_configured"; return; }
       if with_timeout systemctl --user is-active "$SYSTEMD_UNIT" >/dev/null 2>&1; then
         echo "running"
-      elif with_timeout systemctl --user cat nanoclaw >/dev/null 2>&1; then
+      elif with_timeout systemctl --user cat clawbridge >/dev/null 2>&1; then
         echo "stopped"
       else
         echo "not_configured"
@@ -237,7 +237,7 @@ END_S=$(date +%s)
 ELAPSED_MS=$(( (END_S - START_S) * 1000 ))
 
 cat <<EOF
-=== NANOCLAW SETUP: PROBE ===
+=== CLAWBRIDGE SETUP: PROBE ===
 OS: ${OS}
 SHELL: ${SHELL_NAME}
 HOST_DEPS: ${HOST_DEPS}

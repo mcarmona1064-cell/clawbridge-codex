@@ -10,7 +10,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
-const TEST_DIR = '/tmp/nanoclaw-v2-channel-e2e';
+const TEST_DIR = '/tmp/clawbridge-v2-channel-e2e';
 if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
 fs.mkdirSync(TEST_DIR, { recursive: true });
 
@@ -179,7 +179,7 @@ console.log(`✓ Container status: ${session.container_status}`);
 import { execSync } from 'child_process';
 const checkContainerLogs = () => {
   try {
-    const containers = execSync('docker ps -a --filter name=nanoclaw-v2-test-channel --format "{{.Names}}"').toString().trim();
+    const containers = execSync('docker ps -a --filter name=clawbridge-v2-test-channel --format "{{.Names}}"').toString().trim();
     for (const name of containers.split('\n').filter(Boolean)) {
       console.log(`\nContainer logs (${name}):`);
       console.log(execSync(`docker logs ${name} 2>&1`).toString());

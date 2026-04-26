@@ -12,7 +12,7 @@
  * gives enough contrast for the cursor to read as "active".
  *
  * Not a full clack-feature clone: no search, no maxItems paging, no custom
- * bar characters. Just the bits the NanoClaw setup menus actually use.
+ * bar characters. Just the bits the ClawBridge setup menus actually use.
  */
 import { SelectPrompt } from '@clack/core';
 import { isCancel } from '@clack/prompts';

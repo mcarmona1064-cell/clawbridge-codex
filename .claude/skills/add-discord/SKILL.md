@@ -9,7 +9,7 @@ Adds Discord bot support via the Chat SDK bridge.
 
 ## Install
 
-NanoClaw doesn't ship channels in trunk. This skill copies the Discord adapter in from the `channels` branch.
+ClawBridge doesn't ship channels in trunk. This skill copies the Discord adapter in from the `channels` branch.
 
 ### Pre-flight (idempotent)
 
@@ -58,7 +58,7 @@ pnpm run build
 ### Create Discord Bot
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application** and give it a name (e.g., "NanoClaw Assistant")
+2. Click **New Application** and give it a name (e.g., "ClawBridge Assistant")
 3. From the **General Information** tab, copy the **Application ID** and **Public Key**
 4. Go to the **Bot** tab and click **Add Bot** if needed
 5. Copy the Bot Token (click **Reset Token** if you need a new one — you can only see it once)

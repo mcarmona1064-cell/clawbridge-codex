@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "=== NANOCLAW SETUP: INSTALL_RESEND ==="
+echo "=== CLAWBRIDGE SETUP: INSTALL_RESEND ==="
 
 needs_install=false
 [[ -f src/channels/resend.ts ]] || needs_install=true
