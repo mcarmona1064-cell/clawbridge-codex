@@ -1,48 +1,4 @@
-import { readEnvFile } from '../env.js'
-import { log } from '../log.js'
-
-// ── Auth ─────────────────────────────────────────────────────────────────────
-
-const envCfg = readEnvFile(['OPENAI_API_KEY'])
-
-function getOpenAiKey(): string | null {
-  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null
-}
-
-// ── OpenAI embeddings (when key is available) ─────────────────────────────────
-
-async function embedOpenAi(text: string): Promise<number[] | null> {
-  const key = getOpenAiKey()
-  if (!key) return null
-
-  try {
-    const res = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({ model: 'text-embedding-3-small', input: text }),
-    })
-
-    const data = (await res.json()) as {
-      data?: Array<{ embedding: number[] }>
-      error?: { message: string }
-    }
-
-    if (data.error) {
-      log.warn('[memory] OpenAI embedding error', { error: data.error.message })
-      return null
-    }
-
-    return data.data?.[0]?.embedding ?? null
-  } catch (err) {
-    log.warn('[memory] OpenAI embedding fetch failed', { err })
-    return null
-  }
-}
-
-// ── TF-IDF keyword similarity (zero-cost fallback) ────────────────────────────
+// ── Stop words ────────────────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
   'the', 'and', 'for', 'with', 'that', 'this', 'from', 'have',
@@ -57,6 +13,8 @@ function tokenize(text: string): string[] {
     .filter((w) => w.length > 3 && !STOP_WORDS.has(w))
 }
 
+// ── Keyword similarity (TF-IDF style, no external API needed) ─────────────────
+
 export function keywordSimilarity(query: string, memory: string): number {
   const queryWords = new Set(tokenize(query))
   if (queryWords.size === 0) return 0
@@ -65,7 +23,7 @@ export function keywordSimilarity(query: string, memory: string): number {
   return matches / queryWords.size
 }
 
-// ── Cosine similarity ─────────────────────────────────────────────────────────
+// ── Cosine similarity (for future vector use) ─────────────────────────────────
 
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0
@@ -81,13 +39,8 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom
 }
 
-// ── Public embed function ─────────────────────────────────────────────────────
+// ── embed stub (returns null — keyword similarity is used instead) ────────────
 
-/**
- * Generate an embedding for text.
- * Uses OpenAI text-embedding-3-small when OPENAI_API_KEY is set.
- * Returns null when no embedding API is available (caller falls back to keyword similarity).
- */
-export async function embed(text: string): Promise<number[] | null> {
-  return embedOpenAi(text)
+export async function embed(_text: string): Promise<number[] | null> {
+  return null
 }
