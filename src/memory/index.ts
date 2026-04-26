@@ -5,3 +5,13 @@ export { runReflectionAgent } from './reflection-agent.js'
 export { generateCrossClientReport } from './cross-client.js'
 export { embed, keywordSimilarity, cosineSimilarity } from './embeddings.js'
 export type { Memory, MemorySegment, MemoryQueryResult } from './types.js'
+
+// Hindsight integration
+export {
+  hindsightRetain,
+  hindsightRecall,
+  hindsightReflect,
+  ensureClientBank,
+  isHindsightAvailable,
+  bankId,
+} from './hindsight.js'

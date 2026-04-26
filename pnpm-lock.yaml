@@ -17,6 +17,9 @@ importers:
       '@onecli-sh/sdk':
         specifier: ^0.3.1
         version: 0.3.1
+      '@vectorize-io/hindsight-client':
+        specifier: ^0.5.4
+        version: 0.5.4
       better-sqlite3:
         specifier: 11.10.0
         version: 11.10.0
@@ -502,6 +505,9 @@ packages:
   '@typescript-eslint/visitor-keys@8.58.2':
     resolution: {integrity: sha512-f1WO2Lx8a9t8DARmcWAUPJbu0G20bJlj8L4z72K00TMeJAoyLr/tHhI/pzYBLrR4dXWkcxO1cWYZEOX8DKHTqA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@vectorize-io/hindsight-client@0.5.4':
+    resolution: {integrity: sha512-XroGmAsIRLm754+BieorqNoX3tUoSH/Uph2nkPjpLVnrRfrmT7ew1vIPfw95ycGRRLTSpk3usD2+tw6vdchtpQ==}
 
   '@vitest/expect@4.1.4':
     resolution: {integrity: sha512-iPBpra+VDuXmBFI3FMKHSFXp3Gx5HfmSCE8X67Dn+bwephCnQCaB7qWK2ldHa+8ncN8hJU8VTMcxjPpyMkUjww==}
@@ -1848,6 +1854,8 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.58.2
       eslint-visitor-keys: 5.0.1
+
+  '@vectorize-io/hindsight-client@0.5.4': {}
 
   '@vitest/expect@4.1.4':
     dependencies:

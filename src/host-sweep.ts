@@ -45,7 +45,7 @@ import { log } from './log.js';
 import { openInboundDb, openOutboundDb, inboundDbPath, heartbeatPath } from './session-manager.js';
 import { isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
 import type { Session } from './types.js';
-import { MemoryManager, runReflectionAgent, generateCrossClientReport } from './memory/index.js';
+import { MemoryManager, runReflectionAgent, generateCrossClientReport, hindsightRetain, hindsightReflect, isHindsightAvailable } from './memory/index.js';
 
 const SWEEP_INTERVAL_MS = 60_000;
 // Absolute idle ceiling for a running container. If the heartbeat file hasn't
@@ -107,8 +107,8 @@ export function decideStuckAction(args: {
 }
 
 let running = false;
-let lastDecayDate = '' // YYYY-MM-DD of last nightly decay run
-let lastWeeklyReportDate = '' // YYYY-Www of last weekly cross-client report
+let lastDecayDate = ''; // YYYY-MM-DD of last nightly decay run
+let lastWeeklyReportDate = ''; // YYYY-Www of last weekly cross-client report
 
 export function startHostSweep(): void {
   if (running) return;
@@ -133,7 +133,7 @@ async function sweep(): Promise<void> {
   }
 
   // Nightly memory decay — runs once at/after 2am each calendar day
-  await runNightlyMemoryDecay()
+  await runNightlyMemoryDecay();
 
   // Weekly cross-client report — runs Sunday midnight
   await runWeeklyCrossClientReport();
@@ -167,30 +167,29 @@ async function runNightlyMemoryDecay(): Promise<void> {
   }
 }
 
-
 async function runWeeklyCrossClientReport(): Promise<void> {
-  const now = new Date()
+  const now = new Date();
   // Only run on Sunday (0) between midnight and 01:00 local time
-  if (now.getDay() !== 0 || now.getHours() !== 0) return
+  if (now.getDay() !== 0 || now.getHours() !== 0) return;
 
   // ISO week key: YYYY-Www
-  const startOfYear = new Date(now.getFullYear(), 0, 1)
-  const weekNum = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
-  const weekKey = `${now.getFullYear()}-W${String(weekNum).padStart(2, '0')}`
-  if (lastWeeklyReportDate === weekKey) return
-  lastWeeklyReportDate = weekKey
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+  const weekKey = `${now.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+  if (lastWeeklyReportDate === weekKey) return;
+  lastWeeklyReportDate = weekKey;
 
-  log.info('[memory] Running weekly cross-client report', { week: weekKey })
+  log.info('[memory] Running weekly cross-client report', { week: weekKey });
   try {
-    const sessions = getActiveSessions()
-    const clientIds = sessions.map((s) => s.id)
+    const sessions = getActiveSessions();
+    const clientIds = sessions.map((s) => s.id);
     if (clientIds.length < 2) {
-      log.debug('[memory] Not enough clients for weekly report', { count: clientIds.length })
-      return
+      log.debug('[memory] Not enough clients for weekly report', { count: clientIds.length });
+      return;
     }
-    await generateCrossClientReport(clientIds)
+    await generateCrossClientReport(clientIds);
   } catch (err) {
-    log.error('[memory] Weekly cross-client report failed', { err })
+    log.error('[memory] Weekly cross-client report failed', { err });
   }
 }
 
