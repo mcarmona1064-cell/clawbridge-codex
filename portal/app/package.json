@@ -1,0 +1,26 @@
+{
+  "name": "@clawbridge/portal",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev -p 4000",
+    "build": "next build",
+    "start": "next start -p 4000"
+  },
+  "dependencies": {
+    "next": "14.2.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@headlessui/react": "^2.0.0",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.400.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/react": "^18.0.0",
+    "@types/node": "^20.0.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.0.0",
+    "postcss": "^8.0.0"
+  }
+}
