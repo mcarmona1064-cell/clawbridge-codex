@@ -5,6 +5,10 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "main": "dist/index.js",
+  "bin": {
+    "clawbridge-agent": "./dist/setup/index.js",
+    "clawbridge": "./dist/setup/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -15,7 +19,9 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "prepare": "husky",
     "setup": "tsx setup/index.ts",
+    "setup:wizard": "tsx src/setup/index.ts",
     "setup:auto": "tsx setup/auto.ts",
+    "migrate": "tsx src/setup/migrate.ts",
     "chat": "tsx scripts/chat.ts",
     "auth": "tsx src/whatsapp-auth.ts",
     "lint": "eslint src/",

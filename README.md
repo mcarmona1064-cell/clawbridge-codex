@@ -26,12 +26,51 @@ ClawBridge provides that same core functionality, but in a codebase small enough
 ## Quick Start
 
 ```bash
+npx clawbridge-agent setup
+```
+
+The interactive wizard walks you through fresh install or migration from OpenClaw/NanoClaw in minutes.
+
+Or migrate from an existing install:
+
+```bash
+npx clawbridge-agent setup --migrate
+```
+
+**From a local checkout:**
+
+```bash
 git clone https://github.com/other2368-byte/clawbridge-agent.git clawbridge-v2
 cd clawbridge-v2
+pnpm run setup:wizard
+```
+
+`clawbridge.sh` is also available for automated/scripted installs:
+
+```bash
 bash clawbridge.sh
 ```
 
-`clawbridge.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if missing, registers your Anthropic credential with OneCLI, builds the agent container, and pairs your first channel (Telegram, Discord, WhatsApp, or a local CLI). If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
+`clawbridge.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if missing, registers your Claude credential with OneCLI, builds the agent container, and pairs your first channel (Telegram, Discord, WhatsApp, or a local CLI). If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
+
+## Features
+
+- 🤖 Multi-channel AI agents (Telegram, WhatsApp, Discord, Slack, iMessage, 15+ more)
+- 🔌 700+ integrations via Nango (Google, HubSpot, Stripe, Slack…)
+- 📊 Client portal with analytics & ROI dashboard
+- 💳 Stripe billing (Starter $299, Pro $599, Enterprise $1,299/mo)
+- 📞 Voice agents via Retell AI
+- 👁 Vision & document analysis via Claude
+- 🔒 Container-isolated, self-hosted — your data stays yours
+- 🚀 Migrate from OpenClaw or NanoClaw/Cyndra in minutes
+
+## Architecture
+
+```
+messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent SDK) → outbound.db → host process (delivery) → messaging apps
+```
+
+A single Node host orchestrates per-session agent containers. Agents run in Docker with explicit filesystem mounts. Credentials never enter containers — outbound requests route through [OneCLI's Agent Vault](https://github.com/onecli/onecli). See [docs/architecture.md](docs/architecture.md) for the full writeup.
 
 ## Philosophy
 
