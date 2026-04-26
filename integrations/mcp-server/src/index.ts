@@ -7,6 +7,9 @@ import {
 import Nango from "@nangohq/node";
 import { z } from "zod";
 
+import Retell from "retell-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+
 const secretKey = process.env.NANGO_SECRET_KEY;
 const serverUrl = process.env.NANGO_SERVER_URL ?? "http://localhost:3003";
 
@@ -16,6 +19,39 @@ if (!secretKey) {
 }
 
 const nango = new Nango({ secretKey, host: serverUrl });
+
+
+// ---------------------------------------------------------------------------
+// Retell client
+// ---------------------------------------------------------------------------
+
+const retellClient = process.env.RETELL_API_KEY
+  ? new Retell({ apiKey: process.env.RETELL_API_KEY })
+  : null;
+
+function requireRetell(): Retell {
+  if (!retellClient) throw new Error("RETELL_API_KEY is not configured");
+  return retellClient;
+}
+
+// ---------------------------------------------------------------------------
+// Portal DB helper — fetch client Anthropic API key
+// ---------------------------------------------------------------------------
+
+async function getClientAnthropicKey(clientId: string): Promise<string> {
+  const portalApiUrl = process.env.PORTAL_API_URL ?? "http://localhost:3010";
+  const portalAdminToken = process.env.PORTAL_ADMIN_TOKEN ?? "";
+  const res = await fetch(`${portalApiUrl}/api/clients/${clientId}/anthropic-key`, {
+    headers: { Authorization: `Bearer ${portalAdminToken}` },
+  });
+  if (!res.ok) {
+    const envKey = process.env.ANTHROPIC_API_KEY;
+    if (envKey) return envKey;
+    throw new Error(`No Anthropic API key found for client "${clientId}". Store one via onboarding or set ANTHROPIC_API_KEY.`);
+  }
+  const data = await res.json() as { api_key: string };
+  return data.api_key;
+}
 
 const server = new Server(
   { name: "clawbridge-integrations", version: "1.0.0" },
@@ -285,6 +321,121 @@ const TOOLS = [
         content: { type: "string", description: "Plain text content for the page" },
       },
       required: ["client_id", "parent_page_id", "title", "content"],
+    },
+  },
+  // ---- Retell Voice -------------------------------------------------------
+  {
+    name: "create_voice_agent",
+    description: "Create a Retell voice agent for a client",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        agent_name: { type: "string", description: "Display name for the agent" },
+        system_prompt: { type: "string", description: "System prompt / instructions for the agent" },
+        voice_id: { type: "string", description: "Retell voice ID (default: 11labs-Adrian)" },
+      },
+      required: ["client_id", "agent_name", "system_prompt"],
+    },
+  },
+  {
+    name: "make_call",
+    description: "Make an outbound phone call via Retell",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        to_number: { type: "string", description: "E.164 destination number e.g. +12125550100" },
+        from_number: { type: "string", description: "E.164 caller ID number" },
+        message: { type: "string", description: "Optional dynamic context injected into the call" },
+      },
+      required: ["client_id", "to_number", "from_number"],
+    },
+  },
+  {
+    name: "get_call_transcript",
+    description: "Get the transcript and recording URL for a completed call",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        call_id: { type: "string" },
+      },
+      required: ["client_id", "call_id"],
+    },
+  },
+  {
+    name: "list_recent_calls",
+    description: "List recent calls for a client with status and duration",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        limit: { type: "number", description: "Max number of calls to return (default 20)" },
+      },
+      required: ["client_id"],
+    },
+  },
+  {
+    name: "get_call_analytics",
+    description: "Get call analytics for a client: deflection rate, avg duration, CSAT from call data",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+      },
+      required: ["client_id"],
+    },
+  },
+  // ---- Claude Vision -------------------------------------------------------
+  {
+    name: "analyze_image",
+    description: "Analyze an image/photo using Claude vision and return a description",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        image_url: { type: "string", description: "Public URL of the image" },
+        question: { type: "string", description: "Optional question about the image" },
+      },
+      required: ["client_id", "image_url"],
+    },
+  },
+  {
+    name: "extract_text_from_image",
+    description: "OCR: extract all text from an image",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        image_url: { type: "string" },
+      },
+      required: ["client_id", "image_url"],
+    },
+  },
+  {
+    name: "analyze_document",
+    description: "Analyze an invoice, contract, or form image and return structured data",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        image_url: { type: "string" },
+        doc_type: { type: "string", description: "Document type hint e.g. invoice, contract, form" },
+      },
+      required: ["client_id", "image_url"],
+    },
+  },
+  {
+    name: "describe_chart",
+    description: "Analyze a chart or graph image and return key insights",
+    inputSchema: {
+      type: "object",
+      properties: {
+        client_id: { type: "string" },
+        image_url: { type: "string" },
+      },
+      required: ["client_id", "image_url"],
     },
   },
 ];
@@ -590,6 +741,234 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
         } catch {
           return { content: [{ type: "text", text: connectionNotFound("Notion", client_id) }] };
+        }
+      }
+
+      // ---- Retell Voice ------------------------------------------------
+
+      case "create_voice_agent": {
+        const { client_id, agent_name, system_prompt, voice_id } = args as {
+          client_id: string;
+          agent_name: string;
+          system_prompt: string;
+          voice_id?: string;
+        };
+        try {
+          const retell = requireRetell();
+          // Create an LLM first, then an agent
+          const llm = await retell.llm.create({
+            general_prompt: system_prompt,
+          });
+          const agent = await retell.agent.create({
+            agent_name: `${client_id}-${agent_name}`,
+            response_engine: { type: "retell-llm", llm_id: llm.llm_id },
+            voice_id: voice_id ?? "11labs-Adrian",
+            metadata: { client_id },
+          });
+          return { content: [{ type: "text", text: JSON.stringify({ agent_id: agent.agent_id, llm_id: llm.llm_id, agent_name: agent.agent_name }, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error creating voice agent: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "make_call": {
+        const { client_id, to_number, from_number, message } = args as {
+          client_id: string;
+          to_number: string;
+          from_number: string;
+          message?: string;
+        };
+        try {
+          const retell = requireRetell();
+          const dynamicVars: Record<string, string> = { client_id };
+          if (message) dynamicVars.context = message;
+          const call = await retell.call.createPhoneCall({
+            from_number,
+            to_number,
+            retell_llm_dynamic_variables: dynamicVars,
+          });
+          return { content: [{ type: "text", text: JSON.stringify(call, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error making call: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "get_call_transcript": {
+        const { call_id } = args as { client_id: string; call_id: string };
+        try {
+          const retell = requireRetell();
+          const call = await retell.call.retrieve(call_id);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                call_id: call.call_id,
+                status: call.call_status,
+                transcript: call.transcript,
+                recording_url: call.recording_url,
+                duration_ms: call.duration_ms,
+              }, null, 2),
+            }],
+          };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error fetching transcript: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "list_recent_calls": {
+        const { limit = 20 } = args as { client_id: string; limit?: number };
+        try {
+          const retell = requireRetell();
+          const calls = await retell.call.list({ limit });
+          const summary = (calls as unknown[]).map((c: unknown) => {
+            const call = c as Record<string, unknown>;
+            return {
+              call_id: call.call_id,
+              status: call.call_status,
+              from: call.from_number,
+              to: call.to_number,
+              duration_ms: call.duration_ms,
+              start_time: call.start_timestamp,
+            };
+          });
+          return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error listing calls: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "get_call_analytics": {
+        const { client_id } = args as { client_id: string };
+        try {
+          const retell = requireRetell();
+          const calls = await retell.call.list({ limit: 100 }) as unknown[];
+          const all = calls as Array<Record<string, unknown>>;
+          const total = all.length;
+          const resolved = all.filter((c) => c.call_status === "ended").length;
+          const durations = all
+            .map((c) => typeof c.duration_ms === "number" ? c.duration_ms : 0)
+            .filter((d) => d > 0);
+          const avgDuration = durations.length
+            ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 1000)
+            : 0;
+          const deflectionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                client_id,
+                total_calls: total,
+                resolved_calls: resolved,
+                deflection_rate_pct: deflectionRate,
+                avg_duration_seconds: avgDuration,
+              }, null, 2),
+            }],
+          };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error fetching analytics: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      // ---- Claude Vision ------------------------------------------------
+
+      case "analyze_image": {
+        const { client_id, image_url, question } = args as {
+          client_id: string;
+          image_url: string;
+          question?: string;
+        };
+        try {
+          const apiKey = await getClientAnthropicKey(client_id);
+          const anthropic = new Anthropic({ apiKey });
+          const response = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 1024,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image", source: { type: "url", url: image_url } },
+                { type: "text", text: question ?? "Describe this image in detail." },
+              ],
+            }],
+          });
+          const text = response.content.find((b: {type: string}) => b.type === "text");
+          return { content: [{ type: "text", text: text && "text" in text ? text.text : "No description returned." }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error analyzing image: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "extract_text_from_image": {
+        const { client_id, image_url } = args as { client_id: string; image_url: string };
+        try {
+          const apiKey = await getClientAnthropicKey(client_id);
+          const anthropic = new Anthropic({ apiKey });
+          const response = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 2048,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image", source: { type: "url", url: image_url } },
+                { type: "text", text: "Extract all text visible in this image. Return only the extracted text, preserving layout where possible." },
+              ],
+            }],
+          });
+          const text = response.content.find((b: {type: string}) => b.type === "text");
+          return { content: [{ type: "text", text: text && "text" in text ? text.text : "No text found." }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error extracting text: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "analyze_document": {
+        const { client_id, image_url, doc_type } = args as {
+          client_id: string;
+          image_url: string;
+          doc_type?: string;
+        };
+        try {
+          const apiKey = await getClientAnthropicKey(client_id);
+          const anthropic = new Anthropic({ apiKey });
+          const docHint = doc_type ? ` This is a ${doc_type}.` : "";
+          const response = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 2048,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image", source: { type: "url", url: image_url } },
+                { type: "text", text: `Analyze this document image.${docHint} Extract all key fields and return a structured JSON object with the document type, key-value pairs for all important fields, line items if applicable, totals, dates, and parties involved. Return only valid JSON.` },
+              ],
+            }],
+          });
+          const text = response.content.find((b: {type: string}) => b.type === "text");
+          return { content: [{ type: "text", text: text && "text" in text ? text.text : "{}" }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error analyzing document: ${wrapError(e)}` }], isError: true };
+        }
+      }
+
+      case "describe_chart": {
+        const { client_id, image_url } = args as { client_id: string; image_url: string };
+        try {
+          const apiKey = await getClientAnthropicKey(client_id);
+          const anthropic = new Anthropic({ apiKey });
+          const response = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 1024,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image", source: { type: "url", url: image_url } },
+                { type: "text", text: "Analyze this chart or graph. Describe: (1) the type of chart, (2) what data is being visualized, (3) the key trends or insights, (4) any notable data points or anomalies, and (5) the main takeaway." },
+              ],
+            }],
+          });
+          const text = response.content.find((b: {type: string}) => b.type === "text");
+          return { content: [{ type: "text", text: text && "text" in text ? text.text : "No insights returned." }] };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Error describing chart: ${wrapError(e)}` }], isError: true };
         }
       }
 

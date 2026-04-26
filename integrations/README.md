@@ -125,3 +125,61 @@ cd integrations/mcp-server && npm install && npm run dev
 | `NANGO_REDIS_URL` | Redis URL for Nango job queue |
 | `SERVER_URL` | Public URL of Nango server (used for OAuth callbacks) |
 | `CONNECT_URL` | Public URL of Nango Connect (auth flow) |
+
+---
+
+## Retell Voice Integration
+
+ClawBridge includes a first-class Retell voice integration for AI-powered phone calls.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| Webhook server | `retell/src/index.ts` | Receives Retell events, saves transcripts to DB |
+| Retell client | `retell/src/retell-client.ts` | Wrapper for Retell API (create agents, make calls) |
+
+### Quick Start
+
+```bash
+cd integrations/retell
+npm install
+
+# Set env vars
+export RETELL_API_KEY=your-retell-api-key
+export RETELL_WEBHOOK_SECRET=your-webhook-secret
+export DATABASE_PATH=../portal/portal.db   # shared with portal API
+
+npm run dev   # starts webhook server on port 3020
+```
+
+### Webhook Events Handled
+
+| Event | Action |
+|-------|--------|
+| `call_started` | Creates a call_log row in SQLite |
+| `call_ended` | Updates duration, status, recording_url |
+| `call_analyzed` | Saves transcript, detects sentiment, logs usage |
+
+### MCP Tools (via integrations MCP server)
+
+| Tool | Description |
+|------|-------------|
+| `create_voice_agent` | Create a Retell agent with a custom system prompt |
+| `make_call` | Make an outbound call to any number |
+| `get_call_transcript` | Fetch transcript + recording URL by call_id |
+| `list_recent_calls` | List recent calls with status and duration |
+| `get_call_analytics` | Deflection rate, avg duration, call stats |
+
+---
+
+## Claude Vision Tools
+
+The MCP server includes Claude vision tools powered by each client's stored Anthropic API key.
+
+| Tool | Description |
+|------|-------------|
+| `analyze_image` | Describe any image/photo |
+| `extract_text_from_image` | OCR: extract all text from an image |
+| `analyze_document` | Parse invoices, contracts, forms → structured JSON |
+| `describe_chart` | Analyze charts/graphs → key insights |
+
+These tools automatically use the client's Anthropic API key stored in the portal (encrypted AES-256). Set `PORTAL_API_URL` and `PORTAL_ADMIN_TOKEN` in your MCP server env so it can fetch keys at runtime.

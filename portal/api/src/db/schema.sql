@@ -26,3 +26,25 @@ CREATE TABLE IF NOT EXISTS usage_logs (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id)
 );
+
+-- Phase 4: Anthropic API key support
+ALTER TABLE clients ADD COLUMN anthropic_api_key TEXT;
+
+CREATE TABLE IF NOT EXISTS call_logs (
+  id TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  call_id TEXT UNIQUE NOT NULL,
+  agent_id TEXT,
+  from_number TEXT,
+  to_number TEXT,
+  direction TEXT DEFAULT 'outbound',
+  status TEXT DEFAULT 'completed',
+  duration_seconds INTEGER,
+  recording_url TEXT,
+  transcript TEXT,
+  sentiment TEXT,
+  resolved INTEGER DEFAULT 0,
+  metadata TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id)
+);

@@ -7,6 +7,7 @@ import clientRoutes from './routes/clients.js';
 import statsRoutes from './routes/stats.js';
 import billingRoutes from './routes/billing.js';
 import integrationsRoutes from './routes/integrations.js';
+import callLogsRoutes from './routes/call-logs.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3010', 10);
@@ -26,6 +27,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/call-logs', callLogsRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
