@@ -28,11 +28,7 @@ export interface MigrationAudit {
   configFiles: string[];
 }
 
-export type MigrationSelection =
-  | 'groups'
-  | 'messages'
-  | 'skills'
-  | 'credentials';
+export type MigrationSelection = 'groups' | 'messages' | 'skills' | 'credentials';
 
 export interface MigrationProgress {
   step: string;
@@ -108,13 +104,10 @@ export async function detectInstall(): Promise<MigrationSource | null> {
   return null;
 }
 
-export function resolveManualPath(
-  dir: string,
-): MigrationSource | { error: string } {
+export function resolveManualPath(dir: string): MigrationSource | { error: string } {
   const resolved = path.resolve(dir);
   if (!fs.existsSync(resolved)) return { error: `Path not found: ${resolved}` };
-  if (!fs.statSync(resolved).isDirectory())
-    return { error: `Not a directory: ${resolved}` };
+  if (!fs.statSync(resolved).isDirectory()) return { error: `Not a directory: ${resolved}` };
   const type = identifyType(resolved);
   if (!type) {
     return {
@@ -128,11 +121,10 @@ export function resolveManualPath(
 
 function countSqliteRows(dbPath: string, table: string): number {
   try {
-    const result = spawnSync(
-      'sqlite3',
-      [dbPath, `SELECT COUNT(*) FROM ${table};`],
-      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
-    );
+    const result = spawnSync('sqlite3', [dbPath, `SELECT COUNT(*) FROM ${table};`], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     if (result.status !== 0) return 0;
     return parseInt((result.stdout ?? '0').trim(), 10) || 0;
   } catch {
@@ -153,10 +145,7 @@ function findDatabases(dir: string, maxDepth = 3): string[] {
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue;
       const full = path.join(current, entry.name);
-      if (
-        entry.isFile() &&
-        (entry.name.endsWith('.db') || entry.name.endsWith('.sqlite'))
-      ) {
+      if (entry.isFile() && (entry.name.endsWith('.db') || entry.name.endsWith('.sqlite'))) {
         dbs.push(full);
       } else if (entry.isDirectory() && entry.name !== 'node_modules') {
         walk(full, depth + 1);
@@ -190,13 +179,7 @@ function findSkills(sourceDir: string): string[] {
     if (!fs.existsSync(dir)) continue;
     try {
       fs.readdirSync(dir, { withFileTypes: true })
-        .filter(
-          (e) =>
-            e.isFile() &&
-            (e.name.endsWith('.ts') ||
-              e.name.endsWith('.js') ||
-              e.name.endsWith('.md')),
-        )
+        .filter((e) => e.isFile() && (e.name.endsWith('.ts') || e.name.endsWith('.js') || e.name.endsWith('.md')))
         .forEach((e) => skills.push(e.name));
     } catch {
       // skip
@@ -250,9 +233,7 @@ function findConfigFiles(sourceDir: string): string[] {
   ].filter((rel) => fs.existsSync(path.join(sourceDir, rel)));
 }
 
-export async function auditInstall(
-  source: MigrationSource,
-): Promise<MigrationAudit> {
+export async function auditInstall(source: MigrationSource): Promise<MigrationAudit> {
   const groups = findGroups(source.path);
   const dbs = findDatabases(source.path);
   let messageCount = 0;
@@ -324,8 +305,7 @@ export async function runMigration(
   selections: MigrationSelection[],
   onProgress?: (p: MigrationProgress) => void,
 ): Promise<void> {
-  const emit = (step: string, detail?: string): void =>
-    onProgress?.({ step, detail });
+  const emit = (step: string, detail?: string): void => onProgress?.({ step, detail });
 
   // 1. Backup existing ClawBridge data
   emit('backup', 'Creating backup of existing ClawBridge data…');
@@ -347,20 +327,14 @@ export async function runMigration(
       fs.mkdirSync(destGroupsDir, { recursive: true });
       for (const group of audit.groups) {
         emit('groups', `  Copying: ${group}`);
-        copyDirRecursive(
-          path.join(srcGroupsDir, group),
-          path.join(destGroupsDir, group),
-        );
+        copyDirRecursive(path.join(srcGroupsDir, group), path.join(destGroupsDir, group));
       }
     }
   }
 
   // 3. Message history
   if (selections.includes('messages') && audit.messageCount > 0) {
-    emit(
-      'messages',
-      `Migrating ${audit.messageCount.toLocaleString()} messages…`,
-    );
+    emit('messages', `Migrating ${audit.messageCount.toLocaleString()} messages…`);
     const srcDb = resolvePrimaryDb(source.path);
     if (srcDb) {
       const destStoreDir = path.join(CLAWBRIDGE_HOME, 'store');
@@ -383,10 +357,7 @@ export async function runMigration(
       fs.mkdirSync(destSkillsDir, { recursive: true });
       for (const skill of audit.skills) {
         emit('skills', `  Copying: ${skill}`);
-        fs.copyFileSync(
-          path.join(srcSkillsDir, skill),
-          path.join(destSkillsDir, skill),
-        );
+        fs.copyFileSync(path.join(srcSkillsDir, skill), path.join(destSkillsDir, skill));
       }
     }
   }
@@ -403,10 +374,7 @@ export async function runMigration(
       const srcDir = path.join(source.path, rel);
       if (fs.existsSync(srcDir)) {
         const channelName = path.basename(rel);
-        copyDirRecursive(
-          srcDir,
-          path.join(CLAWBRIDGE_HOME, 'credentials', channelName),
-        );
+        copyDirRecursive(srcDir, path.join(CLAWBRIDGE_HOME, 'credentials', channelName));
         emit('credentials', `  Copied ${channelName} credentials`);
       }
     }
@@ -440,9 +408,7 @@ export async function runMigration(
 export async function rollback(_source: MigrationSource): Promise<void> {
   const backupDir = path.join(CLAWBRIDGE_HOME, 'migration-backup');
   if (!fs.existsSync(backupDir)) {
-    throw new Error(
-      'No migration backup found at ~/.clawbridge/migration-backup/. Cannot roll back.',
-    );
+    throw new Error('No migration backup found at ~/.clawbridge/migration-backup/. Cannot roll back.');
   }
   for (const subdir of ['groups', 'skills', 'store']) {
     const target = path.join(CLAWBRIDGE_HOME, subdir);

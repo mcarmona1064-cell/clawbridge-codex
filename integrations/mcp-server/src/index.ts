@@ -4,7 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import Nango from "@nangohq/node";
+import { Nango } from "@nangohq/node";
 import { z } from "zod";
 
 import Retell from "retell-sdk";
@@ -763,7 +763,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             agent_name: `${client_id}-${agent_name}`,
             response_engine: { type: "retell-llm", llm_id: llm.llm_id },
             voice_id: voice_id ?? "11labs-Adrian",
-            metadata: { client_id },
           });
           return { content: [{ type: "text", text: JSON.stringify({ agent_id: agent.agent_id, llm_id: llm.llm_id, agent_name: agent.agent_name }, null, 2) }] };
         } catch (e) {

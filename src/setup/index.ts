@@ -31,9 +31,7 @@ import {
 // ─── Brand helpers ────────────────────────────────────────────────────────────
 
 const USE_ANSI = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR;
-const TRUECOLOR =
-  USE_ANSI &&
-  (process.env.COLORTERM === 'truecolor' || process.env.COLORTERM === '24bit');
+const TRUECOLOR = USE_ANSI && (process.env.COLORTERM === 'truecolor' || process.env.COLORTERM === '24bit');
 
 function brand(s: string): string {
   if (!USE_ANSI) return s;
@@ -82,8 +80,7 @@ function validateOAuthToken(value: string | undefined): string | undefined {
 function validateTelegramToken(value: string | undefined): string | undefined {
   const t = (value ?? '').trim();
   if (!t) return 'Required';
-  if (!/^\d+:[A-Za-z0-9_-]{35,}$/.test(t))
-    return 'Expected format: 123456789:ABCdef…';
+  if (!/^\d+:[A-Za-z0-9_-]{35,}$/.test(t)) return 'Expected format: 123456789:ABCdef…';
   return undefined;
 }
 
@@ -293,12 +290,14 @@ async function runFreshInstall(): Promise<void> {
   ) as boolean;
   let stripeKey: string | undefined;
   if (wantsStripe) {
-    stripeKey = (ensure(
-      await p.password({
-        message: 'Stripe secret key',
-        validate: validateStripeKey,
-      }),
-    ) as string).trim();
+    stripeKey = (
+      ensure(
+        await p.password({
+          message: 'Stripe secret key',
+          validate: validateStripeKey,
+        }),
+      ) as string
+    ).trim();
   }
 
   // Step 7 — Retell (optional)
@@ -310,12 +309,14 @@ async function runFreshInstall(): Promise<void> {
   ) as boolean;
   let retellKey: string | undefined;
   if (wantsRetell) {
-    retellKey = (ensure(
-      await p.password({
-        message: 'Retell API key',
-        validate: validateRequired,
-      }),
-    ) as string).trim();
+    retellKey = (
+      ensure(
+        await p.password({
+          message: 'Retell API key',
+          validate: validateRequired,
+        }),
+      ) as string
+    ).trim();
   }
 
   // Generate .env
@@ -369,18 +370,12 @@ async function runFreshInstall(): Promise<void> {
     }
   }
 
-  p.outro(
-    k.green('✅ ClawBridge is running!') +
-      `  Portal: ${k.bold('http://localhost:4000')}`,
-  );
+  p.outro(k.green('✅ ClawBridge is running!') + `  Portal: ${k.bold('http://localhost:4000')}`);
 }
 
 // ─── Migration audit display ──────────────────────────────────────────────────
 
-function printAuditReport(
-  source: MigrationSource,
-  audit: MigrationAudit,
-): void {
+function printAuditReport(source: MigrationSource, audit: MigrationAudit): void {
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
@@ -391,15 +386,10 @@ function printAuditReport(
     ['Groups found:', String(audit.groups.length)],
     ['Messages:', audit.messageCount.toLocaleString()],
     ['Custom skills:', String(audit.skills.length)],
-    [
-      'Channels:',
-      audit.channels.length > 0 ? audit.channels.join(', ') : 'none detected',
-    ],
+    ['Channels:', audit.channels.length > 0 ? audit.channels.join(', ') : 'none detected'],
   ];
   const keyWidth = Math.max(...rows.map(([key]) => key.length));
-  const tableLines = rows
-    .map(([key, val]) => `  ${dim(key.padEnd(keyWidth))}  ${k.bold(val)}`)
-    .join('\n');
+  const tableLines = rows.map(([key, val]) => `  ${dim(key.padEnd(keyWidth))}  ${k.bold(val)}`).join('\n');
 
   p.note(tableLines, `📊 Migration Audit — ${label} at ${source.path}`);
 }
@@ -419,9 +409,7 @@ async function runMigrationFlow(): Promise<void> {
   const detected = await detectInstall();
   s.stop(
     detected
-      ? k.green(
-          `Found ${typeLabel[detected.type] ?? detected.type} at ${detected.path}`,
-        )
+      ? k.green(`Found ${typeLabel[detected.type] ?? detected.type} at ${detected.path}`)
       : dim('No install auto-detected.'),
   );
 
@@ -492,14 +480,8 @@ async function runMigrationFlow(): Promise<void> {
   ) as MigrationSelection[];
 
   // 4. Safety notice + confirm
-  p.log.info(
-    dim(
-      'This will NOT affect your existing installation. Your data there is untouched.',
-    ),
-  );
-  const confirmed = ensure(
-    await p.confirm({ message: 'Start migration?', initialValue: true }),
-  ) as boolean;
+  p.log.info(dim('This will NOT affect your existing installation. Your data there is untouched.'));
+  const confirmed = ensure(await p.confirm({ message: 'Start migration?', initialValue: true })) as boolean;
   if (!confirmed) {
     p.cancel('Migration cancelled. Nothing was changed.');
     process.exit(0);
@@ -549,10 +531,7 @@ async function runMigrationFlow(): Promise<void> {
     p.log.success(`${label} marked as deactivated.`);
   }
 
-  p.outro(
-    k.green('✅ Migration done!') +
-      `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`,
-  );
+  p.outro(k.green('✅ Migration done!') + `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`);
 }
 
 async function askManualPath(): Promise<MigrationSource> {

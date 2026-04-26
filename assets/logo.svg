@@ -1,0 +1,8 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>
+  <path d='M8 26 C8 26 10 18 14 14 C18 10 22 8 22 8' stroke='#f97316' stroke-width='2' stroke-linecap='round' fill='none'/>
+  <path d='M13 28 C13 28 14 20 17 16 C20 12 24 10 24 10' stroke='#f97316' stroke-width='2' stroke-linecap='round' fill='none'/>
+  <path d='M18 29 C18 29 18 22 20 18 C22 14 25 12 25 12' stroke='#f97316' stroke-width='2' stroke-linecap='round' fill='none'/>
+  <circle cx='22' cy='8' r='2' fill='#f97316'/>
+  <circle cx='24' cy='10' r='2' fill='#f97316'/>
+  <circle cx='25' cy='12' r='2' fill='#f97316'/>
+</svg>

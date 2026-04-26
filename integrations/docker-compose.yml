@@ -43,6 +43,7 @@ services:
 
   nango-server:
     image: nangohq/nango:hosted
+    platform: linux/amd64
     container_name: nango-server
     restart: unless-stopped
     env_file: .env

@@ -24,6 +24,7 @@ export async function assignPhoneNumber(agentId: string, phoneNumber: string) {
   const result = await client.phoneNumber.import({
     phone_number: phoneNumber,
     inbound_agent_id: agentId,
+    termination_uri: '',
   });
   return result;
 }
