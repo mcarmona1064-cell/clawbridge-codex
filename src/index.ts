@@ -13,6 +13,8 @@ import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
+import { initErrorHandler } from './error-handler.js';
+import { startHealthCheck, stopHealthCheck } from './health-check.js';
 import { routeInbound } from './router.js';
 import { log } from './log.js';
 
@@ -72,6 +74,7 @@ function printBanner(): void {
 
 async function main(): Promise<void> {
   printBanner();
+  initErrorHandler();
   log.info('ClawBridge starting');
 
   // 1. Init central DB
@@ -175,6 +178,9 @@ async function main(): Promise<void> {
   startHostSweep();
   log.info('Host sweep started');
 
+  // 7. Start health monitoring
+  startHealthCheck();
+
   log.info('ClawBridge running');
 }
 
@@ -190,6 +196,7 @@ async function shutdown(signal: string): Promise<void> {
   }
   stopDeliveryPolls();
   stopHostSweep();
+  stopHealthCheck();
   await teardownChannelAdapters();
   process.exit(0);
 }
