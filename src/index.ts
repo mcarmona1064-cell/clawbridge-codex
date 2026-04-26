@@ -17,6 +17,7 @@ import { initErrorHandler } from './error-handler.js';
 import { startHealthCheck, stopHealthCheck } from './health-check.js';
 import { routeInbound } from './router.js';
 import { log } from './log.js';
+import { initMemoryDb, MemoryManager } from './memory/index.js';
 
 // Response + shutdown registries live in response-registry.ts to break the
 // circular import cycle: src/index.ts imports src/modules/index.js for side
@@ -75,6 +76,7 @@ function printBanner(): void {
 async function main(): Promise<void> {
   printBanner();
   initErrorHandler();
+  initMemoryDb();
   log.info('ClawBridge starting');
 
   // 1. Init central DB
@@ -82,6 +84,13 @@ async function main(): Promise<void> {
   const db = initDb(dbPath);
   runMigrations(db);
   log.info('Central DB ready', { path: dbPath });
+
+  // Memory system — load persisted context for this session
+  const memoryManager = new MemoryManager('global');
+  const memoryContext = await memoryManager.loadForSession();
+  if (memoryContext) {
+    log.info('[memory] Session context loaded', { chars: memoryContext.length });
+  }
 
   // 1b. One-time filesystem cutover — idempotent, no-op after first run.
   migrateGroupsToClaudeLocal();

@@ -45,6 +45,7 @@ import { log } from './log.js';
 import { openInboundDb, openOutboundDb, inboundDbPath, heartbeatPath } from './session-manager.js';
 import { isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
 import type { Session } from './types.js';
+import { MemoryManager } from './memory/index.js';
 
 const SWEEP_INTERVAL_MS = 60_000;
 // Absolute idle ceiling for a running container. If the heartbeat file hasn't
@@ -106,6 +107,7 @@ export function decideStuckAction(args: {
 }
 
 let running = false;
+let lastDecayDate = ''; // YYYY-MM-DD of last nightly decay run
 
 export function startHostSweep(): void {
   if (running) return;
@@ -129,7 +131,36 @@ async function sweep(): Promise<void> {
     log.error('Host sweep error', { err });
   }
 
+  // Nightly memory decay — runs once at/after 2am each calendar day
+  await runNightlyMemoryDecay();
+
   setTimeout(sweep, SWEEP_INTERVAL_MS);
+}
+
+async function runNightlyMemoryDecay(): Promise<void> {
+  const now = new Date();
+  // Only run between 02:00 and 03:00 local time, once per calendar day
+  if (now.getHours() !== 2) return;
+  const today = now.toISOString().slice(0, 10);
+  if (lastDecayDate === today) return;
+  lastDecayDate = today;
+
+  log.info('[memory] Running nightly decay pass');
+  try {
+    const sessions = getActiveSessions();
+    const clientIds = new Set<string>();
+    clientIds.add('global');
+    for (const session of sessions) {
+      clientIds.add(session.id);
+    }
+    for (const clientId of clientIds) {
+      const manager = new MemoryManager(clientId);
+      await manager.runDecay();
+    }
+    log.info('[memory] Nightly decay complete', { clients: clientIds.size });
+  } catch (err) {
+    log.error('[memory] Nightly decay failed', { err });
+  }
 }
 
 async function sweepSession(session: Session): Promise<void> {
