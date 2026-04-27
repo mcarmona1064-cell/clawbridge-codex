@@ -3,10 +3,9 @@
 # from the /add-telegram skill into one idempotent script so /new-setup can
 # run them programmatically before continuing to credentials and pairing.
 #
-# Copies the Telegram adapter, helpers, tests, and the pair-telegram setup
-# step in from the `channels` branch; appends the self-registration import;
-# registers the `pair-telegram` entry in the setup STEPS map; installs the
-# pinned @chat-adapter/telegram package; builds. All steps are safe to re-run.
+# Checks that all Telegram adapter files are present and registers the
+# pair-telegram setup step; installs the pinned @chat-adapter/telegram
+# package; builds. All steps are safe to re-run.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,13 +37,7 @@ if ! $needs_install; then
   exit 0
 fi
 
-echo "STEP: fetch-channels-branch"
-git fetch origin channels
-
-echo "STEP: copy-files"
-for f in "${CHANNEL_FILES[@]}"; do
-  git show "origin/channels:$f" > "$f"
-done
+# Telegram adapter is bundled in main branch
 
 echo "STEP: register-import"
 if ! grep -q "import './telegram.js';" src/channels/index.ts; then
