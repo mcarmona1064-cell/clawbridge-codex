@@ -154,7 +154,6 @@ async function main(): Promise<void> {
     };
   });
 
-
   // Boot warning: check if any DB-registered messaging group has a channel type
   // with no active adapter (missing credentials / not imported).
   {

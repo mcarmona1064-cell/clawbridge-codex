@@ -977,7 +977,6 @@ async function askManualPath(): Promise<MigrationSource> {
   }
 }
 
-
 // ─── Container image build ────────────────────────────────────────────────────
 
 async function buildContainerImage(): Promise<void> {

@@ -168,8 +168,8 @@ async function spawnContainer(session: Session): Promise<void> {
         hint: !imageExists
           ? `Image "${imageTag}" not found — run: clawbridge build-image`
           : !mountExists
-          ? `Mount path "${agentRunnerSrc}" not found — reinstall: npm install -g clawbridge-agent@latest`
-          : 'Docker runtime error — check: docker ps',
+            ? `Mount path "${agentRunnerSrc}" not found — reinstall: npm install -g clawbridge-agent@latest`
+            : 'Docker runtime error — check: docker ps',
       });
     }
   });
