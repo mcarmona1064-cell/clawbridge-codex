@@ -109,7 +109,7 @@ function validateRequired(value: string | undefined): string | undefined {
 function validateStripeKey(value: string | undefined): string | undefined {
   const v = (value ?? '').trim();
   if (!v) return 'Required';
-  if (!v.startsWith('sk_')) return 'Should start with sk_';
+  if (!v.startsWith('sk_')) return 'Should start with sk_…';
   return undefined;
 }
 
@@ -155,7 +155,6 @@ interface FreshConfig {
   channels: string[];
   adminEmail: string;
   adminPassword: string;
-  stripeKey?: string;
   retellKey?: string;
   hindsightDbPassword?: string;
   hindsightApiKey?: string;
@@ -195,9 +194,6 @@ function buildEnvFile(cfg: FreshConfig): string {
   if (cfg.channels.includes('gmail')) {
     lines.push('# Gmail', 'GMAIL_CLIENT_ID=', 'GMAIL_CLIENT_SECRET=', '');
   }
-  if (cfg.stripeKey) {
-    lines.push('# Stripe billing', `STRIPE_SECRET_KEY=${cfg.stripeKey}`, '');
-  }
   if (cfg.retellKey) {
     lines.push('# Retell AI (voice)', `RETELL_API_KEY=${cfg.retellKey}`, '');
   }
@@ -212,6 +208,128 @@ function buildEnvFile(cfg: FreshConfig): string {
   }
 
   return lines.join('\n') + '\n';
+}
+
+
+// ─── Source .env reader ───────────────────────────────────────────────────────
+
+function parseEnvFile(envPath: string): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!fs.existsSync(envPath)) return map;
+  try {
+    for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq === -1) continue;
+      map.set(t.slice(0, eq).trim(), t.slice(eq + 1).trim());
+    }
+  } catch { /* ignore */ }
+  return map;
+}
+
+// ─── Shared prompt helpers ────────────────────────────────────────────────────
+
+async function promptClaudeToken(existingValue?: string): Promise<string> {
+  if (existingValue) {
+    p.log.success('Claude OAuth token found in source ✓');
+    return existingValue;
+  }
+  p.log.message(
+    dim(
+      '  To authenticate with Claude, run this in a separate terminal:\n' +
+      '    claude setup-token\n' +
+      '  then paste the token below.',
+    ),
+  );
+  const token = ensure(
+    await p.password({
+      message: 'Paste your Claude OAuth token',
+      validate: validateOAuthToken,
+    }),
+  ) as string;
+  const s = p.spinner();
+  s.start('Validating Claude token…');
+  const ok = testOAuthToken(token.trim());
+  s.stop(ok ? k.green('Claude token looks good.') : k.yellow('Could not verify token (offline?) — continuing anyway.'));
+  return token.trim();
+}
+
+async function promptAgentName(existingValue?: string): Promise<string> {
+  if (existingValue) {
+    const keep = ensure(
+      await p.confirm({
+        message: `Agent name from source: "${existingValue}". Keep this name?`,
+        initialValue: true,
+      }),
+    ) as boolean;
+    if (keep) return existingValue;
+  }
+  const raw = ensure(
+    await p.text({
+      message: 'Agent name',
+      placeholder: 'ClawBridge',
+      defaultValue: 'ClawBridge',
+    }),
+  ) as string;
+  return raw.trim() || 'ClawBridge';
+}
+
+async function promptAdminCreds(existing?: { email?: string; password?: string }): Promise<{ email: string; password: string }> {
+  if (existing?.email && existing?.password) {
+    return { email: existing.email, password: existing.password };
+  }
+  const email = ensure(
+    await p.text({
+      message: 'Admin email (for portal login)',
+      placeholder: 'admin@example.com',
+      validate: validateEmail,
+    }),
+  ) as string;
+  const password = ensure(
+    await p.password({
+      message: 'Admin password',
+      validate: validatePassword,
+    }),
+  ) as string;
+  return { email: email.trim(), password };
+}
+
+async function promptRetell(): Promise<string | undefined> {
+  const wants = ensure(
+    await p.confirm({
+      message: 'Add Retell AI voice keys? (optional — skip for now)',
+      initialValue: false,
+    }),
+  ) as boolean;
+  if (!wants) return undefined;
+  return (
+    ensure(
+      await p.password({
+        message: 'Retell API key',
+        validate: validateRequired,
+      }),
+    ) as string
+  ).trim();
+}
+
+async function promptHindsight(existingUrl?: string): Promise<{ dbPassword?: string; apiKey?: string; url?: string }> {
+  if (existingUrl) {
+    p.log.success('Hindsight already configured ✓');
+    return {};
+  }
+  const wants = ensure(
+    await p.confirm({
+      message: 'Enable Hindsight semantic memory? (recommended for production — skip for now)',
+      initialValue: false,
+    }),
+  ) as boolean;
+  if (!wants) return {};
+  const dbPassword = crypto.randomBytes(16).toString('hex');
+  const apiKey = crypto.randomBytes(16).toString('hex');
+  const url = 'http://localhost:8888';
+  p.log.info(dim('Hindsight credentials generated and will be written to .env'));
+  return { dbPassword, apiKey, url };
 }
 
 // ─── Docker pre-flight check ─────────────────────────────────────────────────
@@ -285,28 +403,7 @@ async function runFreshInstall(): Promise<void> {
   p.log.step('Starting fresh install…');
 
   // Step 1 — Claude OAuth token
-  p.log.message(
-    dim(
-      '  To authenticate with Claude, run this in a separate terminal:\n' +
-        '    claude setup-token\n' +
-        '  then paste the token below.',
-    ),
-  );
-  const oauthToken = ensure(
-    await p.password({
-      message: 'Paste your Claude OAuth token',
-      validate: validateOAuthToken,
-    }),
-  ) as string;
-
-  const s1 = p.spinner();
-  s1.start('Validating Claude token…');
-  const tokenValid = testOAuthToken(oauthToken.trim());
-  s1.stop(
-    tokenValid
-      ? k.green('Claude token looks good.')
-      : k.yellow('Could not verify token (offline?) — continuing anyway.'),
-  );
+  const oauthToken = await promptClaudeToken();
 
   // Step 2 — Channels
   type ChannelOption = { value: string; label: string; hint?: string };
@@ -339,84 +436,16 @@ async function runFreshInstall(): Promise<void> {
   }
 
   // Step 4 — Agent name
-  const agentNameRaw = ensure(
-    await p.text({
-      message: 'Agent name',
-      placeholder: 'ClawBridge',
-      defaultValue: 'ClawBridge',
-    }),
-  ) as string;
-  const agentName = agentNameRaw.trim() || 'ClawBridge';
+  const agentName = await promptAgentName();
 
   // Step 5 — Admin credentials
-  const adminEmail = ensure(
-    await p.text({
-      message: 'Admin email (for portal login)',
-      placeholder: 'admin@example.com',
-      validate: validateEmail,
-    }),
-  ) as string;
-  const adminPassword = ensure(
-    await p.password({
-      message: 'Admin password',
-      validate: validatePassword,
-    }),
-  ) as string;
-
-  // Step 6 — Stripe (optional)
-  const wantsStripe = ensure(
-    await p.confirm({
-      message: 'Add Stripe billing keys? (optional — skip for now)',
-      initialValue: false,
-    }),
-  ) as boolean;
-  let stripeKey: string | undefined;
-  if (wantsStripe) {
-    stripeKey = (
-      ensure(
-        await p.password({
-          message: 'Stripe secret key',
-          validate: validateStripeKey,
-        }),
-      ) as string
-    ).trim();
-  }
+  const { email: adminEmail, password: adminPassword } = await promptAdminCreds();
 
   // Step 7 — Retell (optional)
-  const wantsRetell = ensure(
-    await p.confirm({
-      message: 'Add Retell AI voice keys? (optional — skip for now)',
-      initialValue: false,
-    }),
-  ) as boolean;
-  let retellKey: string | undefined;
-  if (wantsRetell) {
-    retellKey = (
-      ensure(
-        await p.password({
-          message: 'Retell API key',
-          validate: validateRequired,
-        }),
-      ) as string
-    ).trim();
-  }
+  const retellKey = await promptRetell();
 
   // Step 8 — Hindsight (optional)
-  const wantsHindsight = ensure(
-    await p.confirm({
-      message: 'Enable Hindsight semantic memory? (recommended for production — skip for now)',
-      initialValue: false,
-    }),
-  ) as boolean;
-  let hindsightDbPassword: string | undefined;
-  let hindsightApiKey: string | undefined;
-  let hindsightUrl: string | undefined;
-  if (wantsHindsight) {
-    hindsightDbPassword = crypto.randomBytes(16).toString('hex');
-    hindsightApiKey = crypto.randomBytes(16).toString('hex');
-    hindsightUrl = 'http://localhost:8888';
-    p.log.info(dim('Hindsight credentials generated and will be written to .env'));
-  }
+  const { dbPassword: hindsightDbPassword, apiKey: hindsightApiKey, url: hindsightUrl } = await promptHindsight();
 
   // Generate .env
   const cfg: FreshConfig = {
@@ -424,9 +453,8 @@ async function runFreshInstall(): Promise<void> {
     oauthToken: oauthToken.trim(),
     telegramToken,
     channels: channelChoices,
-    adminEmail: adminEmail.trim(),
+    adminEmail,
     adminPassword,
-    stripeKey,
     retellKey,
     hindsightDbPassword,
     hindsightApiKey,
@@ -709,6 +737,111 @@ async function runMigrationFlow(): Promise<void> {
         p.log.error(rbErr instanceof Error ? rbErr.message : String(rbErr));
       }
       process.exit(1);
+    }
+  }
+
+  // ── Configure new features ─────────────────────────────────────────────────
+  p.intro(dim('Let\'s configure ClawBridge\'s new features for your migrated install.'));
+
+  // Read source .env for pre-existing values
+  const sourceEnvPaths = [
+    path.join(source.path, '.env'),
+    path.join(source.path, '.env.local'),
+    path.join(source.path, 'config', '.env'),
+  ];
+  let sourceEnv = new Map<string, string>();
+  for (const ep of sourceEnvPaths) {
+    const parsed = parseEnvFile(ep);
+    if (parsed.size > 0) { sourceEnv = parsed; break; }
+  }
+
+  const integrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
+
+  // Step A — Claude OAuth token
+  const migratedOauthToken = await promptClaudeToken(
+    sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'),
+  );
+
+  // Step B — Agent name
+  const migratedAgentName = await promptAgentName(
+    sourceEnv.get('ASSISTANT_NAME') ?? sourceEnv.get('AGENT_NAME'),
+  );
+
+  // Step C — Admin credentials (reuse silently if found)
+  const existingAdminEmail = sourceEnv.get('ADMIN_EMAIL');
+  const existingAdminPassword = sourceEnv.get('ADMIN_PASSWORD');
+  if (existingAdminEmail && existingAdminPassword) {
+    p.log.success('Admin credentials found in source ✓');
+  }
+  const { email: migratedAdminEmail, password: migratedAdminPassword } = await promptAdminCreds({
+    email: existingAdminEmail,
+    password: existingAdminPassword,
+  });
+
+  // Step D — Retell AI voice (always ask — new in ClawBridge)
+  const migratedRetellKey = await promptRetell();
+
+  // Step E — Hindsight (skip if already configured in source)
+  const { dbPassword: migratedHindsightDbPw, apiKey: migratedHindsightApiKey, url: migratedHindsightUrl } =
+    await promptHindsight(sourceEnv.get('HINDSIGHT_URL'));
+
+  // Detect channels from source .env for the new .env
+  const migratedChannels: string[] = [];
+  if (sourceEnv.get('TELEGRAM_BOT_TOKEN')) migratedChannels.push('telegram');
+  if ([...sourceEnv.keys()].some(k => /WHATSAPP/i.test(k))) migratedChannels.push('whatsapp');
+  if ([...sourceEnv.keys()].some(k => /DISCORD/i.test(k))) migratedChannels.push('discord');
+  if ([...sourceEnv.keys()].some(k => /SLACK/i.test(k))) migratedChannels.push('slack');
+  if ([...sourceEnv.keys()].some(k => /GMAIL|GOOGLE_OAUTH/i.test(k))) migratedChannels.push('gmail');
+
+  // Step F — Generate complete .env
+  const migratedCfg: FreshConfig = {
+    agentName: migratedAgentName,
+    oauthToken: migratedOauthToken,
+    telegramToken: sourceEnv.get('TELEGRAM_BOT_TOKEN'),
+    channels: migratedChannels,
+    adminEmail: migratedAdminEmail,
+    adminPassword: migratedAdminPassword,
+    retellKey: migratedRetellKey,
+    hindsightDbPassword: migratedHindsightDbPw ?? sourceEnv.get('HINDSIGHT_DB_PASSWORD'),
+    hindsightApiKey: migratedHindsightApiKey ?? sourceEnv.get('HINDSIGHT_API_KEY'),
+    hindsightUrl: migratedHindsightUrl ?? sourceEnv.get('HINDSIGHT_URL'),
+  };
+
+  const envPath = path.join(integrationsDir, '.env');
+  const confirmEnvWrite = ensure(
+    await p.confirm({
+      message: `.env will be written to ${envPath}. Continue?`,
+      initialValue: true,
+    }),
+  ) as boolean;
+  if (confirmEnvWrite) {
+    fs.mkdirSync(integrationsDir, { recursive: true });
+    fs.writeFileSync(envPath, buildEnvFile(migratedCfg));
+    p.log.success(`.env written to ${envPath}`);
+  }
+
+  // Step G — docker compose up
+  const wantsMigrationDocker = ensure(
+    await p.confirm({
+      message: 'Start ClawBridge with docker compose now?',
+      initialValue: true,
+    }),
+  ) as boolean;
+  if (wantsMigrationDocker) {
+    const ds = p.spinner();
+    ds.start('Running docker compose up -d…');
+    const dockerResult = spawnSync('docker', ['compose', 'up', '-d'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf-8',
+      cwd: integrationsDir,
+    });
+    if (dockerResult.error) {
+      ds.stop(k.red('Docker not found — install Docker Desktop first: https://docs.docker.com/get-docker/'));
+    } else if (dockerResult.status === 0) {
+      ds.stop(k.green('ClawBridge is running.'));
+    } else {
+      ds.stop(k.yellow('docker compose returned an error — check output below.'));
+      if (dockerResult.stderr) console.error(dockerResult.stderr);
     }
   }
 
