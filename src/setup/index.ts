@@ -24,9 +24,11 @@ import {
   resolveManualPath,
   rollback,
   runMigration,
+  verifyMigration,
   type MigrationAudit,
   type MigrationSelection,
   type MigrationSource,
+  type VerificationCheck,
 } from './migrate.js';
 
 // ─── Brand helpers ────────────────────────────────────────────────────────────
@@ -566,6 +568,43 @@ async function runMigrationFlow(): Promise<void> {
       }
     }
     process.exit(1);
+  }
+
+  // 5a. Post-migration verification (automatic)
+  const verifySpinner = p.spinner();
+  verifySpinner.start('Verifying migration…');
+  const verifyResult = await verifyMigration(source, audit, selections);
+  verifySpinner.stop('Verification complete.');
+
+  for (const check of verifyResult.checks) {
+    if (check.passed) {
+      p.log.success(check.message);
+    } else {
+      p.log.warn(check.message);
+    }
+  }
+
+  if (verifyResult.passed) {
+    p.log.success(k.green('✓ Migration verified — everything looks good'));
+  } else {
+    const continueAnyway = ensure(
+      await p.confirm({
+        message: 'Continue anyway?',
+        initialValue: false,
+      }),
+    ) as boolean;
+    if (!continueAnyway) {
+      const rb = p.spinner();
+      rb.start('Rolling back…');
+      try {
+        await rollback(source);
+        rb.stop(k.green('Rolled back successfully.'));
+      } catch (rbErr) {
+        rb.stop(k.red('Rollback also failed.'));
+        p.log.error(rbErr instanceof Error ? rbErr.message : String(rbErr));
+      }
+      process.exit(1);
+    }
   }
 
   // 6. Optionally deactivate source

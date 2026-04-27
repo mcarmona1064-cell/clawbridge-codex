@@ -450,3 +450,219 @@ export function deactivateSource(source: MigrationSource): void {
     // service may not be registered — ignore
   }
 }
+
+// ─── Post-migration Verification ─────────────────────────────────────────────
+
+export interface VerificationCheck {
+  label: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface VerificationResult {
+  passed: boolean;
+  checks: VerificationCheck[];
+}
+
+export async function verifyMigration(
+  source: MigrationSource,
+  audit: MigrationAudit,
+  selections: MigrationSelection[],
+): Promise<VerificationResult> {
+  const checks: VerificationCheck[] = [];
+
+  const srcAccessible = (() => {
+    try {
+      return fs.existsSync(source.path) && fs.statSync(source.path).isDirectory();
+    } catch {
+      return false;
+    }
+  })();
+
+  // ── Groups & memory ───────────────────────────────────────────────────────
+  if (selections.includes('groups')) {
+    const srcGroupsDir = resolveGroupsDir(source.path);
+    const destGroupsDir = path.join(CLAWBRIDGE_HOME, 'groups');
+
+    const srcGroupCount = audit.groups.length;
+    let destGroupCount = 0;
+    try {
+      if (fs.existsSync(destGroupsDir)) {
+        destGroupCount = fs
+          .readdirSync(destGroupsDir, { withFileTypes: true })
+          .filter((e) => e.isDirectory()).length;
+      }
+    } catch {
+      // treat as 0
+    }
+
+    // Also count memory entries (any .md files across group subdirs)
+    let srcMemoryCount = 0;
+    let destMemoryCount = 0;
+    const countMdFiles = (dir: string): number => {
+      let n = 0;
+      try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isFile() && entry.name.endsWith('.md')) n++;
+          else if (entry.isDirectory()) n += countMdFiles(full);
+        }
+      } catch {
+        // skip
+      }
+      return n;
+    };
+
+    if (srcAccessible && srcGroupsDir) srcMemoryCount = countMdFiles(srcGroupsDir);
+    destMemoryCount = countMdFiles(destGroupsDir);
+
+    if (destGroupCount < srcGroupCount) {
+      const missing = srcGroupCount - destGroupCount;
+      checks.push({ label: 'Groups', passed: false, message: `Groups: ${destGroupCount}/${srcGroupCount} ⚠ (${missing} missing)` });
+    } else {
+      checks.push({ label: 'Groups', passed: true, message: `Groups: ${destGroupCount}/${srcGroupCount} ✓` });
+    }
+
+    if (srcAccessible && srcMemoryCount > 0) {
+      if (destMemoryCount < srcMemoryCount) {
+        const missing = srcMemoryCount - destMemoryCount;
+        checks.push({ label: 'Memory', passed: false, message: `Memory entries: ${destMemoryCount}/${srcMemoryCount} ⚠ (${missing} missing)` });
+      } else {
+        checks.push({ label: 'Memory', passed: true, message: `Memory entries: ${destMemoryCount}/${srcMemoryCount} ✓` });
+      }
+    }
+  }
+
+  // ── Message history ───────────────────────────────────────────────────────
+  if (selections.includes('messages')) {
+    const srcDb = resolvePrimaryDb(source.path);
+    const destDb = path.join(CLAWBRIDGE_HOME, 'store', 'messages.db');
+
+    let srcCount = 0;
+    let destCount = 0;
+
+    if (srcAccessible && srcDb) {
+      for (const table of ['messages', 'message', 'msgs']) {
+        const c = countSqliteRows(srcDb, table);
+        if (c > 0) { srcCount = c; break; }
+      }
+    } else {
+      srcCount = audit.messageCount;
+    }
+
+    if (fs.existsSync(destDb)) {
+      for (const table of ['messages', 'message', 'msgs']) {
+        const c = countSqliteRows(destDb, table);
+        if (c > 0) { destCount = c; break; }
+      }
+    }
+
+    if (destCount === 0 && srcCount > 0) {
+      checks.push({ label: 'Messages', passed: false, message: `Messages: 0/${srcCount.toLocaleString()} ⚠ (none found in destination)` });
+    } else if (srcCount > 0 && destCount < srcCount) {
+      checks.push({ label: 'Messages', passed: false, message: `Messages: ${destCount.toLocaleString()}/${srcCount.toLocaleString()} ⚠ (partial)` });
+    } else {
+      const displayCount = destCount > 0 ? destCount : srcCount;
+      checks.push({ label: 'Messages', passed: true, message: `Messages: ${displayCount.toLocaleString()} ✓` });
+    }
+  }
+
+  // ── Custom skills ─────────────────────────────────────────────────────────
+  if (selections.includes('skills')) {
+    const srcSkillsDir = resolveSkillsDir(source.path);
+    const destSkillsDir = path.join(CLAWBRIDGE_HOME, 'skills');
+    const skillFailures: string[] = [];
+
+    for (const skill of audit.skills) {
+      const destFile = path.join(destSkillsDir, skill);
+      if (!fs.existsSync(destFile)) {
+        skillFailures.push(skill);
+        continue;
+      }
+      if (srcAccessible && srcSkillsDir) {
+        const srcFile = path.join(srcSkillsDir, skill);
+        try {
+          const srcSize = fs.statSync(srcFile).size;
+          const destSize = fs.statSync(destFile).size;
+          const diff = Math.abs(srcSize - destSize) / (srcSize || 1);
+          if (diff > 0.01) {
+            skillFailures.push(`${skill} (size mismatch: ${srcSize}B → ${destSize}B)`);
+          }
+        } catch {
+          // can't stat src, skip size check
+        }
+      }
+    }
+
+    const okCount = audit.skills.length - skillFailures.length;
+    if (skillFailures.length > 0) {
+      checks.push({ label: 'Skills', passed: false, message: `Skills: ${okCount}/${audit.skills.length} ⚠ — issues: ${skillFailures.join(', ')}` });
+    } else {
+      checks.push({ label: 'Skills', passed: true, message: `Skills: ${audit.skills.length}/${audit.skills.length} ✓` });
+    }
+  }
+
+  // ── Channel credentials ───────────────────────────────────────────────────
+  if (selections.includes('credentials')) {
+    const srcEnvPath = path.join(source.path, '.env');
+    const destEnvPath = path.join(CLAWBRIDGE_HOME, '.env.migrated');
+
+    if (fs.existsSync(srcEnvPath) && fs.existsSync(destEnvPath)) {
+      const parseEnv = (content: string): Map<string, string> => {
+        const map = new Map<string, string>();
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx === -1) continue;
+          const key = trimmed.slice(0, eqIdx).trim();
+          const val = trimmed.slice(eqIdx + 1).trim();
+          if (key) map.set(key, val);
+        }
+        return map;
+      };
+
+      const channelKeyPatterns = [
+        /TELEGRAM.*TOKEN|TELEGRAM.*BOT/i,
+        /WHATSAPP/i,
+        /DISCORD.*TOKEN/i,
+        /SLACK.*TOKEN|SLACK.*BOT|SLACK.*SECRET/i,
+        /GMAIL|GOOGLE.*OAUTH/i,
+        /SIGNAL/i,
+        /TEAMS|MICROSOFT.*BOT/i,
+      ];
+
+      let srcEnvContent = '';
+      let destEnvContent = '';
+      try { srcEnvContent = fs.readFileSync(srcEnvPath, 'utf-8'); } catch { /* skip */ }
+      try { destEnvContent = fs.readFileSync(destEnvPath, 'utf-8'); } catch { /* skip */ }
+
+      const srcEnv = parseEnv(srcEnvContent);
+      const destEnv = parseEnv(destEnvContent);
+
+      const missingKeys: string[] = [];
+      for (const [key, val] of srcEnv) {
+        if (!val) continue;
+        const isChannelKey = channelKeyPatterns.some((pat) => pat.test(key));
+        if (!isChannelKey) continue;
+        const destVal = destEnv.get(key);
+        if (!destVal) {
+          missingKeys.push(key);
+        }
+      }
+
+      if (missingKeys.length > 0) {
+        checks.push({ label: 'Credentials', passed: false, message: `Credentials: missing keys in .env.migrated — ${missingKeys.join(', ')}` });
+      } else {
+        checks.push({ label: 'Credentials', passed: true, message: 'Credentials: all channel keys present ✓' });
+      }
+    } else if (fs.existsSync(srcEnvPath) && !fs.existsSync(destEnvPath)) {
+      checks.push({ label: 'Credentials', passed: false, message: 'Credentials: .env.migrated not found in destination' });
+    } else {
+      checks.push({ label: 'Credentials', passed: true, message: 'Credentials: .env.migrated present ✓' });
+    }
+  }
+
+  const failed = checks.filter((c) => !c.passed);
+  return { passed: failed.length === 0, checks };
+}
