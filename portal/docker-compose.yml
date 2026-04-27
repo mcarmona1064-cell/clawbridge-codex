@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   portal-api:
     image: node:20-alpine

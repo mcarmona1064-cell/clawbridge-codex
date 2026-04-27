@@ -8,12 +8,14 @@
  *   1. Fresh install  — guided .env generation + docker compose up
  *   2. Migrate from OpenClaw
  *   3. Migrate from NanoClaw
+ *   4. Migrate from Cyndra
  */
 import { spawnSync, execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 import * as p from '@clack/prompts';
 import k from 'kleur';
@@ -392,20 +394,8 @@ function checkNodePrerequisites(): void {
   }
   p.log.success('Node.js ' + version + ' \u2713');
 
-  // Check pnpm is installed; auto-install if missing
-  let pnpmCheck = spawnSync('pnpm', ['--version'], { encoding: 'utf8' });
-  if (pnpmCheck.error || pnpmCheck.status !== 0) {
-    p.log.warn('pnpm not found. Installing...');
-    spawnSync('npm', ['install', '-g', 'pnpm'], { stdio: 'inherit' });
-    // Re-check after install attempt
-    pnpmCheck = spawnSync('pnpm', ['--version'], { encoding: 'utf8' });
-    if (pnpmCheck.error || pnpmCheck.status !== 0) {
-      p.log.error('Failed to install pnpm. Run: npm install -g pnpm');
-      process.exit(1);
-    }
-  }
-  const pnpmVersion = pnpmCheck.stdout.trim();
-  p.log.success('pnpm ' + pnpmVersion + ' \u2713');
+  // pnpm is a dev-only tool — not required for users who install via npm install -g
+  // Skip the check to avoid blocking fresh installs that don't have pnpm.
 }
 
 // ─── Fresh install flow ───────────────────────────────────────────────────────
@@ -472,7 +462,7 @@ async function runFreshInstall(): Promise<void> {
 
   const envContent = buildEnvFile(cfg);
   const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
-  const packageIntegrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
+  const packageIntegrationsDir = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../../integrations');
 
   // Create ~/.clawbridge/ and logs/ if they don't exist
   fs.mkdirSync(clawbridgeDir, { recursive: true });
@@ -529,22 +519,25 @@ async function runFreshInstall(): Promise<void> {
   }
 
   // Start portal if portal/docker-compose.yml exists in package dir
+  // Run from the package's portal/ dir so ./api and ./app volume paths resolve correctly.
+  // Pass --env-file so NANGO_SECRET_KEY and other vars from ~/.clawbridge/.env are available.
   try {
-    const packageRoot = path.resolve(new URL(import.meta.url).pathname, '../../..');
-    const portalComposeSrc = path.join(packageRoot, 'portal', 'docker-compose.yml');
-    if (fs.existsSync(portalComposeSrc)) {
-      const portalComposeDest = path.join(clawbridgeDir, 'portal-docker-compose.yml');
-      fs.copyFileSync(portalComposeSrc, portalComposeDest);
+    const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+    const portalDir = path.join(packageRoot, 'portal');
+    const portalComposeFile = path.join(portalDir, 'docker-compose.yml');
+    if (fs.existsSync(portalComposeFile)) {
       const ps = p.spinner();
       ps.start('Starting portal…');
-      const portalResult = spawnSync('docker', ['compose', '-f', portalComposeDest, 'up', '-d'], {
+      const portalResult = spawnSync('docker', ['compose', '--env-file', envPath, 'up', '-d'], {
         stdio: ['ignore', 'pipe', 'pipe'],
         encoding: 'utf-8',
+        cwd: portalDir,
       });
       if (portalResult.status === 0) {
         ps.stop(k.green('Portal started.'));
       } else {
-        ps.stop(k.yellow('Portal start failed (non-critical) — check portal-docker-compose.yml'));
+        ps.stop(k.yellow('Portal start failed (non-critical) — check logs in portal/'));
+        if (portalResult.stderr) console.error(portalResult.stderr);
       }
     }
   } catch {
@@ -816,7 +809,7 @@ async function runMigrationFlow(): Promise<void> {
   }
 
   const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
-  const packageIntegrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
+  const packageIntegrationsDir = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../../integrations');
 
   // Create ~/.clawbridge/ and logs/ if they don't exist
   fs.mkdirSync(clawbridgeDir, { recursive: true });
@@ -912,22 +905,25 @@ async function runMigrationFlow(): Promise<void> {
   }
 
   // Start portal if portal/docker-compose.yml exists in package dir
+  // Run from the package's portal/ dir so ./api and ./app volume paths resolve correctly.
+  // Pass --env-file so NANGO_SECRET_KEY and other vars from ~/.clawbridge/.env are available.
   try {
-    const packageRoot2 = path.resolve(new URL(import.meta.url).pathname, '../../..');
-    const portalComposeSrc2 = path.join(packageRoot2, 'portal', 'docker-compose.yml');
-    if (fs.existsSync(portalComposeSrc2)) {
-      const portalComposeDest2 = path.join(clawbridgeDir, 'portal-docker-compose.yml');
-      fs.copyFileSync(portalComposeSrc2, portalComposeDest2);
+    const packageRoot2 = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+    const portalDir2 = path.join(packageRoot2, 'portal');
+    const portalComposeFile2 = path.join(portalDir2, 'docker-compose.yml');
+    if (fs.existsSync(portalComposeFile2)) {
       const ps2 = p.spinner();
       ps2.start('Starting portal…');
-      const portalResult2 = spawnSync('docker', ['compose', '-f', portalComposeDest2, 'up', '-d'], {
+      const portalResult2 = spawnSync('docker', ['compose', '--env-file', envPath, 'up', '-d'], {
         stdio: ['ignore', 'pipe', 'pipe'],
         encoding: 'utf-8',
+        cwd: portalDir2,
       });
       if (portalResult2.status === 0) {
         ps2.stop(k.green('Portal started.'));
       } else {
-        ps2.stop(k.yellow('Portal start failed (non-critical) — check portal-docker-compose.yml'));
+        ps2.stop(k.yellow('Portal start failed (non-critical) — check logs in portal/'));
+        if (portalResult2.stderr) console.error(portalResult2.stderr);
       }
     }
   } catch {
@@ -975,7 +971,7 @@ async function askManualPath(): Promise<MigrationSource> {
 async function registerLaunchd(assistantName: string): Promise<void> {
   try {
     const home = os.homedir();
-    const packageRoot = path.resolve(new URL(import.meta.url).pathname, '../../..');
+    const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
     const tmplPath = path.join(packageRoot, 'launchd', 'com.clawbridge.plist.tmpl');
     if (!fs.existsSync(tmplPath)) {
       p.log.warn('launchd template not found — skipping service registration.');
@@ -1029,9 +1025,10 @@ async function main(): Promise<void> {
         { value: 'fresh', label: 'Fresh install' },
         { value: 'openclaw', label: 'Migrate from OpenClaw' },
         { value: 'nanoclaw', label: 'Migrate from NanoClaw' },
+        { value: 'cyndra', label: 'Migrate from Cyndra' },
       ],
     }),
-  ) as 'fresh' | 'openclaw' | 'nanoclaw';
+  ) as 'fresh' | 'openclaw' | 'nanoclaw' | 'cyndra';
 
   if (mode === 'fresh') {
     await runFreshInstall();
