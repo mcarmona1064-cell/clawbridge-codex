@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * ClawBridge interactive setup wizard.
  *
@@ -288,7 +289,6 @@ async function promptAdminCreds(existing?: {
   return { email: email.trim(), password };
 }
 
-
 async function promptHindsight(existingUrl?: string): Promise<{ dbPassword?: string; apiKey?: string; url?: string }> {
   if (existingUrl) {
     p.log.success('Hindsight already configured ✓');
@@ -416,7 +416,6 @@ async function runFreshInstall(): Promise<void> {
 
   // Step 5 — Admin credentials
   const { email: adminEmail, password: adminPassword } = await promptAdminCreds();
-
 
   // Step 8 — Hindsight (optional)
   const { dbPassword: hindsightDbPassword, apiKey: hindsightApiKey, url: hindsightUrl } = await promptHindsight();
@@ -749,7 +748,6 @@ async function runMigrationFlow(): Promise<void> {
     email: existingAdminEmail,
     password: existingAdminPassword,
   });
-
 
   // Step E — Hindsight (skip if already configured in source)
   const {
