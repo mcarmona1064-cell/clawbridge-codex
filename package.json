@@ -14,6 +14,12 @@
   "files": [
     "dist",
     "integrations/docker-compose.yml",
+    "integrations/auth-portal",
+    "integrations/mcp-server",
+    "integrations/start.sh",
+    "launchd",
+    "setup",
+    "portal",
     "README.md",
     "LICENSE"
   ],
@@ -55,7 +61,8 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "node -e \"console.log('\\n✅ ClawBridge Agent installed. Run: clawbridge-agent setup\\n')\""
   },
   "dependencies": {
     "@clack/core": "^1.2.0",

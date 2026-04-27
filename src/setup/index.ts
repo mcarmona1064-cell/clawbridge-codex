@@ -9,7 +9,7 @@
  *   2. Migrate from OpenClaw
  *   3. Migrate from NanoClaw
  */
-import { spawnSync } from 'child_process';
+import { spawnSync, execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
@@ -35,6 +35,7 @@ import {
 } from './migrate.js';
 
 import { checkForUpdate, runUpdate } from '../updater.js';
+import { getLaunchdLabel } from '../install-slug.js';
 
 // Handle "clawbridge-agent update" command
 if (process.argv[2] === 'update') {
@@ -217,7 +218,7 @@ function buildEnvFile(cfg: FreshConfig): string {
   // Nango integration platform — auto-generated credentials
   const nangoDbPassword = crypto.randomBytes(16).toString('hex');
   const nangoSecretKey = crypto.randomBytes(16).toString('hex');
-  const nangoEncryptionKey = crypto.randomBytes(32).toString('hex');
+  const nangoEncryptionKey = crypto.randomBytes(32).toString('base64');
   lines.push(
     '# Nango integration platform',
     'NANGO_DB_HOST=nango-db',
@@ -473,8 +474,9 @@ async function runFreshInstall(): Promise<void> {
   const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
   const packageIntegrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
 
-  // Create ~/.clawbridge/ if it doesn't exist
+  // Create ~/.clawbridge/ and logs/ if they don't exist
   fs.mkdirSync(clawbridgeDir, { recursive: true });
+  fs.mkdirSync(path.join(clawbridgeDir, 'logs'), { recursive: true });
 
   // Copy docker-compose.yml from package to ~/.clawbridge/ if not already there
   const srcCompose = path.join(packageIntegrationsDir, 'docker-compose.yml');
@@ -525,6 +527,31 @@ async function runFreshInstall(): Promise<void> {
       if (result.stderr) console.error(result.stderr);
     }
   }
+
+  // Start portal if portal/docker-compose.yml exists in package dir
+  try {
+    const packageRoot = path.resolve(new URL(import.meta.url).pathname, '../../..');
+    const portalComposeSrc = path.join(packageRoot, 'portal', 'docker-compose.yml');
+    if (fs.existsSync(portalComposeSrc)) {
+      const portalComposeDest = path.join(clawbridgeDir, 'portal-docker-compose.yml');
+      fs.copyFileSync(portalComposeSrc, portalComposeDest);
+      const ps = p.spinner();
+      ps.start('Starting portal…');
+      const portalResult = spawnSync('docker', ['compose', '-f', portalComposeDest, 'up', '-d'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        encoding: 'utf-8',
+      });
+      if (portalResult.status === 0) {
+        ps.stop(k.green('Portal started.'));
+      } else {
+        ps.stop(k.yellow('Portal start failed (non-critical) — check portal-docker-compose.yml'));
+      }
+    }
+  } catch {
+    // portal is optional — don't fail setup
+  }
+
+  await registerLaunchd(cfg.agentName);
 
   if (composeSuccess) {
     p.outro(k.green('✅ ClawBridge is running!') + `  Portal: ${k.bold('http://localhost:4000')}`);
@@ -791,8 +818,9 @@ async function runMigrationFlow(): Promise<void> {
   const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
   const packageIntegrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
 
-  // Create ~/.clawbridge/ if it doesn't exist
+  // Create ~/.clawbridge/ and logs/ if they don't exist
   fs.mkdirSync(clawbridgeDir, { recursive: true });
+  fs.mkdirSync(path.join(clawbridgeDir, 'logs'), { recursive: true });
 
   // Copy docker-compose.yml from package to ~/.clawbridge/ if not already there
   const srcCompose = path.join(packageIntegrationsDir, 'docker-compose.yml');
@@ -883,6 +911,29 @@ async function runMigrationFlow(): Promise<void> {
     }
   }
 
+  // Start portal if portal/docker-compose.yml exists in package dir
+  try {
+    const packageRoot2 = path.resolve(new URL(import.meta.url).pathname, '../../..');
+    const portalComposeSrc2 = path.join(packageRoot2, 'portal', 'docker-compose.yml');
+    if (fs.existsSync(portalComposeSrc2)) {
+      const portalComposeDest2 = path.join(clawbridgeDir, 'portal-docker-compose.yml');
+      fs.copyFileSync(portalComposeSrc2, portalComposeDest2);
+      const ps2 = p.spinner();
+      ps2.start('Starting portal…');
+      const portalResult2 = spawnSync('docker', ['compose', '-f', portalComposeDest2, 'up', '-d'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        encoding: 'utf-8',
+      });
+      if (portalResult2.status === 0) {
+        ps2.stop(k.green('Portal started.'));
+      } else {
+        ps2.stop(k.yellow('Portal start failed (non-critical) — check portal-docker-compose.yml'));
+      }
+    }
+  } catch {
+    // portal is optional — don't fail setup
+  }
+
   // 6. Optionally deactivate source
   const label = typeLabel[source.type] ?? source.type;
   const wantsDeactivate = ensure(
@@ -895,6 +946,8 @@ async function runMigrationFlow(): Promise<void> {
     deactivateSource(source);
     p.log.success(`${label} marked as deactivated.`);
   }
+
+  await registerLaunchd(migratedCfg.agentName);
 
   p.outro(k.green('✅ Migration done!') + `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`);
 }
@@ -914,6 +967,51 @@ async function askManualPath(): Promise<MigrationSource> {
       continue;
     }
     return result;
+  }
+}
+
+
+// ─── launchd registration ─────────────────────────────────────────────────────
+
+async function registerLaunchd(assistantName: string): Promise<void> {
+  try {
+    const home = os.homedir();
+    const packageRoot = path.resolve(new URL(import.meta.url).pathname, '../../..');
+    const tmplPath = path.join(packageRoot, 'launchd', 'com.clawbridge.plist.tmpl');
+    if (!fs.existsSync(tmplPath)) {
+      p.log.warn('launchd template not found — skipping service registration.');
+      return;
+    }
+    const slug = getLaunchdLabel(packageRoot);
+    let nodePath = process.execPath;
+    try {
+      const which = spawnSync('which', ['node'], { encoding: 'utf-8' });
+      if (which.status === 0 && which.stdout.trim()) nodePath = which.stdout.trim();
+    } catch { /* use process.execPath */ }
+
+    const tmpl = fs.readFileSync(tmplPath, 'utf-8');
+    const plistContent = tmpl
+      .replace(/\{\{SLUG\}\}/g, slug)
+      .replace(/\{\{HOME\}\}/g, home)
+      .replace(/\{\{NODE_PATH\}\}/g, nodePath)
+      .replace(/\{\{PROJECT_ROOT\}\}/g, packageRoot);
+
+    const launchAgentsDir = path.join(home, 'Library', 'LaunchAgents');
+    fs.mkdirSync(launchAgentsDir, { recursive: true });
+    const plistPath = path.join(launchAgentsDir, `${slug}.plist`);
+    fs.writeFileSync(plistPath, plistContent);
+    p.log.success(`launchd plist written to ~/Library/LaunchAgents/${slug}.plist`);
+
+    try {
+      const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+      execSync(`launchctl bootstrap gui/${uid} ${plistPath}`, { encoding: 'utf-8' });
+      p.log.success('ClawBridge agent registered with launchd and will start automatically.');
+    } catch (err) {
+      p.log.warn(`launchctl bootstrap failed: ${err instanceof Error ? err.message : String(err)}`);
+      p.log.info(`To register manually: launchctl bootstrap gui/$(id -u) ${plistPath}`);
+    }
+  } catch (err) {
+    p.log.warn(`launchd registration failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

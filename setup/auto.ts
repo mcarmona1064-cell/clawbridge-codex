@@ -1,3 +1,5 @@
+// TODO: This scripted path is incomplete — use `clawbridge-agent setup` (interactive wizard) instead.
+// See Bug 6 in diagnostic report 2026-04-27.
 /**
  * Non-interactive setup driver — the step sequencer for `pnpm run setup:auto`.
  *
