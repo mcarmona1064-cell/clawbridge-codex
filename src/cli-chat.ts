@@ -73,44 +73,45 @@ export async function main(): Promise<void> {
     output: process.stdout,
   });
 
-  rl.on('close', () => {
-    console.log('\nGoodbye!');
-    process.exit(0);
-  });
-
-  const prompt = (): void => {
-    rl.question('\x1b[36mYou:\x1b[0m ', (input) => {
-      const trimmed = input.trim();
-
-      if (!trimmed) {
-        prompt();
-        return;
-      }
-
-      if (trimmed === '/exit' || trimmed === '/quit') {
-        rl.close();
-        return;
-      }
-
-      if (trimmed === '/clear') {
-        messages.length = 0;
-        console.log('\x1b[90m[Conversation cleared]\x1b[0m\n');
-        prompt();
-        return;
-      }
-
-      // Handle async chat inside the sync callback
-      chat(trimmed)
-        .then((reply) => {
-          console.log(`\n\x1b[33m${agentName}:\x1b[0m ${reply}\n`);
-          prompt();
-        })
-        .catch((err: Error) => {
-          console.error(`\x1b[31mError: ${err.message}\x1b[0m\n`);
-          prompt();
-        });
+  return new Promise<void>((resolve) => {
+    rl.on('close', () => {
+      console.log('\nGoodbye!');
+      resolve();
     });
-  };
 
-  prompt();
+    const prompt = (): void => {
+      rl.question('\x1b[36mYou:\x1b[0m ', (input) => {
+        const trimmed = input.trim();
+
+        if (!trimmed) {
+          prompt();
+          return;
+        }
+
+        if (trimmed === '/exit' || trimmed === '/quit') {
+          rl.close();
+          return;
+        }
+
+        if (trimmed === '/clear') {
+          messages.length = 0;
+          console.log('\x1b[90m[Conversation cleared]\x1b[0m\n');
+          prompt();
+          return;
+        }
+
+        chat(trimmed)
+          .then((reply) => {
+            console.log(`\n\x1b[33m${agentName}:\x1b[0m ${reply}\n`);
+            prompt();
+          })
+          .catch((err: Error) => {
+            console.error(`\x1b[31mError: ${err.message}\x1b[0m\n`);
+            prompt();
+          });
+      });
+    };
+
+    prompt();
+  });
 }
