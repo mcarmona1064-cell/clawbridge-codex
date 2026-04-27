@@ -5,6 +5,32 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "main": "dist/index.js",
+  "author": "ClawBridge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/other2368-byte/clawbridge-agent.git"
+  },
+  "homepage": "https://github.com/other2368-byte/clawbridge-agent",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ai-agent",
+    "claude",
+    "anthropic",
+    "chatbot",
+    "telegram",
+    "whatsapp",
+    "discord",
+    "slack",
+    "self-hosted",
+    "white-label"
+  ],
   "bin": {
     "clawbridge-agent": "./dist/setup/index.js",
     "clawbridge": "./dist/setup/index.js"
@@ -18,6 +44,7 @@
     "format:fix": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "prepare": "husky",
+    "prepublishOnly": "pnpm build",
     "setup": "tsx setup/index.ts",
     "setup:wizard": "tsx src/setup/index.ts",
     "setup:auto": "tsx setup/auto.ts",
