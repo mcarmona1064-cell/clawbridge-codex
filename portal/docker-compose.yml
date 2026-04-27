@@ -9,7 +9,7 @@ services:
       - "3010:3010"
     volumes:
       - ./api:/app
-      - portal-db:/app/data
+      - ${HOME}/.clawbridge/portal-data:/app/data
     environment:
       - PORT=3010
       - DATABASE_PATH=/app/data/portal.db
@@ -48,6 +48,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
-
-volumes:
-  portal-db:
