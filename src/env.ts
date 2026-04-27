@@ -14,11 +14,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * so they don't leak to child processes.
  */
 export function readEnvFile(keys: string[]): Record<string, string> {
-  const candidates = [
-    path.join(homedir(), '.clawbridge', '.env'),
-    path.resolve(__dirname, '../../integrations/.env'),
-  ];
-  const envFile = candidates.find(p => fs.existsSync(p)) ?? candidates[0];
+  const candidates = [path.join(homedir(), '.clawbridge', '.env'), path.resolve(__dirname, '../../integrations/.env')];
+  const envFile = candidates.find((p) => fs.existsSync(p)) ?? candidates[0];
   let content: string;
   try {
     content = fs.readFileSync(envFile, 'utf-8');
