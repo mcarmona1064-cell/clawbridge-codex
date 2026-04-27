@@ -56,3 +56,19 @@ router.get('/client/:id', (req: AuthRequest, res: Response): void => {
 });
 
 export default router;
+
+router.get('/activity', (_req: AuthRequest, res: Response): void => {
+  const db = getDb();
+  try {
+    const events = db.prepare(`
+      SELECT ul.event_type, ul.metadata, ul.created_at, c.name as client_name
+      FROM usage_logs ul
+      JOIN clients c ON ul.client_id = c.id
+      ORDER BY ul.created_at DESC
+      LIMIT 50
+    `).all();
+    res.json(events);
+  } catch {
+    res.json([]);
+  }
+});

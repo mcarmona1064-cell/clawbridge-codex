@@ -1,13 +1,8 @@
-import {
-  CheckCircle2,
-  Clock,
-  DollarSign,
-  ShieldCheck,
-  Zap,
-  Star,
-  Moon,
-  TrendingUp,
-} from 'lucide-react';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import clsx from 'clsx';
 
 export interface OverviewStats {
@@ -15,7 +10,6 @@ export interface OverviewStats {
   tasksCompleted?: number;
   messagesProcessed?: number;
   monthlyRevenue?: number;
-  // Extended metrics
   tasksThisMonth?: number;
   hoursSaved?: number;
   costSaved?: number;
@@ -25,127 +19,49 @@ export interface OverviewStats {
   afterHoursTasks?: number;
   planCost?: number;
   daysActive?: number;
+  // Mission control fields
+  systemHealth?: number;
+  activeAgents?: number;
+  messagesToday?: number;
+  errorRate?: number;
 }
 
-interface Benchmark {
-  label: string;
-  yours: number | string;
-  industry: number | string;
-  unit?: string;
-  higherIsBetter?: boolean;
+// Generate mock 24h sparkline data
+function mockSparkline(base: number, variance: number, points = 12) {
+  return Array.from({ length: points }, (_, i) => ({
+    t: i,
+    v: Math.max(0, base + (Math.random() - 0.5) * variance * 2),
+  }));
 }
 
-const BENCHMARKS: Benchmark[] = [
-  { label: 'Deflection Rate',   yours: 78,  industry: 55, unit: '%',  higherIsBetter: true },
-  { label: 'Avg Response Time', yours: 1.2, industry: 4.5, unit: 'min', higherIsBetter: false },
-  { label: 'CSAT Score',        yours: 4.7, industry: 4.1, unit: '/5', higherIsBetter: true },
-];
+const MOCK_HEALTH_SPARK = mockSparkline(97, 3);
+const MOCK_AGENTS_SPARK = mockSparkline(8, 2);
+const MOCK_MSGS_SPARK   = mockSparkline(350, 80);
+const MOCK_ERR_SPARK    = mockSparkline(0.4, 0.3);
 
-interface StatCard {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ElementType;
-  accent?: boolean;
-  benchmarkIdx?: number;
+interface MiniSparkProps {
+  data: { t: number; v: number }[];
+  color: string;
 }
 
-function buildCards(stats: OverviewStats): StatCard[] {
-  const tasks = stats.tasksThisMonth ?? stats.tasksCompleted ?? 0;
-  const avgMinutes = 8; // minutes per task saved
-  const hoursSaved = stats.hoursSaved ?? Math.round((tasks * avgMinutes) / 60);
-  const costSaved = stats.costSaved ?? Math.round(hoursSaved * 35); // $35/hr labor
-  const deflection = stats.deflectionRate ?? 78;
-  const responseMin = stats.avgResponseTime ?? 1.2;
-  const csat = stats.csatScore ?? 4.7;
-  const afterHours = stats.afterHoursTasks ?? Math.round(tasks * 0.31);
-
-  return [
-    {
-      label: 'Tasks Handled',
-      value: tasks.toLocaleString(),
-      sub: 'this month',
-      icon: CheckCircle2,
-      benchmarkIdx: undefined,
-    },
-    {
-      label: 'Hours Saved',
-      value: hoursSaved.toLocaleString(),
-      sub: `≈ ${tasks} tasks × ${avgMinutes} min avg`,
-      icon: Clock,
-    },
-    {
-      label: 'Cost Saved',
-      value: `$${costSaved.toLocaleString()}`,
-      sub: 'vs. human agents @ $35/hr',
-      icon: DollarSign,
-    },
-    {
-      label: 'Deflection Rate',
-      value: `${deflection}%`,
-      sub: 'industry avg 55%',
-      icon: ShieldCheck,
-      benchmarkIdx: 0,
-    },
-    {
-      label: 'Avg Response Time',
-      value: `${responseMin}m`,
-      sub: 'industry avg 4.5 min',
-      icon: Zap,
-      benchmarkIdx: 1,
-    },
-    {
-      label: 'CSAT Score',
-      value: `${csat}/5`,
-      sub: 'industry avg 4.1',
-      icon: Star,
-      benchmarkIdx: 2,
-    },
-    {
-      label: 'After-Hours Recovery',
-      value: afterHours.toLocaleString(),
-      sub: 'tasks outside 9–5',
-      icon: Moon,
-    },
-  ];
-}
-
-function roiDays(stats: OverviewStats): number {
-  const planCost = stats.planCost ?? 299;
-  const dailyCostSaved = ((stats.costSaved ?? 0) || (stats.hoursSaved ?? 0) * 35) / 30;
-  if (dailyCostSaved <= 0) return 0;
-  return Math.round(planCost / dailyCostSaved);
-}
-
-function BenchmarkBar({ b }: { b: Benchmark }) {
-  const yoursNum = typeof b.yours === 'number' ? b.yours : parseFloat(String(b.yours));
-  const industryNum = typeof b.industry === 'number' ? b.industry : parseFloat(String(b.industry));
-  const max = Math.max(yoursNum, industryNum) * 1.3;
-  const yoursPct = (yoursNum / max) * 100;
-  const industryPct = (industryNum / max) * 100;
-  const winning = b.higherIsBetter ? yoursNum >= industryNum : yoursNum <= industryNum;
-
+function MiniSpark({ data, color }: MiniSparkProps) {
   return (
-    <div className="mt-3 space-y-1.5">
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-          <div
-            className={clsx('h-full rounded-full', winning ? 'bg-green-400' : 'bg-yellow-400')}
-            style={{ width: `${yoursPct}%` }}
-          />
-        </div>
-        <span className="text-[12px] text-[rgba(245,245,247,0.6)] w-16 text-right">You</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-white/20"
-            style={{ width: `${industryPct}%` }}
-          />
-        </div>
-        <span className="text-[12px] text-[rgba(245,245,247,0.6)] w-16 text-right">Industry</span>
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height={36}>
+      <LineChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+        <Line
+          type="monotone"
+          dataKey="v"
+          stroke={color}
+          strokeWidth={1.5}
+          dot={false}
+          isAnimationActive={false}
+        />
+        <Tooltip
+          contentStyle={{ display: 'none' }}
+          cursor={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -154,91 +70,95 @@ interface StatsCardsProps {
   isDemo?: boolean;
 }
 
+function formatCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
 export default function StatsCards({ stats = {}, isDemo }: StatsCardsProps) {
-  const cards = buildCards(stats);
-  const roi = roiDays(stats);
+  const health = stats.systemHealth ?? 97;
+  const agents = stats.activeAgents ?? 8;
+  const msgs   = stats.messagesToday ?? 8400;
+  const errRate = stats.errorRate ?? 0.4;
+
+  const healthColor = health >= 95 ? '#2ECC71' : health >= 80 ? '#F5A623' : '#E84040';
+  const errColor    = errRate > 1   ? '#E84040' : errRate > 0.3 ? '#F5A623' : '#2ECC71';
+
+  const cards = [
+    {
+      label: 'System Health',
+      value: `${health}`,
+      unit: '',
+      sub: 'Overall score',
+      color: healthColor,
+      spark: MOCK_HEALTH_SPARK,
+      extra: (
+        <span className="text-[11px] font-bold" style={{ color: healthColor }}>
+          {health >= 95 ? 'Nominal' : health >= 80 ? 'Degraded' : 'Critical'}
+        </span>
+      ),
+    },
+    {
+      label: 'Active Agents',
+      value: String(agents),
+      unit: '',
+      sub: 'Running now',
+      color: '#00D4FF',
+      spark: MOCK_AGENTS_SPARK,
+      extra: (
+        <span className="flex items-center gap-1 text-[11px] text-[#8892A0]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#00D4FF] pulse-dot" />
+          Live
+        </span>
+      ),
+    },
+    {
+      label: 'Messages Today',
+      value: formatCount(msgs),
+      unit: '',
+      sub: 'Last 24h',
+      color: '#7B68EE',
+      spark: MOCK_MSGS_SPARK,
+      extra: null,
+    },
+    {
+      label: 'Error Rate',
+      value: `${errRate.toFixed(1)}%`,
+      unit: '',
+      sub: 'Last 24h',
+      color: errColor,
+      spark: MOCK_ERR_SPARK,
+      extra: (
+        <span className="text-[11px] font-bold" style={{ color: errColor }}>
+          {errRate > 1 ? 'Above threshold' : errRate > 0.3 ? 'Elevated' : 'Normal'}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      {/* ROI Hero Card */}
-      <div className="bg-[#2a2a2d] border border-white/[0.06] rounded-2xl p-5 flex items-center gap-5">
-        <div className="p-3 rounded-xl bg-[#f97316]/10">
-          <TrendingUp size={22} className="text-[#f97316]" />
-        </div>
-        <div>
-          <p className="text-[rgba(245,245,247,0.6)] text-[16px]">Return on investment</p>
-          {roi > 0 ? (
-            <p className="text-[28px] font-bold text-[#F5F5F7]">
-              Your agent paid for itself{' '}
-              <span className="text-[#f97316]">{roi} days ago</span>
-            </p>
-          ) : (
-            <p className="text-[28px] font-bold text-[#F5F5F7]">
-              ROI tracking starts after first full month
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* 7 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {cards.map((card, i) => {
-          const Icon = card.icon;
-          const hasBenchmark = card.benchmarkIdx !== undefined;
-          const benchmark = hasBenchmark ? BENCHMARKS[card.benchmarkIdx!] : null;
-          // Only first card gets accent color treatment
-          const isFirst = i === 0;
-
-          return (
-            <div
-              key={card.label}
-              className="bg-[#2a2a2d] border border-white/[0.06] rounded-2xl p-5 flex flex-col gap-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[rgba(245,245,247,0.6)] text-[16px]">{card.label}</span>
-                <div className={clsx(
-                  'p-2 rounded-xl',
-                  isFirst ? 'bg-[#f97316]/10' : 'bg-white/[0.06]'
-                )}>
-                  <Icon
-                    size={16}
-                    strokeWidth={2}
-                    className={isFirst ? 'text-[#f97316]' : 'text-[rgba(245,245,247,0.6)]'}
-                  />
-                </div>
-              </div>
-
-              <div className="text-[28px] font-bold text-[#F5F5F7]">{card.value}</div>
-
-              {card.sub && (
-                <p className="text-[rgba(245,245,247,0.6)] text-[14px] font-semibold leading-tight">
-                  {card.sub}
-                </p>
-              )}
-
-              {benchmark && <BenchmarkBar b={benchmark} />}
-            </div>
-          );
-        })}
-
-        {/* 8th card — placeholder for "this month" sparkline space */}
-        <div className="bg-[#2a2a2d] border border-white/[0.06] rounded-2xl p-5 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[rgba(245,245,247,0.6)] text-[16px]">Monthly Revenue</span>
-            <div className="p-2 rounded-xl bg-white/[0.06]">
-              <DollarSign size={16} strokeWidth={2} className="text-[rgba(245,245,247,0.6)]" />
-            </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className="bg-[#0F1318] border border-[#252C38] rounded-xl p-4 flex flex-col gap-1"
+        >
+          <span className="text-[11px] uppercase tracking-wider text-[#8892A0] font-bold">{card.label}</span>
+          <div className="flex items-end justify-between">
+            <span className="font-mono text-[32px] font-bold leading-none" style={{ color: card.color }}>
+              {card.value}
+            </span>
+            {card.extra}
           </div>
-          <div className="text-[28px] font-bold text-[#F5F5F7]">
-            ${(stats.monthlyRevenue ?? 0).toLocaleString()}
+          <span className="text-[11px] text-[#8892A0]">{card.sub}</span>
+          <div className="mt-1">
+            <MiniSpark data={card.spark} color={card.color} />
           </div>
-          <p className="text-[rgba(245,245,247,0.6)] text-[14px] font-semibold">active subscriptions</p>
         </div>
-      </div>
-
+      ))}
       {isDemo && (
-        <div className="rounded-xl border border-[#f97316]/30 bg-[#f97316]/5 px-5 py-3 text-[16px] text-[rgba(245,245,247,0.6)]">
-          <span className="text-[#f97316] font-bold">Demo data</span> — this is what your dashboard will look like once your agent starts handling tasks.
+        <div className="col-span-full rounded-xl border border-[#00D4FF]/20 bg-[#00D4FF]/5 px-4 py-2.5 text-[13px] text-[#8892A0]">
+          <span className="text-[#00D4FF] font-bold">Demo data</span> — metrics will populate once your agents start handling traffic.
         </div>
       )}
     </div>
