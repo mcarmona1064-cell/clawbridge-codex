@@ -78,7 +78,7 @@ services:
       POSTGRES_USER: hindsight
       POSTGRES_PASSWORD: ${HINDSIGHT_DB_PASSWORD}
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - hindsight-db-data:/var/lib/postgresql/data
     networks:
