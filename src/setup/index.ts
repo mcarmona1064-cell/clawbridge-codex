@@ -508,13 +508,26 @@ async function runMigrationFlow(): Promise<void> {
     return;
   }
 
-  const selections = ensure(
-    await p.multiselect<MigrationSelection>({
-      message: 'What would you like to migrate?',
-      options: selectionOptions,
-      required: true,
+  // 3a. "Migrate everything" fast path
+  const migrateAll = ensure(
+    await p.confirm({
+      message: 'Migrate everything? (recommended)',
+      initialValue: true,
     }),
-  ) as MigrationSelection[];
+  ) as boolean;
+
+  let selections: MigrationSelection[];
+  if (migrateAll) {
+    selections = selectionOptions.map((o) => o.value);
+  } else {
+    selections = ensure(
+      await p.multiselect<MigrationSelection>({
+        message: 'What would you like to migrate?',
+        options: selectionOptions,
+        required: true,
+      }),
+    ) as MigrationSelection[];
+  }
 
   // 4. Safety notice + confirm
   p.log.info(dim('This will NOT affect your existing installation. Your data there is untouched.'));
