@@ -8,7 +8,6 @@
  *   1. Fresh install  — guided .env generation + docker compose up
  *   2. Migrate from OpenClaw
  *   3. Migrate from NanoClaw
- *   4. Migrate from Cyndra
  */
 import { spawnSync, execSync } from 'child_process';
 import fs from 'fs';
@@ -563,7 +562,6 @@ function printAuditReport(source: MigrationSource, audit: MigrationAudit): void 
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
-    cyndra: 'Cyndra',
   };
   const label = typeLabel[source.type] ?? source.type;
   const rows: Array<[string, string]> = [
@@ -586,7 +584,6 @@ async function runMigrationFlow(): Promise<void> {
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
-    cyndra: 'Cyndra',
   };
 
   // 1. Detect install
@@ -1025,10 +1022,9 @@ async function main(): Promise<void> {
         { value: 'fresh', label: 'Fresh install' },
         { value: 'openclaw', label: 'Migrate from OpenClaw' },
         { value: 'nanoclaw', label: 'Migrate from NanoClaw' },
-        { value: 'cyndra', label: 'Migrate from Cyndra' },
       ],
     }),
-  ) as 'fresh' | 'openclaw' | 'nanoclaw' | 'cyndra';
+  ) as 'fresh' | 'openclaw' | 'nanoclaw';
 
   if (mode === 'fresh') {
     await runFreshInstall();

@@ -4,7 +4,6 @@
  * Handles detection and migration from:
  *   - OpenClaw  (~/.openclaw, ~/openclaw, ~/clawdbot)
  *   - NanoClaw  (~/.nanoclaw)
- *   - Cyndra    (~/.cyndra)
  */
 import fs from 'fs';
 import path from 'path';
@@ -18,7 +17,7 @@ import type { MemorySegment } from '../memory/types.js';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
-export type MigrationSourceType = 'openclaw' | 'nanoclaw' | 'cyndra';
+export type MigrationSourceType = 'openclaw' | 'nanoclaw';
 
 export interface MigrationSource {
   type: MigrationSourceType;
@@ -80,15 +79,6 @@ const CANDIDATE_PATHS: Array<{ paths: string[]; type: MigrationSourceType }> = [
     ],
     type: 'nanoclaw',
   },
-  {
-    paths: [
-      path.join(HOME, '.cyndra'),
-      path.join(HOME, 'cyndra'),
-      path.join(HOME, 'Projects', 'cyndra'),
-      path.join(HOME, 'projects', 'cyndra'),
-    ],
-    type: 'cyndra',
-  },
 ];
 
 function identifyType(dir: string): MigrationSourceType | null {
@@ -101,7 +91,6 @@ function identifyType(dir: string): MigrationSourceType | null {
       const name = (pkg.name ?? '').toLowerCase();
       if (name.includes('openclaw') || name.includes('clawdbot')) return 'openclaw';
       if (name.includes('nanoclaw')) return 'nanoclaw';
-      if (name.includes('cyndra')) return 'cyndra';
     } catch {
       // ignore
     }
@@ -109,7 +98,6 @@ function identifyType(dir: string): MigrationSourceType | null {
   const base = path.basename(dir).toLowerCase();
   if (base.includes('openclaw') || base.includes('clawdbot')) return 'openclaw';
   if (base.includes('nanoclaw')) return 'nanoclaw';
-  if (base.includes('cyndra')) return 'cyndra';
   return null;
 }
 
@@ -132,7 +120,7 @@ export function resolveManualPath(dir: string): MigrationSource | { error: strin
   const type = identifyType(resolved);
   if (!type) {
     return {
-      error: `Could not identify install type at ${resolved}. Is this an OpenClaw, NanoClaw, or Cyndra directory?`,
+      error: `Could not identify install type at ${resolved}. Is this an OpenClaw or NanoClaw directory?`,
     };
   }
   return { type, path: resolved };
@@ -851,7 +839,6 @@ export function deactivateSource(source: MigrationSource): void {
   const stopCmds: Record<MigrationSourceType, string[]> = {
     openclaw: ['systemctl', '--user', 'stop', 'openclaw'],
     nanoclaw: ['systemctl', '--user', 'stop', 'nanoclaw'],
-    cyndra: ['systemctl', '--user', 'stop', 'cyndra'],
   };
   try {
     const [cmd, ...args] = stopCmds[source.type];
