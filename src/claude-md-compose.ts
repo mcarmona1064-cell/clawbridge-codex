@@ -176,7 +176,9 @@ export function migrateGroupsToClaudeLocal(): void {
       try {
         const firstLine = fs.readFileSync(claudeMd, 'utf8').split('\n')[0];
         isComposed = firstLine.includes('Composed at spawn');
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (isComposed) {
         fs.unlinkSync(claudeMd);
         actions.push(`${entry.name}/CLAUDE.md removed (was composed)`);
@@ -192,7 +194,9 @@ export function migrateGroupsToClaudeLocal(): void {
           fs.unlinkSync(claudeMd);
           actions.push(`${entry.name}/CLAUDE.md removed (stale composed)`);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
