@@ -269,14 +269,17 @@ function buildMounts(
     mounts.push({ hostPath: containerJsonPath, containerPath: '/workspace/agent/container.json', readonly: true });
   }
 
-  // Composer-managed CLAUDE.md artifacts — nested RO mounts. These are
-  // regenerated from the shared base + fragments on every spawn; any
-  // agent-side writes would be clobbered, so enforce read-only. Only
-  // CLAUDE.local.md (per-group memory) remains RW via the group-dir mount.
+  // Composer-managed artifacts — nested RO mounts. These are regenerated
+  // from the shared base + fragments on every spawn; any agent-side writes
+  // would be clobbered, so enforce read-only. Only CLAUDE.local.md
+  // (per-group user-editable persona) remains RW via the group-dir mount.
+  // `_composed.md` is the machine-managed entry point (underscore prefix =
+  // internal, do not edit). It is mounted as CLAUDE.md inside the container
+  // so Claude Code picks it up automatically.
   // `.claude-shared.md` is a symlink whose target (`/app/CLAUDE.md`) is
   // already RO-mounted, so writes through it fail regardless — no need for
   // a nested mount there.
-  const composedClaudeMd = path.join(groupDir, 'CLAUDE.md');
+  const composedClaudeMd = path.join(groupDir, '_composed.md');
   if (fs.existsSync(composedClaudeMd)) {
     mounts.push({ hostPath: composedClaudeMd, containerPath: '/workspace/agent/CLAUDE.md', readonly: true });
   }
@@ -448,6 +451,12 @@ async function buildContainerArgs(
   } else {
     log.warn('No credentials found in ~/.clawbridge/.env — container will have no credentials', { containerName });
   }
+
+  // HINDSIGHT_* vars are intentionally NOT passed to containers.
+  // Hindsight (semantic memory) runs as a host-side service and is accessed
+  // only by the host process (src/memory/hindsight.ts). Containers have no
+  // direct Hindsight access — memory retrieval is injected into context by
+  // the host before the container session starts.
 
   // Host gateway
   args.push(...hostGatewayArgs());

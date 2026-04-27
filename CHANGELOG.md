@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.1.2 — 2026-04-27
+- fix: #22 — Hindsight env vars clarified as host-only; added explicit exclusion comment in container-runner.ts so the non-passthrough is intentional and documented; updated .env.example section header
+- fix: #23 — composed CLAUDE.md renamed to `_composed.md` (underscore prefix = machine-managed, do not edit); `CLAUDE.local.md` is now the sole user-editable persona file, seeded with a default template on first group init; README documents the distinction
+
 ## v2.1.1 — 2026-04-27
 - fix: add `container/` and `scripts/` to npm package files (critical — fixes exit 125 on every container spawn)
 - fix: auto-build Docker image during setup

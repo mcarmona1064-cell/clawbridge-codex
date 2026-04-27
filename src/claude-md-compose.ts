@@ -35,9 +35,12 @@ const MCP_TOOLS_HOST_SUBPATH = path.join('container', 'agent-runner', 'src', 'mc
 const COMPOSED_HEADER = '<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->';
 
 /**
- * Regenerate `groups/<folder>/CLAUDE.md` from the shared base, enabled skill
+ * Regenerate `groups/<folder>/_composed.md` from the shared base, enabled skill
  * fragments, and MCP server fragments declared in `container.json`. Creates
  * an empty `CLAUDE.local.md` if missing.
+ *
+ * The composed file uses an underscore prefix to signal it is machine-managed
+ * and should not be edited. `CLAUDE.local.md` is the user-editable persona file.
  */
 export function composeGroupClaudeMd(group: AgentGroup): void {
   const groupDir = path.resolve(GROUPS_DIR, group.folder);
@@ -121,7 +124,7 @@ export function composeGroupClaudeMd(group: AgentGroup): void {
     imports.push(`@./.claude-fragments/${name}`);
   }
   const body = [COMPOSED_HEADER, ...imports, ''].join('\n');
-  writeAtomic(path.join(groupDir, 'CLAUDE.md'), body);
+  writeAtomic(path.join(groupDir, '_composed.md'), body);
 
   const localFile = path.join(groupDir, 'CLAUDE.local.md');
   if (!fs.existsSync(localFile)) {
@@ -165,9 +168,31 @@ export function migrateGroupsToClaudeLocal(): void {
 
     const claudeMd = path.join(groupDir, 'CLAUDE.md');
     const claudeLocal = path.join(groupDir, 'CLAUDE.local.md');
+    const composedMd = path.join(groupDir, '_composed.md');
     if (fs.existsSync(claudeMd) && !fs.existsSync(claudeLocal)) {
-      fs.renameSync(claudeMd, claudeLocal);
-      actions.push(`${entry.name}/CLAUDE.md → CLAUDE.local.md`);
+      // If CLAUDE.md is a composed (machine-generated) file, don't migrate it
+      // to CLAUDE.local.md — just remove it so _composed.md takes over.
+      let isComposed = false;
+      try {
+        const firstLine = fs.readFileSync(claudeMd, 'utf8').split('\n')[0];
+        isComposed = firstLine.includes('Composed at spawn');
+      } catch { /* ignore */ }
+      if (isComposed) {
+        fs.unlinkSync(claudeMd);
+        actions.push(`${entry.name}/CLAUDE.md removed (was composed)`);
+      } else {
+        fs.renameSync(claudeMd, claudeLocal);
+        actions.push(`${entry.name}/CLAUDE.md → CLAUDE.local.md`);
+      }
+    } else if (fs.existsSync(claudeMd) && !fs.existsSync(composedMd)) {
+      // Old composed CLAUDE.md still present after cutover — remove it
+      try {
+        const firstLine = fs.readFileSync(claudeMd, 'utf8').split('\n')[0];
+        if (firstLine.includes('Composed at spawn')) {
+          fs.unlinkSync(claudeMd);
+          actions.push(`${entry.name}/CLAUDE.md removed (stale composed)`);
+        }
+      } catch { /* ignore */ }
     }
   }
 

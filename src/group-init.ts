@@ -44,11 +44,27 @@ export function initGroupFilesystem(group: AgentGroup, opts?: { instructions?: s
     initialized.push('groupDir');
   }
 
-  // groups/<folder>/CLAUDE.local.md — per-group agent memory, auto-loaded by
-  // Claude Code. Seeded with caller-provided instructions on first creation.
+  // groups/<folder>/CLAUDE.local.md — user-editable agent persona, auto-loaded
+  // by Claude Code alongside the machine-managed _composed.md entry point.
+  // Seeded with caller-provided instructions, or a default template on first
+  // creation. The underscore-prefixed _composed.md is internal — this is the
+  // only CLAUDE.md file the user should ever edit.
   const claudeLocalFile = path.join(groupDir, 'CLAUDE.local.md');
   if (!fs.existsSync(claudeLocalFile)) {
-    const body = opts?.instructions ? opts.instructions + '\n' : '';
+    const defaultBody = `# Your Agent Persona
+
+Edit this file to customize your agent's personality, knowledge, and behavior.
+This file is merged with the system configuration automatically.
+
+## About me
+I am ClawBridge, your AI assistant.
+
+## My personality
+- Helpful and direct
+- Remember important context about users
+- Proactive with reminders and follow-ups
+`;
+    const body = opts?.instructions ? opts.instructions + '\n' : defaultBody;
     fs.writeFileSync(claudeLocalFile, body);
     initialized.push('CLAUDE.local.md');
   }
