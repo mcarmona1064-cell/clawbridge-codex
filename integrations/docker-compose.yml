@@ -57,7 +57,7 @@ services:
       - SERVER_URL=${SERVER_URL}
       - CONNECT_URL=${CONNECT_URL}
     ports:
-      - "3003:3003"
+      - "3003:8080"
       - "3009:3009"
     networks:
       - clawbridge-nango

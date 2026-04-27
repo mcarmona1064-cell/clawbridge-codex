@@ -537,6 +537,12 @@ async function runFreshInstall(): Promise<void> {
       } else {
         ps.stop(k.yellow('Portal start failed (non-critical) — check logs in portal/'));
         if (portalResult.stderr) console.error(portalResult.stderr);
+        p.log.info(
+          dim(
+            'If the portal fails to start, run:\n' +
+            '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d'
+          ),
+        );
       }
     }
   } catch {
@@ -921,6 +927,12 @@ async function runMigrationFlow(): Promise<void> {
       } else {
         ps2.stop(k.yellow('Portal start failed (non-critical) — check logs in portal/'));
         if (portalResult2.stderr) console.error(portalResult2.stderr);
+        p.log.info(
+          dim(
+            'If the portal fails to start, run:\n' +
+            '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d'
+          ),
+        );
       }
     }
   } catch {
