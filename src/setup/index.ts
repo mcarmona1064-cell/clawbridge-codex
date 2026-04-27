@@ -7,7 +7,7 @@
  * Three paths:
  *   1. Fresh install  — guided .env generation + docker compose up
  *   2. Migrate from OpenClaw
- *   3. Migrate from NanoClaw / Cyndra
+ *   3. Migrate from NanoClaw
  */
 import { spawnSync } from 'child_process';
 import fs from 'fs';
@@ -871,7 +871,7 @@ async function main(): Promise<void> {
       options: [
         { value: 'fresh', label: 'Fresh install' },
         { value: 'openclaw', label: 'Migrate from OpenClaw' },
-        { value: 'nanoclaw', label: 'Migrate from NanoClaw / Cyndra' },
+        { value: 'nanoclaw', label: 'Migrate from NanoClaw' },
       ],
     }),
   ) as 'fresh' | 'openclaw' | 'nanoclaw';
