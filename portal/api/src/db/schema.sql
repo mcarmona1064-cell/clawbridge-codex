@@ -11,8 +11,6 @@ CREATE TABLE IF NOT EXISTS clients (
   email TEXT UNIQUE NOT NULL,
   subdomain TEXT UNIQUE NOT NULL,
   plan TEXT DEFAULT 'starter',
-  stripe_customer_id TEXT,
-  stripe_subscription_id TEXT,
   status TEXT DEFAULT 'active',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   last_active DATETIME

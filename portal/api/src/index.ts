@@ -15,9 +15,6 @@ const PORT = parseInt(process.env.PORT || '3010', 10);
 // Middlewares
 app.use(corsMiddleware);
 
-// Raw body needed for Stripe webhook verification
-app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
-
 // JSON body parser for all other routes
 app.use(express.json());
 

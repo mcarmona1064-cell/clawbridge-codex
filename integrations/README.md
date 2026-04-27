@@ -104,7 +104,6 @@ cd integrations/mcp-server && npm install && npm run dev
 | **Gmail** | `gmail` | Send emails, read inbox, fetch message metadata |
 | **HubSpot** | `hubspot` | List/create contacts, create deals, manage pipeline |
 | **Slack** | `slack` | Send messages, list channels, post notifications |
-| **Stripe** | `stripe` | View payment intents, look up customers |
 | **Notion** | `notion` | Search pages/databases, create new pages |
 | **Google Drive** | `google-drive` | Read/write files, search documents |
 | **LinkedIn** | `linkedin` | Post updates, look up profiles |

@@ -56,9 +56,8 @@ bash clawbridge.sh
 ## Features
 
 - 🤖 Multi-channel AI agents (Telegram, WhatsApp, Discord, Slack, iMessage, 15+ more)
-- 🔌 700+ integrations via Nango (Google, HubSpot, Stripe, Slack…)
+- 🔌 700+ integrations via Nango (Google, HubSpot, Slack…)
 - 📊 Client portal with analytics & ROI dashboard
-- 💳 Stripe billing (Starter $299, Pro $599, Enterprise $1,299/mo)
 - 📞 Voice agents via Retell AI
 - 👁 Vision & document analysis via Claude
 - 🔒 Container-isolated, self-hosted — your data stays yours

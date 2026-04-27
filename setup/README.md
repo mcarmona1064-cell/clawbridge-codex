@@ -33,7 +33,6 @@ The wizard walks you through these steps:
 3. **Telegram bot token** — paste the token from @BotFather (if Telegram selected)
 4. **Agent name** — what your assistant is called (default: `ClawBridge`)
 5. **Admin credentials** — email + password for the portal at `http://localhost:4000`
-6. **Stripe keys** (optional) — for billing integration
 7. **Retell AI key** (optional) — for voice agents
 8. **Generate `.env`** — writes all config to `.env` in your project root
 9. **docker compose up -d** — starts ClawBridge in the background
@@ -146,7 +145,6 @@ This restores from `~/.clawbridge/migration-backup/` and removes the migrated fi
 | `WHATSAPP_ACCESS_TOKEN` | Channel | WhatsApp Cloud API |
 | `GMAIL_CLIENT_ID` | Channel | Google OAuth client |
 | `GMAIL_CLIENT_SECRET` | Channel | Google OAuth secret |
-| `STRIPE_SECRET_KEY` | Optional | Billing integration |
 | `RETELL_API_KEY` | Optional | Voice agent integration |
 
 ### Example `.env`

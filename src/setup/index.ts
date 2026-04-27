@@ -106,12 +106,6 @@ function validateRequired(value: string | undefined): string | undefined {
   return !(value ?? '').trim() ? 'Required' : undefined;
 }
 
-function validateStripeKey(value: string | undefined): string | undefined {
-  const v = (value ?? '').trim();
-  if (!v) return 'Required';
-  if (!v.startsWith('sk_')) return 'Should start with sk_…';
-  return undefined;
-}
 
 function testOAuthToken(token: string): boolean {
   try {
@@ -210,7 +204,6 @@ function buildEnvFile(cfg: FreshConfig): string {
   return lines.join('\n') + '\n';
 }
 
-
 // ─── Source .env reader ───────────────────────────────────────────────────────
 
 function parseEnvFile(envPath: string): Map<string, string> {
@@ -224,7 +217,9 @@ function parseEnvFile(envPath: string): Map<string, string> {
       if (eq === -1) continue;
       map.set(t.slice(0, eq).trim(), t.slice(eq + 1).trim());
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return map;
 }
 
@@ -238,8 +233,8 @@ async function promptClaudeToken(existingValue?: string): Promise<string> {
   p.log.message(
     dim(
       '  To authenticate with Claude, run this in a separate terminal:\n' +
-      '    claude setup-token\n' +
-      '  then paste the token below.',
+        '    claude setup-token\n' +
+        '  then paste the token below.',
     ),
   );
   const token = ensure(
@@ -275,7 +270,10 @@ async function promptAgentName(existingValue?: string): Promise<string> {
   return raw.trim() || 'ClawBridge';
 }
 
-async function promptAdminCreds(existing?: { email?: string; password?: string }): Promise<{ email: string; password: string }> {
+async function promptAdminCreds(existing?: {
+  email?: string;
+  password?: string;
+}): Promise<{ email: string; password: string }> {
   if (existing?.email && existing?.password) {
     return { email: existing.email, password: existing.password };
   }
@@ -741,7 +739,7 @@ async function runMigrationFlow(): Promise<void> {
   }
 
   // ── Configure new features ─────────────────────────────────────────────────
-  p.intro(dim('Let\'s configure ClawBridge\'s new features for your migrated install.'));
+  p.intro(dim("Let's configure ClawBridge's new features for your migrated install."));
 
   // Read source .env for pre-existing values
   const sourceEnvPaths = [
@@ -752,20 +750,19 @@ async function runMigrationFlow(): Promise<void> {
   let sourceEnv = new Map<string, string>();
   for (const ep of sourceEnvPaths) {
     const parsed = parseEnvFile(ep);
-    if (parsed.size > 0) { sourceEnv = parsed; break; }
+    if (parsed.size > 0) {
+      sourceEnv = parsed;
+      break;
+    }
   }
 
   const integrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
 
   // Step A — Claude OAuth token
-  const migratedOauthToken = await promptClaudeToken(
-    sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'),
-  );
+  const migratedOauthToken = await promptClaudeToken(sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'));
 
   // Step B — Agent name
-  const migratedAgentName = await promptAgentName(
-    sourceEnv.get('ASSISTANT_NAME') ?? sourceEnv.get('AGENT_NAME'),
-  );
+  const migratedAgentName = await promptAgentName(sourceEnv.get('ASSISTANT_NAME') ?? sourceEnv.get('AGENT_NAME'));
 
   // Step C — Admin credentials (reuse silently if found)
   const existingAdminEmail = sourceEnv.get('ADMIN_EMAIL');
@@ -782,16 +779,19 @@ async function runMigrationFlow(): Promise<void> {
   const migratedRetellKey = await promptRetell();
 
   // Step E — Hindsight (skip if already configured in source)
-  const { dbPassword: migratedHindsightDbPw, apiKey: migratedHindsightApiKey, url: migratedHindsightUrl } =
-    await promptHindsight(sourceEnv.get('HINDSIGHT_URL'));
+  const {
+    dbPassword: migratedHindsightDbPw,
+    apiKey: migratedHindsightApiKey,
+    url: migratedHindsightUrl,
+  } = await promptHindsight(sourceEnv.get('HINDSIGHT_URL'));
 
   // Detect channels from source .env for the new .env
   const migratedChannels: string[] = [];
   if (sourceEnv.get('TELEGRAM_BOT_TOKEN')) migratedChannels.push('telegram');
-  if ([...sourceEnv.keys()].some(k => /WHATSAPP/i.test(k))) migratedChannels.push('whatsapp');
-  if ([...sourceEnv.keys()].some(k => /DISCORD/i.test(k))) migratedChannels.push('discord');
-  if ([...sourceEnv.keys()].some(k => /SLACK/i.test(k))) migratedChannels.push('slack');
-  if ([...sourceEnv.keys()].some(k => /GMAIL|GOOGLE_OAUTH/i.test(k))) migratedChannels.push('gmail');
+  if ([...sourceEnv.keys()].some((k) => /WHATSAPP/i.test(k))) migratedChannels.push('whatsapp');
+  if ([...sourceEnv.keys()].some((k) => /DISCORD/i.test(k))) migratedChannels.push('discord');
+  if ([...sourceEnv.keys()].some((k) => /SLACK/i.test(k))) migratedChannels.push('slack');
+  if ([...sourceEnv.keys()].some((k) => /GMAIL|GOOGLE_OAUTH/i.test(k))) migratedChannels.push('gmail');
 
   // Step F — Generate complete .env
   const migratedCfg: FreshConfig = {

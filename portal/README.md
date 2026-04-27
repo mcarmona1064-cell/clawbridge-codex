@@ -1,12 +1,12 @@
 # ClawBridge Client Portal — Phase 3
 
-A full-stack client portal with Stripe billing for the ClawBridge Agent Platform.
+A full-stack client portal for the ClawBridge Agent Platform.
 
 ## Stack
 
 - **Frontend**: Next.js 14 (App Router), Tailwind CSS, TypeScript — port 4000
 - **Backend**: Express + SQLite (better-sqlite3), TypeScript — port 3010
-- **Billing**: Stripe subscriptions (Starter $299 / Pro $599 / Enterprise $1299)
+- **Billing**: Subscription plans (Starter $299 / Pro $599 / Enterprise $1299)
 - **Integrations**: Nango proxy (optional)
 
 ## Quick Start
@@ -14,7 +14,7 @@ A full-stack client portal with Stripe billing for the ClawBridge Agent Platform
 ```bash
 cd portal
 cp .env.example .env
-# Edit .env with your Stripe keys (optional for demo mode)
+
 docker compose up
 ```
 
@@ -53,26 +53,6 @@ curl -X POST http://localhost:3010/api/clients \
 
 The client's portal will be available at `http://localhost:4000/acme` (or `https://acme.clawbridgeagency.com` in production with subdomain routing).
 
-## Stripe Setup
-
-1. Create a Stripe account at https://stripe.com
-2. Create three recurring products/prices in the Stripe dashboard:
-   - Starter: $299/month
-   - Pro: $599/month
-   - Enterprise: $1299/month
-3. Copy the price IDs into `.env`:
-   ```
-   STRIPE_SECRET_KEY=sk_live_...
-   STRIPE_STARTER_PRICE_ID=price_xxxx
-   STRIPE_PRO_PRICE_ID=price_yyyy
-   STRIPE_ENTERPRISE_PRICE_ID=price_zzzz
-   ```
-4. Set up a webhook in Stripe → Developers → Webhooks pointing to:
-   `https://your-api-domain.com/api/billing/webhook`
-   Events to listen for: `customer.subscription.deleted`, `invoice.payment_succeeded`
-5. Copy the webhook signing secret to `STRIPE_WEBHOOK_SECRET`
-
-Without Stripe keys configured, the portal runs in **demo mode** — plan changes are saved to the local DB without processing payments.
 
 ## Subdomain Routing (Production)
 
@@ -124,7 +104,6 @@ export function middleware(req: NextRequest) {
 | POST | /api/billing/subscribe | Subscribe client to plan |
 | GET | /api/billing/invoices/:clientId | List invoices |
 | POST | /api/billing/cancel | Cancel subscription |
-| POST | /api/billing/webhook | Stripe webhook |
 | GET | /api/integrations | List integrations |
 | GET | /health | Health check |
 

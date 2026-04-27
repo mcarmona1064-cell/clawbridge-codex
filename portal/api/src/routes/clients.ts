@@ -52,7 +52,7 @@ function decryptApiKey(encoded: string): string {
 router.get('/', (req: AuthRequest, res: Response): void => {
   const db = getDb();
   const clients = db
-    .prepare('SELECT id, name, email, subdomain, plan, status, stripe_customer_id, stripe_subscription_id, created_at, last_active FROM clients ORDER BY created_at DESC')
+    .prepare('SELECT id, name, email, subdomain, plan, status, created_at, last_active FROM clients ORDER BY created_at DESC')
     .all();
   res.json(clients);
 });
@@ -131,7 +131,7 @@ router.post('/', (req: AuthRequest, res: Response): void => {
 router.get('/:id', (req: AuthRequest, res: Response): void => {
   const db = getDb();
   const client = db
-    .prepare('SELECT id, name, email, subdomain, plan, status, stripe_customer_id, stripe_subscription_id, created_at, last_active FROM clients WHERE id = ?')
+    .prepare('SELECT id, name, email, subdomain, plan, status, created_at, last_active FROM clients WHERE id = ?')
     .get(req.params.id);
   if (!client) {
     res.status(404).json({ error: 'Client not found' });

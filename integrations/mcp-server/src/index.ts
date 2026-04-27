@@ -271,31 +271,6 @@ const TOOLS = [
       required: ["client_id"],
     },
   },
-  // Stripe
-  {
-    name: "get_stripe_payments",
-    description: "List recent Stripe payments",
-    inputSchema: {
-      type: "object",
-      properties: {
-        client_id: { type: "string" },
-        limit: { type: "number", description: "Number of payments (default 10)" },
-      },
-      required: ["client_id"],
-    },
-  },
-  {
-    name: "get_stripe_customers",
-    description: "Look up Stripe customers, optionally by email",
-    inputSchema: {
-      type: "object",
-      properties: {
-        client_id: { type: "string" },
-        email: { type: "string", description: "Filter by email address" },
-      },
-      required: ["client_id"],
-    },
-  },
   // Notion
   {
     name: "search_notion",
@@ -672,32 +647,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
         } catch {
           return { content: [{ type: "text", text: connectionNotFound("Slack", client_id) }] };
-        }
-      }
-
-      // ---- Stripe -------------------------------------------------------
-
-      case "get_stripe_payments": {
-        const { client_id, limit = 10 } = args as { client_id: string; limit?: number };
-        try {
-          const data = await nangoGet("stripe", client_id, "/v1/payment_intents", {
-            limit: String(limit),
-          });
-          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-        } catch {
-          return { content: [{ type: "text", text: connectionNotFound("Stripe", client_id) }] };
-        }
-      }
-
-      case "get_stripe_customers": {
-        const { client_id, email } = args as { client_id: string; email?: string };
-        try {
-          const params: Record<string, string> = { limit: "20" };
-          if (email) params.email = email;
-          const data = await nangoGet("stripe", client_id, "/v1/customers", params);
-          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-        } catch {
-          return { content: [{ type: "text", text: connectionNotFound("Stripe", client_id) }] };
         }
       }
 
