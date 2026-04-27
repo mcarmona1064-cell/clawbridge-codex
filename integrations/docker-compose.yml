@@ -69,13 +69,10 @@ services:
       nango-redis:
         condition: service_healthy
 
-volumes:
-  nango-db-data:
-  nango-redis-data:
-
   # ── Hindsight memory (optional — enables semantic per-client memory) ──────────
   hindsight-db:
     image: pgvector/pgvector:pg17
+    platform: linux/amd64
     container_name: hindsight-db
     restart: unless-stopped
     environment:
@@ -96,6 +93,7 @@ volumes:
 
   hindsight-api:
     image: ghcr.io/vectorize-io/hindsight:latest
+    platform: linux/amd64
     container_name: hindsight-api
     restart: unless-stopped
     ports:
@@ -125,4 +123,6 @@ volumes:
       HINDSIGHT_API_LOG_LEVEL: info
 
 volumes:
+  nango-db-data:
+  nango-redis-data:
   hindsight-db-data:

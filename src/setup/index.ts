@@ -164,7 +164,7 @@ function buildEnvFile(cfg: FreshConfig): string {
     `# Generated: ${new Date().toISOString()}`,
     '',
     '# Agent identity',
-    `AGENT_NAME=${cfg.agentName}`,
+    `ASSISTANT_NAME=${cfg.agentName}`,
     '',
     '# Claude Auth (Claude Pro/Max subscription)',
     '# Get this token by running: claude setup-token',
@@ -365,7 +365,8 @@ async function runFreshInstall(): Promise<void> {
   };
 
   const envContent = buildEnvFile(cfg);
-  const envPath = path.join(process.cwd(), '.env');
+  const integrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
+  const envPath = path.join(integrationsDir, '.env');
 
   const confirmWrite = ensure(
     await p.confirm({
@@ -394,8 +395,11 @@ async function runFreshInstall(): Promise<void> {
     const result = spawnSync('docker', ['compose', 'up', '-d'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',
+      cwd: integrationsDir,
     });
-    if (result.status === 0) {
+    if (result.error) {
+      s2.stop(k.red('Docker not found — install Docker Desktop first: https://docs.docker.com/get-docker/'));
+    } else if (result.status === 0) {
       s2.stop(k.green('ClawBridge is running.'));
     } else {
       s2.stop(k.yellow('docker compose returned an error — check output below.'));

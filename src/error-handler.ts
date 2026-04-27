@@ -208,7 +208,7 @@ async function getDiagnosis(error: Error, fileContext: string): Promise<string> 
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'claude-opus-4-5-20251001',
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }],
       }),

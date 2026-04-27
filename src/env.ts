@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { log } from './log.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Parse the .env file and return values for the requested keys.
@@ -9,12 +13,16 @@ import { log } from './log.js';
  * so they don't leak to child processes.
  */
 export function readEnvFile(keys: string[]): Record<string, string> {
-  const envFile = path.join(process.cwd(), '.env');
+  const envFile = path.resolve(__dirname, '../../integrations/.env');
   let content: string;
   try {
     content = fs.readFileSync(envFile, 'utf-8');
   } catch (err) {
-    log.debug('.env file not found, using defaults', { err });
+    if (!fs.existsSync(envFile) && !process.env['CLAUDE_CODE_OAUTH_TOKEN']) {
+      log.warn('Warning: .env not found and no environment variables set. Run the setup wizard first.');
+    } else {
+      log.debug('.env file not found, using defaults', { err });
+    }
     return {};
   }
 
