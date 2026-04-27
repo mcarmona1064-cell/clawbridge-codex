@@ -25,18 +25,20 @@ Otherwise continue. Every step below is safe to re-run.
 ### 1. Fetch the channels branch
 
 ```bash
-git fetch origin channels
+source setup/lib/channels-remote.sh
+CHANNELS_REMOTE=$(resolve_channels_remote)
+git fetch "$CHANNELS_REMOTE" channels
 ```
 
 ### 2. Copy the adapter, helpers, tests, and setup step
 
 ```bash
-git show origin/channels:src/channels/telegram.ts                        > src/channels/telegram.ts
-git show origin/channels:src/channels/telegram-pairing.ts                > src/channels/telegram-pairing.ts
-git show origin/channels:src/channels/telegram-pairing.test.ts           > src/channels/telegram-pairing.test.ts
-git show origin/channels:src/channels/telegram-markdown-sanitize.ts      > src/channels/telegram-markdown-sanitize.ts
-git show origin/channels:src/channels/telegram-markdown-sanitize.test.ts > src/channels/telegram-markdown-sanitize.test.ts
-git show origin/channels:setup/pair-telegram.ts                          > setup/pair-telegram.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/telegram.ts                        > src/channels/telegram.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/telegram-pairing.ts                > src/channels/telegram-pairing.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/telegram-pairing.test.ts           > src/channels/telegram-pairing.test.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/telegram-markdown-sanitize.ts      > src/channels/telegram-markdown-sanitize.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/telegram-markdown-sanitize.test.ts > src/channels/telegram-markdown-sanitize.test.ts
+git show ${CHANNELS_REMOTE}/channels:setup/pair-telegram.ts                          > setup/pair-telegram.ts
 ```
 
 ### 3. Append the self-registration import

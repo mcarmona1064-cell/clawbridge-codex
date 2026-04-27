@@ -24,13 +24,15 @@ Otherwise continue. Every step below is safe to re-run.
 ### 1. Fetch the channels branch
 
 ```bash
-git fetch origin channels
+source setup/lib/channels-remote.sh
+CHANNELS_REMOTE=$(resolve_channels_remote)
+git fetch "$CHANNELS_REMOTE" channels
 ```
 
 ### 2. Copy the adapter
 
 ```bash
-git show origin/channels:src/channels/slack.ts > src/channels/slack.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/slack.ts > src/channels/slack.ts
 ```
 
 ### 3. Append the self-registration import

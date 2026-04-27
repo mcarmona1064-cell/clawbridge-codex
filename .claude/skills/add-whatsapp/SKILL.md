@@ -26,15 +26,17 @@ Otherwise continue. Every step below is safe to re-run.
 ### 1. Fetch the channels branch
 
 ```bash
-git fetch origin channels
+source setup/lib/channels-remote.sh
+CHANNELS_REMOTE=$(resolve_channels_remote)
+git fetch "$CHANNELS_REMOTE" channels
 ```
 
 ### 2. Copy the adapter and setup steps
 
 ```bash
-git show origin/channels:src/channels/whatsapp.ts > src/channels/whatsapp.ts
-git show origin/channels:setup/whatsapp-auth.ts   > setup/whatsapp-auth.ts
-git show origin/channels:setup/groups.ts          > setup/groups.ts
+git show ${CHANNELS_REMOTE}/channels:src/channels/whatsapp.ts > src/channels/whatsapp.ts
+git show ${CHANNELS_REMOTE}/channels:setup/whatsapp-auth.ts   > setup/whatsapp-auth.ts
+git show ${CHANNELS_REMOTE}/channels:setup/groups.ts          > setup/groups.ts
 ```
 
 ### 3. Append the self-registration import

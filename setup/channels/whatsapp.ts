@@ -68,7 +68,7 @@ export async function runWhatsAppChannel(displayName: string): Promise<void> {
     },
   );
   if (!install.ok) {
-    fail(
+    await fail(
       'whatsapp-install',
       "Couldn't install the WhatsApp adapter.",
       'See logs/setup-steps/ for details, then retry setup.',
@@ -78,7 +78,7 @@ export async function runWhatsAppChannel(displayName: string): Promise<void> {
   const auth = await runWhatsAppAuth(method, phone);
   if (!auth.ok) {
     const reason = auth.terminal?.fields.ERROR ?? 'unknown';
-    fail(
+    await fail(
       'whatsapp-auth',
       `WhatsApp authentication failed (${reason}).`,
       reason === 'qr_timeout' || reason === 'timeout'
@@ -89,7 +89,7 @@ export async function runWhatsAppChannel(displayName: string): Promise<void> {
 
   const botPhone = readAuthedPhone();
   if (!botPhone) {
-    fail(
+    await fail(
       'whatsapp-auth',
       "Authenticated but couldn't read your WhatsApp number from the saved credentials.",
       'Re-run setup to try again.',
@@ -140,7 +140,7 @@ export async function runWhatsAppChannel(displayName: string): Promise<void> {
     },
   );
   if (!init.ok) {
-    fail(
+    await fail(
       'init-first-agent',
       `Couldn't finish connecting ${agentName}.`,
       'You can retry later with `/manage-channels`.',
