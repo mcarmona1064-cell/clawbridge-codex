@@ -260,10 +260,14 @@ const MEMORY_TABLE_CANDIDATES = ['memories', 'memory_entries', 'agent_memories',
 
 function detectMemoryTable(dbPath: string): string | null {
   for (const table of MEMORY_TABLE_CANDIDATES) {
-    const result = spawnSync('sqlite3', [dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const result = spawnSync(
+      'sqlite3',
+      [dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`],
+      {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
     if (result.status === 0 && (result.stdout ?? '').trim() === table) {
       return table;
     }
@@ -279,10 +283,14 @@ function countMemoryEntries(dbPath: string): number {
 
 function countScheduledTasks(dbPath: string): number {
   for (const table of ['scheduled_tasks', 'cron_tasks', 'tasks', 'jobs']) {
-    const result = spawnSync('sqlite3', [dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const result = spawnSync(
+      'sqlite3',
+      [dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`],
+      {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
     if (result.status === 0 && (result.stdout ?? '').trim() === table) {
       return countSqliteRows(dbPath, table);
     }
@@ -338,18 +346,26 @@ function migrateAllSqliteTables(srcPath: string, destPath: string): string[] {
 
     // Get all user tables from source
     const srcTables = (
-      srcDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as Array<{ name: string }>
+      srcDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as Array<{
+        name: string;
+      }>
     ).map((r) => r.name);
 
     for (const tableName of srcTables) {
       try {
         // Get column info from source
-        const srcCols = (srcDb.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string; type: string; notnull: number; dflt_value: string | null; pk: number }>);
+        const srcCols = srcDb.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{
+          name: string;
+          type: string;
+          notnull: number;
+          dflt_value: string | null;
+          pk: number;
+        }>;
 
         // Check if table exists in dest
-        const destTableExists = (
-          destDb.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(tableName) as { name: string } | undefined
-        );
+        const destTableExists = destDb
+          .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+          .get(tableName) as { name: string } | undefined;
 
         if (!destTableExists) {
           // Create table in dest using source schema
@@ -366,7 +382,9 @@ function migrateAllSqliteTables(srcPath: string, destPath: string): string[] {
         }
 
         // Get dest columns (may differ from source)
-        const destCols = (destDb.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).map((c) => c.name);
+        const destCols = (destDb.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).map(
+          (c) => c.name,
+        );
         const srcColNames = srcCols.map((c) => c.name);
 
         // Only use columns that exist in both
@@ -418,7 +436,13 @@ function groupFolderToSlug(folderName: string): string {
 // ─── Memory → Hindsight migration ────────────────────────────────────────────
 
 const VALID_SEGMENTS = new Set<string>([
-  'identity', 'preference', 'correction', 'relationship', 'knowledge', 'behavioral', 'context',
+  'identity',
+  'preference',
+  'correction',
+  'relationship',
+  'knowledge',
+  'behavioral',
+  'context',
 ]);
 
 function normalizeSegment(raw: string): MemorySegment {
@@ -507,13 +531,15 @@ function readMemoryEntries(dbPath: string, groupSlug?: string): MemoryEntry[] {
       rows = srcDb.prepare(`SELECT * FROM "${table}"`).all() as Record<string, unknown>[];
     }
 
-    return rows.map((r) => ({
-      id: r['id'] as string | number | undefined,
-      content: String(r['content'] ?? ''),
-      segment: String(r['segment'] ?? r['type'] ?? 'knowledge'),
-      importance: typeof r['importance'] === 'number' ? r['importance'] : 0.6,
-      created_at: r['created_at'] as string | undefined,
-    })).filter((e) => e.content.trim().length > 0);
+    return rows
+      .map((r) => ({
+        id: r['id'] as string | number | undefined,
+        content: String(r['content'] ?? ''),
+        segment: String(r['segment'] ?? r['type'] ?? 'knowledge'),
+        importance: typeof r['importance'] === 'number' ? r['importance'] : 0.6,
+        created_at: r['created_at'] as string | undefined,
+      }))
+      .filter((e) => e.content.trim().length > 0);
   } catch {
     return [];
   } finally {
@@ -685,7 +711,10 @@ export async function runMigration(
                 bySlug.set(slug, groupMemories);
                 // Remove from global if found per-group
                 const globalList = bySlug.get('global') ?? [];
-                bySlug.set('global', globalList.filter((m) => !groupMemories.includes(m)));
+                bySlug.set(
+                  'global',
+                  globalList.filter((m) => !groupMemories.includes(m)),
+                );
               }
             }
           }
@@ -693,14 +722,20 @@ export async function runMigration(
           for (const [slug, memories] of bySlug) {
             if (memories.length === 0) continue;
             emit('hindsight', `  Retaining ${memories.length} memories for bank: ${slug}…`);
-            const { retained, failed, queued } = await migrateMemoryToHindsight(slug, memories, { hindsightUrl: hindsightCfg.url, hindsightApiKey: hindsightCfg.apiKey });
+            const { retained, failed, queued } = await migrateMemoryToHindsight(slug, memories, {
+              hindsightUrl: hindsightCfg.url,
+              hindsightApiKey: hindsightCfg.apiKey,
+            });
             result.hindsightRetained += retained;
             result.hindsightFailed += failed;
             result.hindsightQueued += queued;
           }
 
           if (result.hindsightQueued > 0) {
-            emit('hindsight', `  ⚠ Hindsight not reachable — ${result.hindsightQueued} memories will sync on first startup`);
+            emit(
+              'hindsight',
+              `  ⚠ Hindsight not reachable — ${result.hindsightQueued} memories will sync on first startup`,
+            );
           } else {
             emit('hindsight', `  Retained: ${result.hindsightRetained}, Failed: ${result.hindsightFailed}`);
           }

@@ -214,9 +214,36 @@ function buildEnvFile(cfg: FreshConfig): string {
   return lines.join('\n') + '\n';
 }
 
+// ─── Docker pre-flight check ─────────────────────────────────────────────────
+
+function checkDockerPrerequisites(): void {
+  const dockerCheck = spawnSync('docker', ['--version'], { encoding: 'utf8' });
+  if (dockerCheck.error || dockerCheck.status !== 0) {
+    p.log.error('Docker Desktop is not installed.');
+    p.log.info('Download it at: https://docs.docker.com/get-docker/');
+    process.exit(1);
+  }
+
+  const daemonCheck = spawnSync('docker', ['info'], { encoding: 'utf8', timeout: 5000 });
+  if (daemonCheck.status !== 0) {
+    p.log.error('Docker Desktop is not running.');
+    p.log.info('Please start Docker Desktop and try again.');
+    process.exit(1);
+  }
+
+  const composeCheck = spawnSync('docker', ['compose', 'version'], { encoding: 'utf8' });
+  if (composeCheck.error || composeCheck.status !== 0) {
+    p.log.error('Docker Compose not found. Make sure Docker Desktop is up to date.');
+    process.exit(1);
+  }
+
+  p.log.success('Docker Desktop detected ✓');
+}
+
 // ─── Fresh install flow ───────────────────────────────────────────────────────
 
 async function runFreshInstall(): Promise<void> {
+  checkDockerPrerequisites();
   p.log.step('Starting fresh install…');
 
   // Step 1 — Claude OAuth token
@@ -438,6 +465,7 @@ function printAuditReport(source: MigrationSource, audit: MigrationAudit): void 
 // ─── Migration flow ───────────────────────────────────────────────────────────
 
 async function runMigrationFlow(): Promise<void> {
+  checkDockerPrerequisites();
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
@@ -533,7 +561,6 @@ async function runMigrationFlow(): Promise<void> {
     ) as MigrationSelection[];
   }
 
-
   // 3b. Hindsight config (optional — if user has Hindsight enabled)
   let hindsightCfg: HindsightConfig | undefined;
   const wantsHindsightMigration = ensure(
@@ -576,9 +603,15 @@ async function runMigrationFlow(): Promise<void> {
   migSpinner.start('Migrating…');
   let migrationResult: MigrationResult | undefined;
   try {
-    migrationResult = await runMigration(source, audit, selections, ({ step, detail }) => {
-      migSpinner.message(detail ?? step);
-    }, hindsightCfg);
+    migrationResult = await runMigration(
+      source,
+      audit,
+      selections,
+      ({ step, detail }) => {
+        migSpinner.message(detail ?? step);
+      },
+      hindsightCfg,
+    );
     migSpinner.stop(k.green('Migration complete.'));
   } catch (err) {
     migSpinner.stop(k.red('Migration failed.'));
