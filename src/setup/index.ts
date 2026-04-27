@@ -207,6 +207,25 @@ function buildEnvFile(cfg: FreshConfig): string {
     );
   }
 
+  // Nango integration platform — auto-generated credentials
+  const nangoDbPassword = crypto.randomBytes(16).toString('hex');
+  const nangoSecretKey = crypto.randomBytes(16).toString('hex');
+  const nangoEncryptionKey = crypto.randomBytes(32).toString('hex');
+  lines.push(
+    '# Nango integration platform',
+    'NANGO_DB_HOST=nango-db',
+    'NANGO_DB_PORT=5432',
+    'NANGO_DB_USER=nango',
+    `NANGO_DB_PASSWORD=${nangoDbPassword}`,
+    'NANGO_DB_NAME=nango',
+    'NANGO_REDIS_URL=redis://nango-redis:6379',
+    `NANGO_SECRET_KEY=${nangoSecretKey}`,
+    `NANGO_ENCRYPTION_KEY=${nangoEncryptionKey}`,
+    'SERVER_URL=http://localhost:3003',
+    'CONNECT_URL=http://localhost:3006',
+    '',
+  );
+
   return lines.join('\n') + '\n';
 }
 
