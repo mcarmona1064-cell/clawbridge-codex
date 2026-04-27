@@ -66,51 +66,51 @@ export async function main(): Promise<void> {
   console.log(`  │  Type /exit or Ctrl+C to quit      │`);
   console.log(`  ╰──────────────────────────────────╯\n`);
 
+  process.stdin.resume()
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: true,
-  });
+  })
 
-  // Handle Ctrl+C gracefully
   rl.on('close', () => {
-    console.log('\nGoodbye!');
-    process.exit(0);
-  });
+    console.log('\nGoodbye!')
+    process.exit(0)
+  })
 
-  const askQuestion = (): void => {
+  const prompt = (): void => {
     rl.question('\x1b[36mYou:\x1b[0m ', (input) => {
-      void (async () => {
-        const trimmed = input.trim();
-        if (!trimmed) {
-          askQuestion();
-          return;
-        }
-        if (trimmed === '/exit' || trimmed === '/quit') {
-          console.log('\nGoodbye!');
-          rl.close();
-          process.exit(0);
-        }
-        if (trimmed === '/clear') {
-          messages.length = 0;
-          console.log('\x1b[90m[Conversation cleared]\x1b[0m\n');
-          askQuestion();
-          return;
-        }
+      const trimmed = input.trim()
 
-        try {
-          process.stdout.write(`\x1b[33m${agentName}:\x1b[0m `);
-          const reply = await chat(trimmed);
-          console.log(reply + '\n');
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error(`\x1b[31mError: ${message}\x1b[0m\n`);
-        }
+      if (!trimmed) {
+        prompt()
+        return
+      }
 
-        askQuestion();
-      })();
-    });
-  };
+      if (trimmed === '/exit' || trimmed === '/quit') {
+        rl.close()
+        return
+      }
 
-  askQuestion();
+      if (trimmed === '/clear') {
+        messages.length = 0
+        console.log('\x1b[90m[Conversation cleared]\x1b[0m\n')
+        prompt()
+        return
+      }
+
+      // Handle async chat inside the sync callback
+      chat(trimmed)
+        .then((reply) => {
+          console.log(`\n\x1b[33m${agentName}:\x1b[0m ${reply}\n`)
+          prompt()
+        })
+        .catch((err: Error) => {
+          console.error(`\x1b[31mError: ${err.message}\x1b[0m\n`)
+          prompt()
+        })
+    })
+  }
+
+  prompt()
 }
