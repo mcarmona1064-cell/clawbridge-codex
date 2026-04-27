@@ -240,10 +240,48 @@ function checkDockerPrerequisites(): void {
   p.log.success('Docker Desktop detected ✓');
 }
 
+// ─── Node.js pre-flight check ─────────────────────────────────────────────────
+
+function checkNodePrerequisites(): void {
+  // Check Node.js is installed
+  const nodeCheck = spawnSync('node', ['--version'], { encoding: 'utf8' });
+  if (nodeCheck.error || nodeCheck.status !== 0) {
+    p.log.error('Node.js is not installed.');
+    p.log.info('Download it at: https://nodejs.org/');
+    process.exit(1);
+  }
+
+  // Check Node.js version >= 20
+  const version = nodeCheck.stdout.trim();
+  const major = parseInt(version.replace(/^v/, '').split('.')[0], 10);
+  if (major < 20) {
+    p.log.error('Node.js v20 or higher is required. You have ' + version);
+    p.log.info('Download latest at: https://nodejs.org/');
+    process.exit(1);
+  }
+  p.log.success('Node.js ' + version + ' \u2713');
+
+  // Check pnpm is installed; auto-install if missing
+  let pnpmCheck = spawnSync('pnpm', ['--version'], { encoding: 'utf8' });
+  if (pnpmCheck.error || pnpmCheck.status !== 0) {
+    p.log.warn('pnpm not found. Installing...');
+    spawnSync('npm', ['install', '-g', 'pnpm'], { stdio: 'inherit' });
+    // Re-check after install attempt
+    pnpmCheck = spawnSync('pnpm', ['--version'], { encoding: 'utf8' });
+    if (pnpmCheck.error || pnpmCheck.status !== 0) {
+      p.log.error('Failed to install pnpm. Run: npm install -g pnpm');
+      process.exit(1);
+    }
+  }
+  const pnpmVersion = pnpmCheck.stdout.trim();
+  p.log.success('pnpm ' + pnpmVersion + ' \u2713');
+}
+
 // ─── Fresh install flow ───────────────────────────────────────────────────────
 
 async function runFreshInstall(): Promise<void> {
   checkDockerPrerequisites();
+  checkNodePrerequisites();
   p.log.step('Starting fresh install…');
 
   // Step 1 — Claude OAuth token
@@ -466,6 +504,7 @@ function printAuditReport(source: MigrationSource, audit: MigrationAudit): void 
 
 async function runMigrationFlow(): Promise<void> {
   checkDockerPrerequisites();
+  checkNodePrerequisites();
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
