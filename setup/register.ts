@@ -51,7 +51,7 @@ function parseArgs(args: string[]): RegisterArgs {
     folder: '',
     channel: 'discord',
     requiresTrigger: false,
-    assistantName: 'Andy',
+    assistantName: 'ClawBridge',
     sessionMode: 'shared',
   };
 
@@ -76,7 +76,7 @@ function parseArgs(args: string[]): RegisterArgs {
         result.requiresTrigger = false;
         break;
       case '--assistant-name':
-        result.assistantName = args[++i] || 'Andy';
+        result.assistantName = args[++i] || 'ClawBridge';
         break;
       case '--session-mode':
         result.sessionMode = args[++i] || 'shared';
@@ -210,8 +210,8 @@ export async function run(args: string[]): Promise<void> {
 
   // 5. Update assistant name in CLAUDE.md files if different from default
   let nameUpdated = false;
-  if (parsed.assistantName !== 'Andy') {
-    log.info('Updating assistant name', { from: 'Andy', to: parsed.assistantName });
+  if (parsed.assistantName) {
+    log.info('Updating assistant name in CLAUDE.md files', { to: parsed.assistantName });
 
     const groupsDir = path.join(projectRoot, 'groups');
     const mdFiles = fs

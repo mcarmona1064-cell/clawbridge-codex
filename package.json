@@ -13,6 +13,8 @@
   "homepage": "https://github.com/other2368-byte/clawbridge-agent",
   "files": [
     "dist",
+    "container",
+    "scripts",
     "integrations/docker-compose.yml",
     "integrations/auth-portal",
     "integrations/mcp-server",

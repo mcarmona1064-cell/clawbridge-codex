@@ -152,6 +152,26 @@ async function spawnContainer(session: Session): Promise<void> {
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
     log.info('Container exited', { sessionId: session.id, code, containerName });
+
+    if (code === 125) {
+      const imageTag = containerConfig.imageTag || CONTAINER_IMAGE;
+      const agentRunnerSrc = path.join(process.cwd(), 'container', 'agent-runner', 'src');
+      const mountExists = fs.existsSync(agentRunnerSrc);
+      let imageExists = false;
+      try {
+        execSync(`${CONTAINER_RUNTIME_BIN} image inspect ${imageTag}`, { stdio: 'pipe' });
+        imageExists = true;
+      } catch {
+        imageExists = false;
+      }
+      log.error('Container spawn failed (exit 125)', {
+        hint: !imageExists
+          ? `Image "${imageTag}" not found — run: clawbridge build-image`
+          : !mountExists
+          ? `Mount path "${agentRunnerSrc}" not found — reinstall: npm install -g clawbridge-agent@latest`
+          : 'Docker runtime error — check: docker ps',
+      });
+    }
   });
 
   container.on('error', (err) => {

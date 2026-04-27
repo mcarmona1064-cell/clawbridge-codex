@@ -549,6 +549,7 @@ async function runFreshInstall(): Promise<void> {
     // portal is optional — don't fail setup
   }
 
+  await buildContainerImage();
   await registerLaunchd(cfg.agentName);
 
   if (composeSuccess) {
@@ -952,6 +953,7 @@ async function runMigrationFlow(): Promise<void> {
     p.log.success(`${label} marked as deactivated.`);
   }
 
+  await buildContainerImage();
   await registerLaunchd(migratedCfg.agentName);
 
   p.outro(k.green('✅ Migration done!') + `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`);
@@ -972,6 +974,34 @@ async function askManualPath(): Promise<MigrationSource> {
       continue;
     }
     return result;
+  }
+}
+
+
+// ─── Container image build ────────────────────────────────────────────────────
+
+async function buildContainerImage(): Promise<void> {
+  try {
+    const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+    const buildScript = path.join(packageRoot, 'container', 'build.sh');
+    if (!fs.existsSync(buildScript)) {
+      p.log.warn('container/build.sh not found — image build skipped');
+      return;
+    }
+    p.log.step('Building agent container image…');
+    const result = spawnSync('bash', [buildScript], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf-8',
+      cwd: path.join(packageRoot, 'container'),
+    });
+    if (result.status === 0) {
+      p.log.success('Container image built successfully.');
+    } else {
+      p.log.warn('Image build failed — run: clawbridge build-image');
+      if (result.stderr) console.error(result.stderr);
+    }
+  } catch (err) {
+    p.log.warn('Image build failed — run: clawbridge build-image');
   }
 }
 

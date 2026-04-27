@@ -154,6 +154,29 @@ async function main(): Promise<void> {
     };
   });
 
+
+  // Boot warning: check if any DB-registered messaging group has a channel type
+  // with no active adapter (missing credentials / not imported).
+  {
+    const { getAllMessagingGroups } = await import('./db/messaging-groups.js');
+    const { getActiveAdapters } = await import('./channels/channel-registry.js');
+    const activeChannelTypes = new Set(getActiveAdapters().map((a) => a.channelType));
+    const allGroups = getAllMessagingGroups();
+    const missingChannels = new Set<string>();
+    for (const mg of allGroups) {
+      if (!activeChannelTypes.has(mg.channel_type)) {
+        missingChannels.add(mg.channel_type);
+      }
+    }
+    for (const ch of missingChannels) {
+      const envKey = ch.toUpperCase() + '_BOT_TOKEN';
+      log.warn(
+        `${ch.charAt(0).toUpperCase() + ch.slice(1)} registered in DB but adapter not active — ${envKey} missing from .env`,
+        { channel: ch },
+      );
+    }
+  }
+
   // 4. Delivery adapter bridge — dispatches to channel adapters
   const deliveryAdapter = {
     async deliver(

@@ -51,7 +51,7 @@ pnpm run setup:wizard
 bash clawbridge.sh
 ```
 
-`clawbridge.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if missing, registers your Claude credential with OneCLI, builds the agent container, and pairs your first channel (Telegram, Discord, WhatsApp, or a local CLI). If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
+`clawbridge.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if missing, writes your Claude credential to `~/.clawbridge/.env`, builds the agent container, and pairs your first channel (Telegram, Discord, WhatsApp, or a local CLI). If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
 
 ## Features
 
@@ -69,7 +69,7 @@ bash clawbridge.sh
 messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent SDK) → outbound.db → host process (delivery) → messaging apps
 ```
 
-A single Node host orchestrates per-session agent containers. Agents run in Docker with explicit filesystem mounts. Credentials never enter containers — outbound requests route through [OneCLI's Agent Vault](https://github.com/onecli/onecli). See [docs/architecture.md](docs/architecture.md) for the full writeup.
+A single Node host orchestrates per-session agent containers. Agents run in Docker with explicit filesystem mounts. Credentials are injected directly from `~/.clawbridge/.env` into container environment variables at spawn time. See [docs/architecture.md](docs/architecture.md) for the full writeup.
 
 ## Philosophy
 
