@@ -45,7 +45,14 @@ import { log } from './log.js';
 import { openInboundDb, openOutboundDb, inboundDbPath, heartbeatPath } from './session-manager.js';
 import { isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
 import type { Session } from './types.js';
-import { MemoryManager, runReflectionAgent, generateCrossClientReport, hindsightRetain, hindsightReflect, isHindsightAvailable } from './memory/index.js';
+import {
+  MemoryManager,
+  runReflectionAgent,
+  generateCrossClientReport,
+  hindsightRetain,
+  hindsightReflect,
+  isHindsightAvailable,
+} from './memory/index.js';
 
 const SWEEP_INTERVAL_MS = 60_000;
 // Absolute idle ceiling for a running container. If the heartbeat file hasn't

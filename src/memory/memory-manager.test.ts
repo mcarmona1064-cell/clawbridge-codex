@@ -2,10 +2,10 @@
  * Tests for the tiered memory system.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import fs from 'fs'
-import os from 'os'
-import path from 'path'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -17,46 +17,46 @@ vi.mock('../log.js', () => ({
     error: vi.fn(),
     fatal: vi.fn(),
   },
-}))
+}));
 
 vi.mock('../env.js', () => ({
   readEnvFile: () => ({}),
-}))
+}));
 
 // ── Test DB setup ─────────────────────────────────────────────────────────────
 
-const TEST_DB_DIR = path.join(os.tmpdir(), `clawbridge-memory-test-${process.pid}`)
-const TEST_DB_PATH = path.join(TEST_DB_DIR, 'memory.db')
+const TEST_DB_DIR = path.join(os.tmpdir(), `clawbridge-memory-test-${process.pid}`);
+const TEST_DB_PATH = path.join(TEST_DB_DIR, 'memory.db');
 
 // Import after mocks are defined
-const { initMemoryDb, upsertMemory, getMemories, closeMemoryDb } = await import('./db.js')
-const { MemoryManager } = await import('./manager.js')
+const { initMemoryDb, upsertMemory, getMemories, closeMemoryDb } = await import('./db.js');
+const { MemoryManager } = await import('./manager.js');
 
 beforeEach(() => {
-  fs.mkdirSync(TEST_DB_DIR, { recursive: true })
-  initMemoryDb(TEST_DB_PATH)
-})
+  fs.mkdirSync(TEST_DB_DIR, { recursive: true });
+  initMemoryDb(TEST_DB_PATH);
+});
 
 afterEach(() => {
-  closeMemoryDb()
+  closeMemoryDb();
   try {
-    fs.rmSync(TEST_DB_DIR, { recursive: true })
+    fs.rmSync(TEST_DB_DIR, { recursive: true });
   } catch {
     // ignore
   }
-})
+});
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('initMemoryDb', () => {
   it('creates the DB file', () => {
-    expect(fs.existsSync(TEST_DB_PATH)).toBe(true)
-  })
-})
+    expect(fs.existsSync(TEST_DB_PATH)).toBe(true);
+  });
+});
 
 describe('upsertMemory / getMemories', () => {
   it('stores and retrieves a memory', () => {
-    const now = new Date().toISOString()
+    const now = new Date().toISOString();
     const mem = {
       id: crypto.randomUUID(),
       clientId: 'client-1',
@@ -66,19 +66,19 @@ describe('upsertMemory / getMemories', () => {
       decayRate: 0.002,
       createdAt: now,
       lastAccessedAt: now,
-    }
+    };
 
-    upsertMemory(mem)
+    upsertMemory(mem);
 
-    const results = getMemories('client-1', 0)
-    expect(results).toHaveLength(1)
-    expect(results[0].content).toBe('Prefers bullet points over paragraphs')
-    expect(results[0].segment).toBe('preference')
-  })
+    const results = getMemories('client-1', 0);
+    expect(results).toHaveLength(1);
+    expect(results[0].content).toBe('Prefers bullet points over paragraphs');
+    expect(results[0].segment).toBe('preference');
+  });
 
   it('filters memories below minImportance after decay', () => {
     // Create a memory with high decay rate and old lastAccessedAt (30 days ago)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const mem = {
       id: crypto.randomUUID(),
       clientId: 'client-decay',
@@ -88,17 +88,17 @@ describe('upsertMemory / getMemories', () => {
       decayRate: 0.08, // context segment — fast decay
       createdAt: thirtyDaysAgo,
       lastAccessedAt: thirtyDaysAgo,
-    }
+    };
 
-    upsertMemory(mem)
+    upsertMemory(mem);
 
     // After 30 days at 8%/day: 0.4 * (0.92^30) ≈ 0.4 * 0.079 ≈ 0.032 — well below 0.3
-    const results = getMemories('client-decay', 0.3)
-    expect(results).toHaveLength(0)
-  })
+    const results = getMemories('client-decay', 0.3);
+    expect(results).toHaveLength(0);
+  });
 
   it('decay reduces importance correctly', () => {
-    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
     const mem = {
       id: crypto.randomUUID(),
       clientId: 'client-math',
@@ -108,23 +108,23 @@ describe('upsertMemory / getMemories', () => {
       decayRate: 0.002,
       createdAt: tenDaysAgo,
       lastAccessedAt: tenDaysAgo,
-    }
+    };
 
-    upsertMemory(mem)
+    upsertMemory(mem);
 
-    const results = getMemories('client-math', 0)
-    expect(results).toHaveLength(1)
+    const results = getMemories('client-math', 0);
+    expect(results).toHaveLength(1);
     // After 10 days at 0.2%/day: 0.7 * (0.998^10) ≈ 0.7 * 0.980 ≈ 0.686
-    const decayed = results[0].importance
-    expect(decayed).toBeGreaterThan(0.68)
-    expect(decayed).toBeLessThan(0.7)
-  })
-})
+    const decayed = results[0].importance;
+    expect(decayed).toBeGreaterThan(0.68);
+    expect(decayed).toBeLessThan(0.7);
+  });
+});
 
 describe('MemoryManager.loadForSession', () => {
   it('returns a formatted string with segment headers', async () => {
-    const now = new Date().toISOString()
-    const clientId = 'session-client'
+    const now = new Date().toISOString();
+    const clientId = 'session-client';
 
     upsertMemory({
       id: crypto.randomUUID(),
@@ -135,7 +135,7 @@ describe('MemoryManager.loadForSession', () => {
       decayRate: 0,
       createdAt: now,
       lastAccessedAt: now,
-    })
+    });
 
     upsertMemory({
       id: crypto.randomUUID(),
@@ -146,22 +146,22 @@ describe('MemoryManager.loadForSession', () => {
       decayRate: 0.002,
       createdAt: now,
       lastAccessedAt: now,
-    })
+    });
 
-    const manager = new MemoryManager(clientId)
-    const output = await manager.loadForSession()
+    const manager = new MemoryManager(clientId);
+    const output = await manager.loadForSession();
 
-    expect(output).toContain('## Remembered Context')
-    expect(output).toContain('**Identity:** Mark owns ClawBridge agency in Philippines')
-    expect(output).toContain('**Preference:** Prefers bullet points over long paragraphs')
-  })
+    expect(output).toContain('## Remembered Context');
+    expect(output).toContain('**Identity:** Mark owns ClawBridge agency in Philippines');
+    expect(output).toContain('**Preference:** Prefers bullet points over long paragraphs');
+  });
 
   it('returns empty string when no memories exist', async () => {
-    const manager = new MemoryManager('empty-client')
-    const output = await manager.loadForSession()
-    expect(output).toBe('')
-  })
-})
+    const manager = new MemoryManager('empty-client');
+    const output = await manager.loadForSession();
+    expect(output).toBe('');
+  });
+});
 
 describe('extractMemories', () => {
   it('parses Claude response and returns memories', async () => {
@@ -169,39 +169,42 @@ describe('extractMemories', () => {
     const mockMemories = [
       { segment: 'preference', content: 'Prefers concise answers without filler', importance: 0.75 },
       { segment: 'identity', content: 'User is a senior software engineer', importance: 0.85 },
-    ]
+    ];
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      json: async () => ({
-        content: [{ type: 'text', text: JSON.stringify(mockMemories) }],
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          content: [{ type: 'text', text: JSON.stringify(mockMemories) }],
+        }),
       }),
-    }))
+    );
 
     // Give it credentials so it doesn't bail early
-    process.env['ANTHROPIC_API_KEY'] = 'test-key'
+    process.env['ANTHROPIC_API_KEY'] = 'test-key';
 
-    const { extractMemories } = await import('./extractor.js')
-    const results = await extractMemories('User said they prefer short answers and mentioned their job', 'test-client')
+    const { extractMemories } = await import('./extractor.js');
+    const results = await extractMemories('User said they prefer short answers and mentioned their job', 'test-client');
 
-    expect(results.length).toBe(2)
-    expect(results[0].segment).toBe('preference')
-    expect(results[0].decayRate).toBe(0.002) // preference default
-    expect(results[1].segment).toBe('identity')
-    expect(results[1].decayRate).toBe(0) // identity never decays
-    expect(results[0].id).toBeTruthy()
-    expect(results[0].createdAt).toBeTruthy()
+    expect(results.length).toBe(2);
+    expect(results[0].segment).toBe('preference');
+    expect(results[0].decayRate).toBe(0.002); // preference default
+    expect(results[1].segment).toBe('identity');
+    expect(results[1].decayRate).toBe(0); // identity never decays
+    expect(results[0].id).toBeTruthy();
+    expect(results[0].createdAt).toBeTruthy();
 
-    vi.unstubAllGlobals()
-    delete process.env['ANTHROPIC_API_KEY']
-  })
+    vi.unstubAllGlobals();
+    delete process.env['ANTHROPIC_API_KEY'];
+  });
 
   it('returns empty array when no credentials configured', async () => {
-    delete process.env['ANTHROPIC_API_KEY']
-    delete process.env['CLAUDE_CODE_OAUTH_TOKEN']
+    delete process.env['ANTHROPIC_API_KEY'];
+    delete process.env['CLAUDE_CODE_OAUTH_TOKEN'];
 
     // Re-import with no credentials (env mock returns {})
-    const mod = await import('./extractor.js')
-    const results = await mod.extractMemories('some text', 'no-creds-client')
-    expect(results).toEqual([])
-  })
-})
+    const mod = await import('./extractor.js');
+    const results = await mod.extractMemories('some text', 'no-creds-client');
+    expect(results).toEqual([]);
+  });
+});

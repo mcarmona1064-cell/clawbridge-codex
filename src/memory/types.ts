@@ -5,23 +5,23 @@ export type MemorySegment =
   | 'relationship'
   | 'knowledge'
   | 'behavioral'
-  | 'context'
+  | 'context';
 
 export interface Memory {
-  id: string // uuid
-  clientId: string // which client this belongs to (or 'global')
-  segment: MemorySegment
-  content: string // plain english fact
-  importance: number // 0.0 - 1.0
-  decayRate: number // daily decay rate (0 = never decays)
-  createdAt: string // ISO
-  lastAccessedAt: string // ISO
-  expiresAt?: string // ISO, optional for short-term
+  id: string; // uuid
+  clientId: string; // which client this belongs to (or 'global')
+  segment: MemorySegment;
+  content: string; // plain english fact
+  importance: number; // 0.0 - 1.0
+  decayRate: number; // daily decay rate (0 = never decays)
+  createdAt: string; // ISO
+  lastAccessedAt: string; // ISO
+  expiresAt?: string; // ISO, optional for short-term
 }
 
 export interface MemoryQueryResult {
-  memories: Memory[]
-  totalTokensEstimate: number
+  memories: Memory[];
+  totalTokensEstimate: number;
 }
 
 export const SEGMENT_DEFAULTS: Record<MemorySegment, { importance: number; decayRate: number }> = {
@@ -32,4 +32,4 @@ export const SEGMENT_DEFAULTS: Record<MemorySegment, { importance: number; decay
   knowledge: { importance: 0.6, decayRate: 0.003 },
   behavioral: { importance: 0.55, decayRate: 0.002 },
   context: { importance: 0.4, decayRate: 0.08 },
-}
+};

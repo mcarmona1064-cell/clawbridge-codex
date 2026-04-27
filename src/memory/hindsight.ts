@@ -8,36 +8,36 @@
  * - Strict tag matching (any_strict) to prevent cross-client data leakage
  */
 
-import { HindsightClient, HindsightError, recallResponseToPromptString } from '@vectorize-io/hindsight-client'
+import { HindsightClient, HindsightError, recallResponseToPromptString } from '@vectorize-io/hindsight-client';
 
-import { readEnvFile } from '../env.js'
-import { log } from '../log.js'
-import type { MemorySegment } from './types.js'
+import { readEnvFile } from '../env.js';
+import { log } from '../log.js';
+import type { MemorySegment } from './types.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const envCfg = readEnvFile(['HINDSIGHT_URL', 'HINDSIGHT_API_KEY'])
+const envCfg = readEnvFile(['HINDSIGHT_URL', 'HINDSIGHT_API_KEY']);
 
 function getHindsightUrl(): string {
-  return process.env['HINDSIGHT_URL'] || envCfg['HINDSIGHT_URL'] || 'http://localhost:8888'
+  return process.env['HINDSIGHT_URL'] || envCfg['HINDSIGHT_URL'] || 'http://localhost:8888';
 }
 
 function getHindsightApiKey(): string | undefined {
-  return process.env['HINDSIGHT_API_KEY'] || envCfg['HINDSIGHT_API_KEY'] || undefined
+  return process.env['HINDSIGHT_API_KEY'] || envCfg['HINDSIGHT_API_KEY'] || undefined;
 }
 
 // ── Singleton client ──────────────────────────────────────────────────────────
 
-let _client: HindsightClient | null = null
+let _client: HindsightClient | null = null;
 
 export function getHindsightClient(): HindsightClient {
   if (!_client) {
     _client = new HindsightClient({
       baseUrl: getHindsightUrl(),
       apiKey: getHindsightApiKey(),
-    })
+    });
   }
-  return _client
+  return _client;
 }
 
 // ── Bank naming ───────────────────────────────────────────────────────────────
@@ -48,8 +48,8 @@ export function getHindsightClient(): HindsightClient {
  */
 export function bankId(clientSlug: string): string {
   // Sanitize: lowercase, replace spaces/special chars with hyphens
-  const slug = clientSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-')
-  return `client-${slug}`
+  const slug = clientSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return `client-${slug}`;
 }
 
 // ── Tag helpers ───────────────────────────────────────────────────────────────
@@ -59,37 +59,37 @@ export function bankId(clientSlug: string): string {
  * Always includes client tag. Optionally includes user, session, and segment tags.
  */
 export function buildTags(opts: {
-  clientSlug: string
-  userId?: string
-  sessionId?: string
-  segment?: MemorySegment
+  clientSlug: string;
+  userId?: string;
+  sessionId?: string;
+  segment?: MemorySegment;
 }): string[] {
-  const tags: string[] = [`client:${opts.clientSlug}`]
-  if (opts.userId) tags.push(`user:${opts.userId}`)
-  if (opts.sessionId) tags.push(`session:${opts.sessionId}`)
-  if (opts.segment) tags.push(`segment:${opts.segment}`)
-  return tags
+  const tags: string[] = [`client:${opts.clientSlug}`];
+  if (opts.userId) tags.push(`user:${opts.userId}`);
+  if (opts.sessionId) tags.push(`session:${opts.sessionId}`);
+  if (opts.segment) tags.push(`segment:${opts.segment}`);
+  return tags;
 }
 
 // ── Availability check ────────────────────────────────────────────────────────
 
-let _hindsightAvailable: boolean | null = null
+let _hindsightAvailable: boolean | null = null;
 
 export async function isHindsightAvailable(): Promise<boolean> {
-  if (_hindsightAvailable !== null) return _hindsightAvailable
+  if (_hindsightAvailable !== null) return _hindsightAvailable;
   try {
-    const res = await fetch(`${getHindsightUrl()}/health`, { signal: AbortSignal.timeout(2000) })
-    _hindsightAvailable = res.ok
+    const res = await fetch(`${getHindsightUrl()}/health`, { signal: AbortSignal.timeout(2000) });
+    _hindsightAvailable = res.ok;
   } catch {
-    _hindsightAvailable = false
+    _hindsightAvailable = false;
   }
-  log.info('[hindsight] Availability check', { available: _hindsightAvailable, url: getHindsightUrl() })
-  return _hindsightAvailable
+  log.info('[hindsight] Availability check', { available: _hindsightAvailable, url: getHindsightUrl() });
+  return _hindsightAvailable;
 }
 
 // Reset availability cache (called on error to retry next time)
 function resetAvailability() {
-  _hindsightAvailable = null
+  _hindsightAvailable = null;
 }
 
 // ── Core operations ───────────────────────────────────────────────────────────
@@ -106,16 +106,16 @@ export async function hindsightRetain(
   clientSlug: string,
   content: string,
   opts: {
-    userId?: string
-    sessionId?: string
-    segment?: MemorySegment
-    context?: string
-    documentId?: string
-    async?: boolean
-    timestamp?: Date
+    userId?: string;
+    sessionId?: string;
+    segment?: MemorySegment;
+    context?: string;
+    documentId?: string;
+    async?: boolean;
+    timestamp?: Date;
   } = {},
 ): Promise<void> {
-  if (!(await isHindsightAvailable())) return
+  if (!(await isHindsightAvailable())) return;
 
   try {
     await getHindsightClient().retain(bankId(clientSlug), content, {
@@ -124,14 +124,14 @@ export async function hindsightRetain(
       tags: buildTags({ clientSlug, userId: opts.userId, sessionId: opts.sessionId, segment: opts.segment }),
       timestamp: opts.timestamp?.toISOString() ?? new Date().toISOString(),
       async: opts.async ?? true,
-    })
-    log.debug('[hindsight] Retained', { client: clientSlug, sessionId: opts.sessionId })
+    });
+    log.debug('[hindsight] Retained', { client: clientSlug, sessionId: opts.sessionId });
   } catch (e) {
     if (e instanceof HindsightError) {
-      log.error('[hindsight] retain failed', { status: e.statusCode, message: e.message })
-      if (e.statusCode === 503 || e.statusCode === 0) resetAvailability()
+      log.error('[hindsight] retain failed', { status: e.statusCode, message: e.message });
+      if (e.statusCode === 503 || e.statusCode === 0) resetAvailability();
     } else {
-      log.error('[hindsight] retain unexpected error', { err: e })
+      log.error('[hindsight] retain unexpected error', { err: e });
     }
     // Never crash the session over memory failure
   }
@@ -150,39 +150,39 @@ export async function hindsightRecall(
   clientSlug: string,
   query: string,
   opts: {
-    userId?: string
-    sessionId?: string
-    budget?: 'low' | 'mid' | 'high'
-    maxTokens?: number
-    types?: Array<'world' | 'experience' | 'observation'>
+    userId?: string;
+    sessionId?: string;
+    budget?: 'low' | 'mid' | 'high';
+    maxTokens?: number;
+    types?: Array<'world' | 'experience' | 'observation'>;
   } = {},
 ): Promise<string> {
-  if (!(await isHindsightAvailable())) return ''
+  if (!(await isHindsightAvailable())) return '';
 
   try {
-    const tags = buildTags({ clientSlug, userId: opts.userId })
+    const tags = buildTags({ clientSlug, userId: opts.userId });
     const response = await getHindsightClient().recall(bankId(clientSlug), query, {
       tags,
       tagsMatch: 'any_strict', // CRITICAL: prevents cross-client data leakage
       budget: opts.budget ?? 'mid',
       maxTokens: opts.maxTokens ?? 3000,
-      types: opts.types ?? ['observation', 'world'] as string[],
+      types: opts.types ?? (['observation', 'world'] as string[]),
       queryTimestamp: new Date().toISOString(),
-    })
+    });
 
-    const text = recallResponseToPromptString(response)
-    if (!text.trim()) return ''
+    const text = recallResponseToPromptString(response);
+    if (!text.trim()) return '';
 
-    log.debug('[hindsight] Recalled', { client: clientSlug, results: response.results.length })
-    return `## Memory Context\n${text}`
+    log.debug('[hindsight] Recalled', { client: clientSlug, results: response.results.length });
+    return `## Memory Context\n${text}`;
   } catch (e) {
     if (e instanceof HindsightError) {
-      log.error('[hindsight] recall failed', { status: e.statusCode, message: e.message })
-      if (e.statusCode === 503 || e.statusCode === 0) resetAvailability()
+      log.error('[hindsight] recall failed', { status: e.statusCode, message: e.message });
+      if (e.statusCode === 503 || e.statusCode === 0) resetAvailability();
     } else {
-      log.error('[hindsight] recall unexpected error', { err: e })
+      log.error('[hindsight] recall unexpected error', { err: e });
     }
-    return '' // Graceful degradation — session continues without memory context
+    return ''; // Graceful degradation — session continues without memory context
   }
 }
 
@@ -198,31 +198,31 @@ export async function hindsightReflect(
   clientSlug: string,
   query: string,
   opts: {
-    userId?: string
-    budget?: 'low' | 'mid' | 'high'
-    maxTokens?: number
+    userId?: string;
+    budget?: 'low' | 'mid' | 'high';
+    maxTokens?: number;
   } = {},
 ): Promise<string> {
-  if (!(await isHindsightAvailable())) return ''
+  if (!(await isHindsightAvailable())) return '';
 
   try {
-    const tags = buildTags({ clientSlug, userId: opts.userId })
+    const tags = buildTags({ clientSlug, userId: opts.userId });
     const response = await getHindsightClient().reflect(bankId(clientSlug), query, {
       tags,
       tagsMatch: 'any_strict',
       budget: opts.budget ?? 'mid',
-    })
+    });
 
-    log.debug('[hindsight] Reflected', { client: clientSlug, tokens: response.usage?.total_tokens })
-    return response.text ?? ''
+    log.debug('[hindsight] Reflected', { client: clientSlug, tokens: response.usage?.total_tokens });
+    return response.text ?? '';
   } catch (e) {
     if (e instanceof HindsightError) {
-      log.error('[hindsight] reflect failed', { status: e.statusCode, message: e.message })
-      if (e.statusCode === 503 || e.statusCode === 0) resetAvailability()
+      log.error('[hindsight] reflect failed', { status: e.statusCode, message: e.message });
+      if (e.statusCode === 503 || e.statusCode === 0) resetAvailability();
     } else {
-      log.error('[hindsight] reflect unexpected error', { err: e })
+      log.error('[hindsight] reflect unexpected error', { err: e });
     }
-    return ''
+    return '';
   }
 }
 
@@ -233,11 +233,11 @@ export async function hindsightReflect(
 export async function ensureClientBank(
   clientSlug: string,
   opts: {
-    name?: string
-    mission?: string
+    name?: string;
+    mission?: string;
   } = {},
 ): Promise<void> {
-  if (!(await isHindsightAvailable())) return
+  if (!(await isHindsightAvailable())) return;
 
   try {
     await getHindsightClient().createBank(bankId(clientSlug), {
@@ -245,11 +245,11 @@ export async function ensureClientBank(
       mission:
         opts.mission ??
         `Track all interactions, preferences, corrections, and behavioral patterns for ${clientSlug}. Focus on actionable facts that improve agent responses over time.`,
-    })
-    log.info('[hindsight] Bank created/confirmed', { client: clientSlug })
+    });
+    log.info('[hindsight] Bank created/confirmed', { client: clientSlug });
   } catch (e) {
     // 409 Conflict = bank already exists, that's fine
-    if (e instanceof HindsightError && e.statusCode === 409) return
-    log.warn('[hindsight] ensureClientBank warning', { err: e })
+    if (e instanceof HindsightError && e.statusCode === 409) return;
+    log.warn('[hindsight] ensureClientBank warning', { err: e });
   }
 }

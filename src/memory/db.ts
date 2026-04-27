@@ -172,20 +172,19 @@ export function touchMemory(id: string): void {
   getMemDb().prepare('UPDATE memories SET last_accessed_at = ? WHERE id = ?').run(new Date().toISOString(), id);
 }
 
-
 export function searchSimilar(
   clientId: string,
   querySimilarityFn: (content: string) => number,
   topK = 10,
   minImportance = 0.3,
 ): Memory[] {
-  const memories = getMemories(clientId, minImportance)
-  const scored = memories.map((m) => ({ m, score: querySimilarityFn(m.content) }))
+  const memories = getMemories(clientId, minImportance);
+  const scored = memories.map((m) => ({ m, score: querySimilarityFn(m.content) }));
   return scored
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
-    .map((s) => s.m)
+    .map((s) => s.m);
 }
 
 /** For tests — close and reset the singleton. */

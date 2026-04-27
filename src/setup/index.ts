@@ -11,6 +11,7 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
+import crypto from 'crypto';
 import path from 'path';
 
 import * as p from '@clack/prompts';
@@ -152,6 +153,9 @@ interface FreshConfig {
   adminPassword: string;
   stripeKey?: string;
   retellKey?: string;
+  hindsightDbPassword?: string;
+  hindsightApiKey?: string;
+  hindsightUrl?: string;
 }
 
 function buildEnvFile(cfg: FreshConfig): string {
@@ -192,6 +196,15 @@ function buildEnvFile(cfg: FreshConfig): string {
   }
   if (cfg.retellKey) {
     lines.push('# Retell AI (voice)', `RETELL_API_KEY=${cfg.retellKey}`, '');
+  }
+  if (cfg.hindsightDbPassword && cfg.hindsightApiKey && cfg.hindsightUrl) {
+    lines.push(
+      '# Hindsight semantic memory',
+      `HINDSIGHT_URL=${cfg.hindsightUrl}`,
+      `HINDSIGHT_API_KEY=${cfg.hindsightApiKey}`,
+      `HINDSIGHT_DB_PASSWORD=${cfg.hindsightDbPassword}`,
+      '',
+    );
   }
 
   return lines.join('\n') + '\n';
@@ -319,6 +332,23 @@ async function runFreshInstall(): Promise<void> {
     ).trim();
   }
 
+  // Step 8 — Hindsight (optional)
+  const wantsHindsight = ensure(
+    await p.confirm({
+      message: 'Enable Hindsight semantic memory? (recommended for production — skip for now)',
+      initialValue: false,
+    }),
+  ) as boolean;
+  let hindsightDbPassword: string | undefined;
+  let hindsightApiKey: string | undefined;
+  let hindsightUrl: string | undefined;
+  if (wantsHindsight) {
+    hindsightDbPassword = crypto.randomBytes(16).toString('hex');
+    hindsightApiKey = crypto.randomBytes(16).toString('hex');
+    hindsightUrl = 'http://localhost:8888';
+    p.log.info(dim('Hindsight credentials generated and will be written to .env'));
+  }
+
   // Generate .env
   const cfg: FreshConfig = {
     agentName,
@@ -329,6 +359,9 @@ async function runFreshInstall(): Promise<void> {
     adminPassword,
     stripeKey,
     retellKey,
+    hindsightDbPassword,
+    hindsightApiKey,
+    hindsightUrl,
   };
 
   const envContent = buildEnvFile(cfg);

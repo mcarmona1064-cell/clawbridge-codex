@@ -1,5 +1,12 @@
 import { log } from '../log.js';
-import { deleteMemory, getMemories, initMemoryDb as _initMemoryDb, searchSimilar, touchMemory, upsertMemory } from './db.js'
+import {
+  deleteMemory,
+  getMemories,
+  initMemoryDb as _initMemoryDb,
+  searchSimilar,
+  touchMemory,
+  upsertMemory,
+} from './db.js';
 import { embed, keywordSimilarity } from './embeddings.js';
 import { extractMemories } from './extractor.js';
 import { SEGMENT_DEFAULTS } from './types.js';
@@ -41,29 +48,29 @@ export class MemoryManager {
    * Returns a formatted string ready for system prompt injection.
    */
   async loadForSession(minImportance: number = MIN_IMPORTANCE_DEFAULT, query?: string): Promise<string> {
-    let memories
+    let memories;
     if (query) {
       // RAG: use semantic/keyword similarity to fetch most relevant memories
-      const embedding = await embed(query)
+      const embedding = await embed(query);
       if (embedding) {
         // Vector similarity via stored embeddings (when available) — falls back to keyword
-        memories = searchSimilar(this.clientId, (content) => keywordSimilarity(query, content), 20, minImportance)
+        memories = searchSimilar(this.clientId, (content) => keywordSimilarity(query, content), 20, minImportance);
       } else {
-        memories = searchSimilar(this.clientId, (content) => keywordSimilarity(query, content), 20, minImportance)
+        memories = searchSimilar(this.clientId, (content) => keywordSimilarity(query, content), 20, minImportance);
       }
       // Always include identity + correction memories regardless of query relevance
       const coreMemories = getMemories(this.clientId, minImportance).filter(
         (m) => m.segment === 'identity' || m.segment === 'correction',
-      )
-      const coreIds = new Set(coreMemories.map((m) => m.id))
-      const ragIds = new Set(memories.map((m) => m.id))
+      );
+      const coreIds = new Set(coreMemories.map((m) => m.id));
+      const ragIds = new Set(memories.map((m) => m.id));
       for (const m of coreMemories) {
-        if (!ragIds.has(m.id)) memories.push(m)
+        if (!ragIds.has(m.id)) memories.push(m);
       }
-      memories = memories.filter((m) => coreIds.has(m.id) || ragIds.has(m.id))
+      memories = memories.filter((m) => coreIds.has(m.id) || ragIds.has(m.id));
     } else {
-      memories = getMemories(this.clientId, minImportance)
-    };
+      memories = getMemories(this.clientId, minImportance);
+    }
 
     if (memories.length === 0) return '';
 
