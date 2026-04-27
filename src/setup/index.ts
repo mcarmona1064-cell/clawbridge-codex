@@ -25,7 +25,9 @@ import {
   rollback,
   runMigration,
   verifyMigration,
+  type HindsightConfig,
   type MigrationAudit,
+  type MigrationResult,
   type MigrationSelection,
   type MigrationSource,
   type VerificationCheck,
@@ -531,6 +533,36 @@ async function runMigrationFlow(): Promise<void> {
     ) as MigrationSelection[];
   }
 
+
+  // 3b. Hindsight config (optional — if user has Hindsight enabled)
+  let hindsightCfg: HindsightConfig | undefined;
+  const wantsHindsightMigration = ensure(
+    await p.confirm({
+      message: 'Migrate memory entries to Hindsight semantic memory? (requires Hindsight running)',
+      initialValue: false,
+    }),
+  ) as boolean;
+  if (wantsHindsightMigration) {
+    const hindsightUrl = (
+      ensure(
+        await p.text({
+          message: 'Hindsight URL',
+          placeholder: 'http://localhost:8888',
+          defaultValue: 'http://localhost:8888',
+        }),
+      ) as string
+    ).trim();
+    const hindsightApiKey = (
+      ensure(
+        await p.password({
+          message: 'Hindsight API key',
+          validate: validateRequired,
+        }),
+      ) as string
+    ).trim();
+    hindsightCfg = { url: hindsightUrl, apiKey: hindsightApiKey };
+  }
+
   // 4. Safety notice + confirm
   p.log.info(dim('This will NOT affect your existing installation. Your data there is untouched.'));
   const confirmed = ensure(await p.confirm({ message: 'Start migration?', initialValue: true })) as boolean;
@@ -542,10 +574,11 @@ async function runMigrationFlow(): Promise<void> {
   // 5. Run migration with progress
   const migSpinner = p.spinner();
   migSpinner.start('Migrating…');
+  let migrationResult: MigrationResult | undefined;
   try {
-    await runMigration(source, audit, selections, ({ step, detail }) => {
+    migrationResult = await runMigration(source, audit, selections, ({ step, detail }) => {
       migSpinner.message(detail ?? step);
-    });
+    }, hindsightCfg);
     migSpinner.stop(k.green('Migration complete.'));
   } catch (err) {
     migSpinner.stop(k.red('Migration failed.'));
@@ -573,7 +606,7 @@ async function runMigrationFlow(): Promise<void> {
   // 5a. Post-migration verification (automatic)
   const verifySpinner = p.spinner();
   verifySpinner.start('Verifying migration…');
-  const verifyResult = await verifyMigration(source, audit, selections);
+  const verifyResult = await verifyMigration(source, audit, selections, migrationResult, hindsightCfg);
   verifySpinner.stop('Verification complete.');
 
   for (const check of verifyResult.checks) {

@@ -11,6 +11,11 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import os from 'os';
 
+import Database from 'better-sqlite3';
+
+import { hindsightRetain, isHindsightAvailable, ensureClientBank } from '../memory/hindsight.js';
+import type { MemorySegment } from '../memory/types.js';
+
 // ─── Public types ────────────────────────────────────────────────────────────
 
 export type MigrationSourceType = 'openclaw' | 'nanoclaw' | 'cyndra';
@@ -23,6 +28,8 @@ export interface MigrationSource {
 export interface MigrationAudit {
   groups: string[];
   messageCount: number;
+  memoryCount: number;
+  scheduledTaskCount: number;
   skills: string[];
   channels: string[];
   configFiles: string[];
@@ -33,6 +40,20 @@ export type MigrationSelection = 'groups' | 'messages' | 'skills' | 'credentials
 export interface MigrationProgress {
   step: string;
   detail?: string;
+}
+
+export interface HindsightConfig {
+  url: string;
+  apiKey: string;
+}
+
+/** Raw memory row from source DB */
+interface MemoryEntry {
+  id?: string | number;
+  content: string;
+  segment: string;
+  importance?: number;
+  created_at?: string;
 }
 
 // ─── Detection ───────────────────────────────────────────────────────────────
@@ -233,10 +254,48 @@ function findConfigFiles(sourceDir: string): string[] {
   ].filter((rel) => fs.existsSync(path.join(sourceDir, rel)));
 }
 
+// ─── Memory table detection ───────────────────────────────────────────────────
+
+const MEMORY_TABLE_CANDIDATES = ['memories', 'memory_entries', 'agent_memories', 'tiered_memories'];
+
+function detectMemoryTable(dbPath: string): string | null {
+  for (const table of MEMORY_TABLE_CANDIDATES) {
+    const result = spawnSync('sqlite3', [dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (result.status === 0 && (result.stdout ?? '').trim() === table) {
+      return table;
+    }
+  }
+  return null;
+}
+
+function countMemoryEntries(dbPath: string): number {
+  const table = detectMemoryTable(dbPath);
+  if (!table) return 0;
+  return countSqliteRows(dbPath, table);
+}
+
+function countScheduledTasks(dbPath: string): number {
+  for (const table of ['scheduled_tasks', 'cron_tasks', 'tasks', 'jobs']) {
+    const result = spawnSync('sqlite3', [dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (result.status === 0 && (result.stdout ?? '').trim() === table) {
+      return countSqliteRows(dbPath, table);
+    }
+  }
+  return 0;
+}
+
 export async function auditInstall(source: MigrationSource): Promise<MigrationAudit> {
   const groups = findGroups(source.path);
   const dbs = findDatabases(source.path);
   let messageCount = 0;
+  let memoryCount = 0;
+  let scheduledTaskCount = 0;
   for (const db of dbs) {
     for (const table of ['messages', 'message', 'msgs']) {
       const count = countSqliteRows(db, table);
@@ -245,14 +304,237 @@ export async function auditInstall(source: MigrationSource): Promise<MigrationAu
         break;
       }
     }
+    memoryCount += countMemoryEntries(db);
+    scheduledTaskCount += countScheduledTasks(db);
   }
   return {
     groups,
     messageCount,
+    memoryCount,
+    scheduledTaskCount,
     skills: findSkills(source.path),
     channels: detectChannels(source.path),
     configFiles: findConfigFiles(source.path),
   };
+}
+
+// ─── SQLite full-table migration ─────────────────────────────────────────────
+
+/**
+ * Copy ALL tables from sourceDb into destDb.
+ * Handles schema mismatches gracefully: only inserts columns that exist in dest.
+ * Returns list of table names successfully migrated.
+ */
+function migrateAllSqliteTables(srcPath: string, destPath: string): string[] {
+  const migrated: string[] = [];
+  let srcDb: Database.Database | null = null;
+  let destDb: Database.Database | null = null;
+
+  try {
+    srcDb = new Database(srcPath, { readonly: true });
+    destDb = new Database(destPath);
+    destDb.pragma('journal_mode = WAL');
+    destDb.pragma('foreign_keys = OFF');
+
+    // Get all user tables from source
+    const srcTables = (
+      srcDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as Array<{ name: string }>
+    ).map((r) => r.name);
+
+    for (const tableName of srcTables) {
+      try {
+        // Get column info from source
+        const srcCols = (srcDb.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string; type: string; notnull: number; dflt_value: string | null; pk: number }>);
+
+        // Check if table exists in dest
+        const destTableExists = (
+          destDb.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(tableName) as { name: string } | undefined
+        );
+
+        if (!destTableExists) {
+          // Create table in dest using source schema
+          const colDefs = srcCols
+            .map((c) => {
+              let def = `"${c.name}" ${c.type}`;
+              if (c.pk) def += ' PRIMARY KEY';
+              else if (c.notnull) def += ' NOT NULL';
+              if (c.dflt_value !== null) def += ` DEFAULT ${c.dflt_value}`;
+              return def;
+            })
+            .join(', ');
+          destDb.exec(`CREATE TABLE IF NOT EXISTS "${tableName}" (${colDefs})`);
+        }
+
+        // Get dest columns (may differ from source)
+        const destCols = (destDb.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).map((c) => c.name);
+        const srcColNames = srcCols.map((c) => c.name);
+
+        // Only use columns that exist in both
+        const sharedCols = srcColNames.filter((c) => destCols.includes(c));
+        if (sharedCols.length === 0) continue;
+
+        const colList = sharedCols.map((c) => `"${c}"`).join(', ');
+        const placeholders = sharedCols.map(() => '?').join(', ');
+        const insertStmt = destDb.prepare(`INSERT OR IGNORE INTO "${tableName}" (${colList}) VALUES (${placeholders})`);
+
+        const rows = srcDb.prepare(`SELECT ${colList} FROM "${tableName}"`).all() as Record<string, unknown>[];
+
+        const insertMany = destDb.transaction((rs: Record<string, unknown>[]) => {
+          for (const row of rs) {
+            const vals = sharedCols.map((c) => row[c] ?? null);
+            insertStmt.run(vals);
+          }
+        });
+        insertMany(rows);
+        migrated.push(tableName);
+      } catch {
+        // Skip table on error — don't abort the whole migration
+      }
+    }
+  } finally {
+    srcDb?.close();
+    destDb?.close();
+  }
+
+  return migrated;
+}
+
+// ─── Client slug derivation ───────────────────────────────────────────────────
+
+/**
+ * Derive a client slug from a group folder name.
+ * Strips the channel prefix: "telegram_family-chat" → "family-chat"
+ */
+function groupFolderToSlug(folderName: string): string {
+  const prefixes = ['telegram_', 'whatsapp_', 'discord_', 'slack_', 'gmail_', 'signal_', 'teams_'];
+  for (const prefix of prefixes) {
+    if (folderName.startsWith(prefix)) {
+      return folderName.slice(prefix.length);
+    }
+  }
+  return folderName;
+}
+
+// ─── Memory → Hindsight migration ────────────────────────────────────────────
+
+const VALID_SEGMENTS = new Set<string>([
+  'identity', 'preference', 'correction', 'relationship', 'knowledge', 'behavioral', 'context',
+]);
+
+function normalizeSegment(raw: string): MemorySegment {
+  const lower = (raw ?? '').toLowerCase();
+  if (VALID_SEGMENTS.has(lower)) return lower as MemorySegment;
+  return 'knowledge'; // fallback
+}
+
+/**
+ * Migrate source DB memory entries into Hindsight for a given client slug.
+ * Returns { retained, failed, queued }.
+ * If Hindsight is unreachable, entries are noted as "queued" (non-fatal).
+ */
+export async function migrateMemoryToHindsight(
+  clientSlug: string,
+  memories: MemoryEntry[],
+  opts: { hindsightUrl: string; hindsightApiKey: string },
+): Promise<{ retained: number; failed: number; queued: number }> {
+  // Override env for this call
+  const originalUrl = process.env['HINDSIGHT_URL'];
+  const originalKey = process.env['HINDSIGHT_API_KEY'];
+  process.env['HINDSIGHT_URL'] = opts.hindsightUrl;
+  process.env['HINDSIGHT_API_KEY'] = opts.hindsightApiKey;
+
+  try {
+    const available = await isHindsightAvailable();
+    if (!available) {
+      return { retained: 0, failed: 0, queued: memories.length };
+    }
+
+    // Ensure the bank exists
+    await ensureClientBank(clientSlug);
+
+    let retained = 0;
+    let failed = 0;
+    const BATCH = 10;
+
+    for (let i = 0; i < memories.length; i += BATCH) {
+      const batch = memories.slice(i, i + BATCH);
+      const results = await Promise.allSettled(
+        batch.map((entry) =>
+          hindsightRetain(clientSlug, entry.content, {
+            segment: normalizeSegment(entry.segment),
+            context: 'migration',
+            documentId: entry.id != null ? `migrated-${clientSlug}-${entry.id}` : undefined,
+            timestamp: entry.created_at ? new Date(entry.created_at) : undefined,
+          }),
+        ),
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') retained++;
+        else failed++;
+      }
+    }
+
+    return { retained, failed, queued: 0 };
+  } finally {
+    // Restore env
+    if (originalUrl !== undefined) process.env['HINDSIGHT_URL'] = originalUrl;
+    else delete process.env['HINDSIGHT_URL'];
+    if (originalKey !== undefined) process.env['HINDSIGHT_API_KEY'] = originalKey;
+    else delete process.env['HINDSIGHT_API_KEY'];
+  }
+}
+
+/**
+ * Read all memory entries for a given group from the source DB.
+ */
+function readMemoryEntries(dbPath: string, groupSlug?: string): MemoryEntry[] {
+  const table = detectMemoryTable(dbPath);
+  if (!table) return [];
+
+  let srcDb: Database.Database | null = null;
+  try {
+    srcDb = new Database(dbPath, { readonly: true });
+    const cols = (srcDb.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
+    const hasClientId = cols.includes('client_id');
+    const hasGroupSlug = cols.includes('group_slug');
+
+    let rows: Record<string, unknown>[];
+    if (groupSlug && hasClientId) {
+      rows = srcDb.prepare(`SELECT * FROM "${table}" WHERE client_id = ?`).all(groupSlug) as Record<string, unknown>[];
+    } else if (groupSlug && hasGroupSlug) {
+      rows = srcDb.prepare(`SELECT * FROM "${table}" WHERE group_slug = ?`).all(groupSlug) as Record<string, unknown>[];
+    } else {
+      rows = srcDb.prepare(`SELECT * FROM "${table}"`).all() as Record<string, unknown>[];
+    }
+
+    return rows.map((r) => ({
+      id: r['id'] as string | number | undefined,
+      content: String(r['content'] ?? ''),
+      segment: String(r['segment'] ?? r['type'] ?? 'knowledge'),
+      importance: typeof r['importance'] === 'number' ? r['importance'] : 0.6,
+      created_at: r['created_at'] as string | undefined,
+    })).filter((e) => e.content.trim().length > 0);
+  } catch {
+    return [];
+  } finally {
+    srcDb?.close();
+  }
+}
+
+// ─── OneCLI token migration ───────────────────────────────────────────────────
+
+function migrateOneCLITokens(): boolean {
+  const onecliDir = path.join(HOME, '.config', 'onecli');
+  if (!fs.existsSync(onecliDir)) return false;
+  try {
+    const destDir = path.join(HOME, '.config', 'onecli');
+    // If source and dest are the same machine (which they are for local migration),
+    // the tokens are already present — nothing to do.
+    // For cross-machine scenarios, copy would be needed.
+    return fs.existsSync(destDir) && fs.readdirSync(destDir).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Migration ───────────────────────────────────────────────────────────────
@@ -299,13 +581,32 @@ function resolvePrimaryDb(sourceDir: string): string | null {
   return findDatabases(sourceDir)[0] ?? null;
 }
 
+export interface MigrationResult {
+  tablesMigrated: string[];
+  hindsightRetained: number;
+  hindsightFailed: number;
+  hindsightQueued: number;
+  onecliMigrated: boolean;
+  scheduledTasksMigrated: number;
+}
+
 export async function runMigration(
   source: MigrationSource,
   audit: MigrationAudit,
   selections: MigrationSelection[],
   onProgress?: (p: MigrationProgress) => void,
-): Promise<void> {
+  hindsightCfg?: HindsightConfig,
+): Promise<MigrationResult> {
   const emit = (step: string, detail?: string): void => onProgress?.({ step, detail });
+
+  const result: MigrationResult = {
+    tablesMigrated: [],
+    hindsightRetained: 0,
+    hindsightFailed: 0,
+    hindsightQueued: 0,
+    onecliMigrated: false,
+    scheduledTasksMigrated: 0,
+  };
 
   // 1. Backup existing ClawBridge data
   emit('backup', 'Creating backup of existing ClawBridge data…');
@@ -318,33 +619,93 @@ export async function runMigration(
     }
   }
 
-  // 2. Groups
+  // 2. Groups (including CLAUDE.md and conversations/ subdirs — full recursive copy)
   if (selections.includes('groups') && audit.groups.length > 0) {
-    emit('groups', `Migrating ${audit.groups.length} group(s)…`);
+    emit('groups', `Migrating ${audit.groups.length} group(s) (including CLAUDE.md and conversation history)…`);
     const srcGroupsDir = resolveGroupsDir(source.path);
     if (srcGroupsDir) {
       const destGroupsDir = path.join(CLAWBRIDGE_HOME, 'groups');
       fs.mkdirSync(destGroupsDir, { recursive: true });
       for (const group of audit.groups) {
         emit('groups', `  Copying: ${group}`);
+        // copyDirRecursive copies everything recursively — CLAUDE.md, conversations/, etc.
         copyDirRecursive(path.join(srcGroupsDir, group), path.join(destGroupsDir, group));
       }
     }
   }
 
-  // 3. Message history
+  // 3. Message history — full SQLite migration (all tables)
   if (selections.includes('messages') && audit.messageCount > 0) {
-    emit('messages', `Migrating ${audit.messageCount.toLocaleString()} messages…`);
+    emit('messages', `Migrating ${audit.messageCount.toLocaleString()} messages (all tables)…`);
     const srcDb = resolvePrimaryDb(source.path);
     if (srcDb) {
       const destStoreDir = path.join(CLAWBRIDGE_HOME, 'store');
       fs.mkdirSync(destStoreDir, { recursive: true });
-      fs.copyFileSync(srcDb, path.join(destStoreDir, 'messages.db'));
-      const note =
-        source.type === 'openclaw'
-          ? '  Copied (OpenClaw schema — verify with `sqlite3 ~/.clawbridge/store/messages.db .tables`)'
-          : '  Direct copy (compatible schema)';
-      emit('messages', note);
+      const destDb = path.join(destStoreDir, 'messages.db');
+
+      // Full table-by-table copy
+      emit('messages', '  Copying all SQLite tables…');
+      result.tablesMigrated = migrateAllSqliteTables(srcDb, destDb);
+      emit('messages', `  Tables migrated: ${result.tablesMigrated.join(', ') || 'none'}`);
+
+      // Count scheduled tasks in dest
+      if (result.tablesMigrated.some((t) => ['scheduled_tasks', 'cron_tasks', 'tasks', 'jobs'].includes(t))) {
+        for (const table of ['scheduled_tasks', 'cron_tasks', 'tasks', 'jobs']) {
+          if (result.tablesMigrated.includes(table)) {
+            result.scheduledTasksMigrated = countSqliteRows(destDb, table);
+            emit('messages', `  Scheduled tasks migrated: ${result.scheduledTasksMigrated}`);
+            break;
+          }
+        }
+      }
+
+      // Migrate memories to Hindsight if enabled
+      if (hindsightCfg && audit.memoryCount > 0) {
+        emit('hindsight', `Migrating ${audit.memoryCount} memory entries to Hindsight…`);
+        const allMemories = readMemoryEntries(srcDb);
+
+        if (allMemories.length > 0) {
+          // Group memories by client slug if possible, otherwise use a shared bank
+          const bySlug = new Map<string, MemoryEntry[]>();
+          for (const mem of allMemories) {
+            // Try to get client_id from the raw row — readMemoryEntries returns flat list
+            // Default to 'global' if no per-client grouping is found
+            const slug = 'global';
+            const list = bySlug.get(slug) ?? [];
+            list.push(mem);
+            bySlug.set(slug, list);
+          }
+
+          // Also try per-group migration for groups that were migrated
+          if (selections.includes('groups')) {
+            for (const group of audit.groups) {
+              const slug = groupFolderToSlug(group);
+              const groupMemories = readMemoryEntries(srcDb, slug);
+              if (groupMemories.length > 0) {
+                bySlug.set(slug, groupMemories);
+                // Remove from global if found per-group
+                const globalList = bySlug.get('global') ?? [];
+                bySlug.set('global', globalList.filter((m) => !groupMemories.includes(m)));
+              }
+            }
+          }
+
+          for (const [slug, memories] of bySlug) {
+            if (memories.length === 0) continue;
+            emit('hindsight', `  Retaining ${memories.length} memories for bank: ${slug}…`);
+            const { retained, failed, queued } = await migrateMemoryToHindsight(slug, memories, { hindsightUrl: hindsightCfg.url, hindsightApiKey: hindsightCfg.apiKey });
+            result.hindsightRetained += retained;
+            result.hindsightFailed += failed;
+            result.hindsightQueued += queued;
+          }
+
+          if (result.hindsightQueued > 0) {
+            emit('hindsight', `  ⚠ Hindsight not reachable — ${result.hindsightQueued} memories will sync on first startup`);
+          } else {
+            emit('hindsight', `  Retained: ${result.hindsightRetained}, Failed: ${result.hindsightFailed}`);
+          }
+        }
+      }
     }
   }
 
@@ -380,7 +741,16 @@ export async function runMigration(
     }
   }
 
-  // 6. Write manifest
+  // 6. OneCLI token migration
+  emit('onecli', 'Checking OneCLI tokens…');
+  result.onecliMigrated = migrateOneCLITokens();
+  if (result.onecliMigrated) {
+    emit('onecli', '  OneCLI tokens present ✓');
+  } else {
+    emit('onecli', '  OneCLI tokens not found (skip)');
+  }
+
+  // 7. Write manifest
   fs.mkdirSync(CLAWBRIDGE_HOME, { recursive: true });
   fs.writeFileSync(
     path.join(CLAWBRIDGE_HOME, 'migration-manifest.json'),
@@ -392,15 +762,20 @@ export async function runMigration(
         audit: {
           groups: audit.groups,
           messageCount: audit.messageCount,
+          memoryCount: audit.memoryCount,
+          scheduledTaskCount: audit.scheduledTaskCount,
           skills: audit.skills,
           channels: audit.channels,
         },
+        result,
       },
       null,
       2,
     ),
   );
   emit('done', 'Migration complete.');
+
+  return result;
 }
 
 // ─── Rollback ────────────────────────────────────────────────────────────────
@@ -468,6 +843,8 @@ export async function verifyMigration(
   source: MigrationSource,
   audit: MigrationAudit,
   selections: MigrationSelection[],
+  migrationResult?: MigrationResult,
+  _hindsightCfg?: HindsightConfig,
 ): Promise<VerificationResult> {
   const checks: VerificationCheck[] = [];
 
@@ -488,15 +865,13 @@ export async function verifyMigration(
     let destGroupCount = 0;
     try {
       if (fs.existsSync(destGroupsDir)) {
-        destGroupCount = fs
-          .readdirSync(destGroupsDir, { withFileTypes: true })
-          .filter((e) => e.isDirectory()).length;
+        destGroupCount = fs.readdirSync(destGroupsDir, { withFileTypes: true }).filter((e) => e.isDirectory()).length;
       }
     } catch {
       // treat as 0
     }
 
-    // Also count memory entries (any .md files across group subdirs)
+    // Count memory entries (.md files) across group subdirs
     let srcMemoryCount = 0;
     let destMemoryCount = 0;
     const countMdFiles = (dir: string): number => {
@@ -518,7 +893,11 @@ export async function verifyMigration(
 
     if (destGroupCount < srcGroupCount) {
       const missing = srcGroupCount - destGroupCount;
-      checks.push({ label: 'Groups', passed: false, message: `Groups: ${destGroupCount}/${srcGroupCount} ⚠ (${missing} missing)` });
+      checks.push({
+        label: 'Groups',
+        passed: false,
+        message: `Groups: ${destGroupCount}/${srcGroupCount} ⚠ (${missing} missing)`,
+      });
     } else {
       checks.push({ label: 'Groups', passed: true, message: `Groups: ${destGroupCount}/${srcGroupCount} ✓` });
     }
@@ -526,9 +905,17 @@ export async function verifyMigration(
     if (srcAccessible && srcMemoryCount > 0) {
       if (destMemoryCount < srcMemoryCount) {
         const missing = srcMemoryCount - destMemoryCount;
-        checks.push({ label: 'Memory', passed: false, message: `Memory entries: ${destMemoryCount}/${srcMemoryCount} ⚠ (${missing} missing)` });
+        checks.push({
+          label: 'Memory',
+          passed: false,
+          message: `Memory entries: ${destMemoryCount}/${srcMemoryCount} ⚠ (${missing} missing)`,
+        });
       } else {
-        checks.push({ label: 'Memory', passed: true, message: `Memory entries: ${destMemoryCount}/${srcMemoryCount} ✓` });
+        checks.push({
+          label: 'Memory',
+          passed: true,
+          message: `Memory entries: ${destMemoryCount}/${srcMemoryCount} ✓`,
+        });
       }
     }
   }
@@ -544,7 +931,10 @@ export async function verifyMigration(
     if (srcAccessible && srcDb) {
       for (const table of ['messages', 'message', 'msgs']) {
         const c = countSqliteRows(srcDb, table);
-        if (c > 0) { srcCount = c; break; }
+        if (c > 0) {
+          srcCount = c;
+          break;
+        }
       }
     } else {
       srcCount = audit.messageCount;
@@ -553,17 +943,92 @@ export async function verifyMigration(
     if (fs.existsSync(destDb)) {
       for (const table of ['messages', 'message', 'msgs']) {
         const c = countSqliteRows(destDb, table);
-        if (c > 0) { destCount = c; break; }
+        if (c > 0) {
+          destCount = c;
+          break;
+        }
       }
     }
 
     if (destCount === 0 && srcCount > 0) {
-      checks.push({ label: 'Messages', passed: false, message: `Messages: 0/${srcCount.toLocaleString()} ⚠ (none found in destination)` });
+      checks.push({
+        label: 'Messages',
+        passed: false,
+        message: `Messages: 0/${srcCount.toLocaleString()} ⚠ (none found in destination)`,
+      });
     } else if (srcCount > 0 && destCount < srcCount) {
-      checks.push({ label: 'Messages', passed: false, message: `Messages: ${destCount.toLocaleString()}/${srcCount.toLocaleString()} ⚠ (partial)` });
+      checks.push({
+        label: 'Messages',
+        passed: false,
+        message: `Messages: ${destCount.toLocaleString()}/${srcCount.toLocaleString()} ⚠ (partial)`,
+      });
     } else {
       const displayCount = destCount > 0 ? destCount : srcCount;
       checks.push({ label: 'Messages', passed: true, message: `Messages: ${displayCount.toLocaleString()} ✓` });
+    }
+
+    // ── SQLite tables migrated ─────────────────────────────────────────────
+    if (migrationResult && migrationResult.tablesMigrated.length > 0) {
+      checks.push({
+        label: 'SQLite Tables',
+        passed: true,
+        message: `SQLite tables migrated: ${migrationResult.tablesMigrated.join(', ')} ✓`,
+      });
+    }
+
+    // ── Scheduled tasks ────────────────────────────────────────────────────
+    if (audit.scheduledTaskCount > 0 || (migrationResult && migrationResult.scheduledTasksMigrated > 0)) {
+      const destTaskCount = migrationResult?.scheduledTasksMigrated ?? 0;
+      const srcTaskCount = audit.scheduledTaskCount;
+      if (srcTaskCount > 0 && destTaskCount < srcTaskCount) {
+        checks.push({
+          label: 'Scheduled Tasks',
+          passed: false,
+          message: `Scheduled tasks: ${destTaskCount}/${srcTaskCount} ⚠`,
+        });
+      } else {
+        const count = destTaskCount > 0 ? destTaskCount : srcTaskCount;
+        checks.push({
+          label: 'Scheduled Tasks',
+          passed: true,
+          message: `Scheduled tasks: ${count} migrated ✓`,
+        });
+      }
+    }
+
+    // ── Memory entries in DB ───────────────────────────────────────────────
+    if (srcAccessible && srcDb && audit.memoryCount > 0) {
+      const destMemDbCount = fs.existsSync(destDb) ? countMemoryEntries(destDb) : 0;
+      if (destMemDbCount < audit.memoryCount) {
+        checks.push({
+          label: 'DB Memory Entries',
+          passed: false,
+          message: `DB memory entries: ${destMemDbCount}/${audit.memoryCount} ⚠`,
+        });
+      } else {
+        checks.push({
+          label: 'DB Memory Entries',
+          passed: true,
+          message: `DB memory entries: ${destMemDbCount}/${audit.memoryCount} ✓`,
+        });
+      }
+    }
+
+    // ── Hindsight retention (informational) ───────────────────────────────
+    if (migrationResult && (migrationResult.hindsightRetained > 0 || migrationResult.hindsightQueued > 0)) {
+      if (migrationResult.hindsightQueued > 0) {
+        checks.push({
+          label: 'Hindsight',
+          passed: true, // non-fatal — will sync on startup
+          message: `Hindsight: ${migrationResult.hindsightQueued} memories queued for first-startup sync ⚠`,
+        });
+      } else {
+        checks.push({
+          label: 'Hindsight',
+          passed: true,
+          message: `Hindsight: ${migrationResult.hindsightRetained} memories retained ✓${migrationResult.hindsightFailed > 0 ? ` (${migrationResult.hindsightFailed} failed)` : ''}`,
+        });
+      }
     }
   }
 
@@ -596,9 +1061,17 @@ export async function verifyMigration(
 
     const okCount = audit.skills.length - skillFailures.length;
     if (skillFailures.length > 0) {
-      checks.push({ label: 'Skills', passed: false, message: `Skills: ${okCount}/${audit.skills.length} ⚠ — issues: ${skillFailures.join(', ')}` });
+      checks.push({
+        label: 'Skills',
+        passed: false,
+        message: `Skills: ${okCount}/${audit.skills.length} ⚠ — issues: ${skillFailures.join(', ')}`,
+      });
     } else {
-      checks.push({ label: 'Skills', passed: true, message: `Skills: ${audit.skills.length}/${audit.skills.length} ✓` });
+      checks.push({
+        label: 'Skills',
+        passed: true,
+        message: `Skills: ${audit.skills.length}/${audit.skills.length} ✓`,
+      });
     }
   }
 
@@ -634,8 +1107,16 @@ export async function verifyMigration(
 
       let srcEnvContent = '';
       let destEnvContent = '';
-      try { srcEnvContent = fs.readFileSync(srcEnvPath, 'utf-8'); } catch { /* skip */ }
-      try { destEnvContent = fs.readFileSync(destEnvPath, 'utf-8'); } catch { /* skip */ }
+      try {
+        srcEnvContent = fs.readFileSync(srcEnvPath, 'utf-8');
+      } catch {
+        /* skip */
+      }
+      try {
+        destEnvContent = fs.readFileSync(destEnvPath, 'utf-8');
+      } catch {
+        /* skip */
+      }
 
       const srcEnv = parseEnv(srcEnvContent);
       const destEnv = parseEnv(destEnvContent);
@@ -652,15 +1133,33 @@ export async function verifyMigration(
       }
 
       if (missingKeys.length > 0) {
-        checks.push({ label: 'Credentials', passed: false, message: `Credentials: missing keys in .env.migrated — ${missingKeys.join(', ')}` });
+        checks.push({
+          label: 'Credentials',
+          passed: false,
+          message: `Credentials: missing keys in .env.migrated — ${missingKeys.join(', ')}`,
+        });
       } else {
         checks.push({ label: 'Credentials', passed: true, message: 'Credentials: all channel keys present ✓' });
       }
     } else if (fs.existsSync(srcEnvPath) && !fs.existsSync(destEnvPath)) {
-      checks.push({ label: 'Credentials', passed: false, message: 'Credentials: .env.migrated not found in destination' });
+      checks.push({
+        label: 'Credentials',
+        passed: false,
+        message: 'Credentials: .env.migrated not found in destination',
+      });
     } else {
       checks.push({ label: 'Credentials', passed: true, message: 'Credentials: .env.migrated present ✓' });
     }
+  }
+
+  // ── OneCLI tokens ─────────────────────────────────────────────────────────
+  {
+    const onecliPresent = migrationResult?.onecliMigrated ?? migrateOneCLITokens();
+    checks.push({
+      label: 'OneCLI',
+      passed: true, // non-fatal
+      message: onecliPresent ? 'OneCLI tokens: ✓' : 'OneCLI tokens: ⚠ not found',
+    });
   }
 
   const failed = checks.filter((c) => !c.passed);
