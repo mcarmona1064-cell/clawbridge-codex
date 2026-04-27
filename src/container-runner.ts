@@ -117,14 +117,7 @@ async function spawnContainer(session: Session): Promise<void> {
 
   const mounts = buildMounts(agentGroup, session, containerConfig, contribution);
   const containerName = `clawbridge-v2-${agentGroup.folder}-${Date.now()}`;
-  const args = await buildContainerArgs(
-    mounts,
-    containerName,
-    agentGroup,
-    containerConfig,
-    provider,
-    contribution,
-  );
+  const args = await buildContainerArgs(mounts, containerName, agentGroup, containerConfig, provider, contribution);
 
   log.info('Spawning container', { sessionId: session.id, agentGroup: agentGroup.name, containerName });
 

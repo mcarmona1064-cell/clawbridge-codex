@@ -1151,7 +1151,6 @@ export async function verifyMigration(
     }
   }
 
-
   const failed = checks.filter((c) => !c.passed);
   return { passed: failed.length === 0, checks };
 }
