@@ -444,24 +444,12 @@ async function runFreshInstall(): Promise<void> {
   };
 
   const envContent = buildEnvFile(cfg);
-  const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
-  const packageIntegrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
-
-  // Create ~/.clawbridge/ if it doesn't exist
-  fs.mkdirSync(clawbridgeDir, { recursive: true });
-
-  // Copy docker-compose.yml from package to ~/.clawbridge/ if not already there
-  const srcCompose = path.join(packageIntegrationsDir, 'docker-compose.yml');
-  const destCompose = path.join(clawbridgeDir, 'docker-compose.yml');
-  if (fs.existsSync(srcCompose)) {
-    fs.copyFileSync(srcCompose, destCompose);
-  }
-
-  const envPath = path.join(clawbridgeDir, '.env');
+  const integrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
+  const envPath = path.join(integrationsDir, '.env');
 
   const confirmWrite = ensure(
     await p.confirm({
-      message: `.env will be written to ~/.clawbridge/.env. Continue?`,
+      message: `.env will be written to ${envPath}. Continue?`,
       initialValue: true,
     }),
   ) as boolean;
@@ -471,7 +459,7 @@ async function runFreshInstall(): Promise<void> {
   }
 
   fs.writeFileSync(envPath, envContent);
-  p.log.success(`.env written to ~/.clawbridge/.env`);
+  p.log.success(`.env written to ${envPath}`);
 
   // docker compose up
   const wantsDocker = ensure(
@@ -480,19 +468,17 @@ async function runFreshInstall(): Promise<void> {
       initialValue: true,
     }),
   ) as boolean;
-  let composeSuccess = false;
   if (wantsDocker) {
     const s2 = p.spinner();
     s2.start('Running docker compose up -d…');
     const result = spawnSync('docker', ['compose', 'up', '-d'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',
-      cwd: clawbridgeDir,
+      cwd: integrationsDir,
     });
     if (result.error) {
       s2.stop(k.red('Docker not found — install Docker Desktop first: https://docs.docker.com/get-docker/'));
     } else if (result.status === 0) {
-      composeSuccess = true;
       s2.stop(k.green('ClawBridge is running.'));
     } else {
       s2.stop(k.yellow('docker compose returned an error — check output below.'));
@@ -500,15 +486,7 @@ async function runFreshInstall(): Promise<void> {
     }
   }
 
-  if (composeSuccess) {
-    p.outro(k.green('✅ ClawBridge is running!') + `  Portal: ${k.bold('http://localhost:4000')}`);
-  } else {
-    p.outro(
-      k.red('✗ Docker compose failed') +
-        ` — your .env is saved at ~/.clawbridge/.env
-  To start manually: cd ~/.clawbridge && docker compose up -d`,
-    );
-  }
+  p.outro(k.green('✅ ClawBridge is running!') + `  Portal: ${k.bold('http://localhost:4000')}`);
 }
 
 // ─── Migration audit display ──────────────────────────────────────────────────
@@ -762,18 +740,7 @@ async function runMigrationFlow(): Promise<void> {
     }
   }
 
-  const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
-  const packageIntegrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
-
-  // Create ~/.clawbridge/ if it doesn't exist
-  fs.mkdirSync(clawbridgeDir, { recursive: true });
-
-  // Copy docker-compose.yml from package to ~/.clawbridge/ if not already there
-  const srcCompose = path.join(packageIntegrationsDir, 'docker-compose.yml');
-  const destCompose = path.join(clawbridgeDir, 'docker-compose.yml');
-  if (fs.existsSync(srcCompose)) {
-    fs.copyFileSync(srcCompose, destCompose);
-  }
+  const integrationsDir = path.resolve(new URL(import.meta.url).pathname, '../../../integrations');
 
   // Step A — Claude OAuth token
   const migratedOauthToken = await promptClaudeToken(sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'));
@@ -820,16 +787,17 @@ async function runMigrationFlow(): Promise<void> {
     hindsightUrl: migratedHindsightUrl ?? sourceEnv.get('HINDSIGHT_URL'),
   };
 
-  const envPath = path.join(clawbridgeDir, '.env');
+  const envPath = path.join(integrationsDir, '.env');
   const confirmEnvWrite = ensure(
     await p.confirm({
-      message: `.env will be written to ~/.clawbridge/.env. Continue?`,
+      message: `.env will be written to ${envPath}. Continue?`,
       initialValue: true,
     }),
   ) as boolean;
   if (confirmEnvWrite) {
+    fs.mkdirSync(integrationsDir, { recursive: true });
     fs.writeFileSync(envPath, buildEnvFile(migratedCfg));
-    p.log.success(`.env written to ~/.clawbridge/.env`);
+    p.log.success(`.env written to ${envPath}`);
   }
 
   // Step G — docker compose up
@@ -845,7 +813,7 @@ async function runMigrationFlow(): Promise<void> {
     const dockerResult = spawnSync('docker', ['compose', 'up', '-d'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',
-      cwd: clawbridgeDir,
+      cwd: integrationsDir,
     });
     if (dockerResult.error) {
       ds.stop(k.red('Docker not found — install Docker Desktop first: https://docs.docker.com/get-docker/'));
