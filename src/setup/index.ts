@@ -970,7 +970,6 @@ async function askManualPath(): Promise<MigrationSource> {
   }
 }
 
-
 // ─── launchd registration ─────────────────────────────────────────────────────
 
 async function registerLaunchd(assistantName: string): Promise<void> {
@@ -987,7 +986,9 @@ async function registerLaunchd(assistantName: string): Promise<void> {
     try {
       const which = spawnSync('which', ['node'], { encoding: 'utf-8' });
       if (which.status === 0 && which.stdout.trim()) nodePath = which.stdout.trim();
-    } catch { /* use process.execPath */ }
+    } catch {
+      /* use process.execPath */
+    }
 
     const tmpl = fs.readFileSync(tmplPath, 'utf-8');
     const plistContent = tmpl
