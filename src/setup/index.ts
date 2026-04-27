@@ -41,6 +41,13 @@ if (process.argv[2] === 'update') {
   await runUpdate();
 }
 
+// Handle "clawbridge chat" command
+if (process.argv[2] === 'chat') {
+  const { main: startChat } = await import('../cli-chat.js');
+  await startChat();
+  process.exit(0);
+}
+
 // Silent version check on startup (non-blocking)
 checkForUpdate().catch(() => {});
 
