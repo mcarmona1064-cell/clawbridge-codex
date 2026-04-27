@@ -1,7 +1,7 @@
 {
   "name": "@clawbridge/integrations-mcp",
   "version": "1.0.0",
-  "description": "ClawBridge Nango MCP server \u2014 gives agents access to 700+ integrations",
+  "description": "ClawBridge Nango MCP server — gives agents access to 700+ integrations",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -12,7 +12,6 @@
     "@anthropic-ai/sdk": "^0.91.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@nangohq/node": "^0.42.0",
-    "retell-sdk": "^4.0.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {

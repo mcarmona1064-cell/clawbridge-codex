@@ -106,7 +106,6 @@ function validateRequired(value: string | undefined): string | undefined {
   return !(value ?? '').trim() ? 'Required' : undefined;
 }
 
-
 function testOAuthToken(token: string): boolean {
   try {
     const result = spawnSync(
@@ -149,7 +148,6 @@ interface FreshConfig {
   channels: string[];
   adminEmail: string;
   adminPassword: string;
-  retellKey?: string;
   hindsightDbPassword?: string;
   hindsightApiKey?: string;
   hindsightUrl?: string;
@@ -187,9 +185,6 @@ function buildEnvFile(cfg: FreshConfig): string {
   }
   if (cfg.channels.includes('gmail')) {
     lines.push('# Gmail', 'GMAIL_CLIENT_ID=', 'GMAIL_CLIENT_SECRET=', '');
-  }
-  if (cfg.retellKey) {
-    lines.push('# Retell AI (voice)', `RETELL_API_KEY=${cfg.retellKey}`, '');
   }
   if (cfg.hindsightDbPassword && cfg.hindsightApiKey && cfg.hindsightUrl) {
     lines.push(
@@ -293,23 +288,6 @@ async function promptAdminCreds(existing?: {
   return { email: email.trim(), password };
 }
 
-async function promptRetell(): Promise<string | undefined> {
-  const wants = ensure(
-    await p.confirm({
-      message: 'Add Retell AI voice keys? (optional — skip for now)',
-      initialValue: false,
-    }),
-  ) as boolean;
-  if (!wants) return undefined;
-  return (
-    ensure(
-      await p.password({
-        message: 'Retell API key',
-        validate: validateRequired,
-      }),
-    ) as string
-  ).trim();
-}
 
 async function promptHindsight(existingUrl?: string): Promise<{ dbPassword?: string; apiKey?: string; url?: string }> {
   if (existingUrl) {
@@ -439,8 +417,6 @@ async function runFreshInstall(): Promise<void> {
   // Step 5 — Admin credentials
   const { email: adminEmail, password: adminPassword } = await promptAdminCreds();
 
-  // Step 7 — Retell (optional)
-  const retellKey = await promptRetell();
 
   // Step 8 — Hindsight (optional)
   const { dbPassword: hindsightDbPassword, apiKey: hindsightApiKey, url: hindsightUrl } = await promptHindsight();
@@ -453,7 +429,6 @@ async function runFreshInstall(): Promise<void> {
     channels: channelChoices,
     adminEmail,
     adminPassword,
-    retellKey,
     hindsightDbPassword,
     hindsightApiKey,
     hindsightUrl,
@@ -775,8 +750,6 @@ async function runMigrationFlow(): Promise<void> {
     password: existingAdminPassword,
   });
 
-  // Step D — Retell AI voice (always ask — new in ClawBridge)
-  const migratedRetellKey = await promptRetell();
 
   // Step E — Hindsight (skip if already configured in source)
   const {
@@ -801,7 +774,6 @@ async function runMigrationFlow(): Promise<void> {
     channels: migratedChannels,
     adminEmail: migratedAdminEmail,
     adminPassword: migratedAdminPassword,
-    retellKey: migratedRetellKey,
     hindsightDbPassword: migratedHindsightDbPw ?? sourceEnv.get('HINDSIGHT_DB_PASSWORD'),
     hindsightApiKey: migratedHindsightApiKey ?? sourceEnv.get('HINDSIGHT_API_KEY'),
     hindsightUrl: migratedHindsightUrl ?? sourceEnv.get('HINDSIGHT_URL'),
