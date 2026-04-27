@@ -540,7 +540,7 @@ async function runFreshInstall(): Promise<void> {
         p.log.info(
           dim(
             'If the portal fails to start, run:\n' +
-            '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d'
+              '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d',
           ),
         );
       }
@@ -930,7 +930,7 @@ async function runMigrationFlow(): Promise<void> {
         p.log.info(
           dim(
             'If the portal fails to start, run:\n' +
-            '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d'
+              '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d',
           ),
         );
       }
