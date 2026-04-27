@@ -18,6 +18,28 @@ function loadEnv(): Record<string, string> {
   return env;
 }
 
+function printSplash(agentName: string): void {
+  // Cyan color
+  const c = '\x1b[36m'
+  const reset = '\x1b[0m'
+
+  const logo = `
+${c}   ██████╗██╗      █████╗ ██╗    ██╗██████╗ ██████╗ ██╗██████╗  ██████╗ ███████╗${reset}
+${c}  ██╔════╝██║     ██╔══██╗██║    ██║██╔══██╗██╔══██╗██║██╔══██╗██╔════╝ ██╔════╝${reset}
+${c}  ██║     ██║     ███████║██║ █╗ ██║██████╔╝██████╔╝██║██║  ██║██║  ███╗█████╗  ${reset}
+${c}  ██║     ██║     ██╔══██║██║███╗██║██╔══██╗██╔══██╗██║██║  ██║██║   ██║██╔══╝  ${reset}
+${c}  ╚██████╗███████╗██║  ██║╚███╔███╔╝██████╔╝██║  ██║██║██████╔╝╚██████╔╝███████╗${reset}
+${c}   ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═════╝ ╚═╝  ╚═╝╚═╝╚═════╝  ╚═════╝ ╚══════╝${reset}
+`
+
+  console.log(logo)
+  console.log(`${c}              INITIALIZING ${agentName.toUpperCase()} AI...${reset}\n`)
+
+  // Brief pause for effect
+  const start = Date.now()
+  while (Date.now() - start < 800) {} // 0.8s dramatic pause
+}
+
 export async function main(): Promise<void> {
   const env = loadEnv();
   const token = env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN;
@@ -47,8 +69,6 @@ export async function main(): Promise<void> {
   const claudeMdPath = join(homedir(), '.clawbridge', 'CLAUDE.md');
   const systemPrompt = existsSync(claudeMdPath) ? readFileSync(claudeMdPath, 'utf8') : undefined;
 
-  console.log(`\nStarting Claude Code with ClawBridge credentials...\n`);
-
   // Build args: inject --name and optionally --system-prompt before user args
   const extraArgs = process.argv.slice(3);
   const claudeArgs: string[] = ['--name', agentName];
@@ -56,6 +76,9 @@ export async function main(): Promise<void> {
     claudeArgs.push('--system-prompt', systemPrompt);
   }
   claudeArgs.push(...extraArgs);
+
+  printSplash(agentName);
+  console.log(`Starting Claude Code...\n`);
 
   // Launch claude with ClawBridge's token
   const result = spawnSync(claudePath, claudeArgs, {
