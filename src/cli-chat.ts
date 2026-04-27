@@ -66,51 +66,51 @@ export async function main(): Promise<void> {
   console.log(`  │  Type /exit or Ctrl+C to quit      │`);
   console.log(`  ╰──────────────────────────────────╯\n`);
 
-  process.stdin.resume()
+  process.stdin.resume();
 
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-  })
+  });
 
   rl.on('close', () => {
-    console.log('\nGoodbye!')
-    process.exit(0)
-  })
+    console.log('\nGoodbye!');
+    process.exit(0);
+  });
 
   const prompt = (): void => {
     rl.question('\x1b[36mYou:\x1b[0m ', (input) => {
-      const trimmed = input.trim()
+      const trimmed = input.trim();
 
       if (!trimmed) {
-        prompt()
-        return
+        prompt();
+        return;
       }
 
       if (trimmed === '/exit' || trimmed === '/quit') {
-        rl.close()
-        return
+        rl.close();
+        return;
       }
 
       if (trimmed === '/clear') {
-        messages.length = 0
-        console.log('\x1b[90m[Conversation cleared]\x1b[0m\n')
-        prompt()
-        return
+        messages.length = 0;
+        console.log('\x1b[90m[Conversation cleared]\x1b[0m\n');
+        prompt();
+        return;
       }
 
       // Handle async chat inside the sync callback
       chat(trimmed)
         .then((reply) => {
-          console.log(`\n\x1b[33m${agentName}:\x1b[0m ${reply}\n`)
-          prompt()
+          console.log(`\n\x1b[33m${agentName}:\x1b[0m ${reply}\n`);
+          prompt();
         })
         .catch((err: Error) => {
-          console.error(`\x1b[31mError: ${err.message}\x1b[0m\n`)
-          prompt()
-        })
-    })
-  }
+          console.error(`\x1b[31mError: ${err.message}\x1b[0m\n`);
+          prompt();
+        });
+    });
+  };
 
-  prompt()
+  prompt();
 }
