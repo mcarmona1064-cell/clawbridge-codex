@@ -34,6 +34,16 @@ import {
   type VerificationCheck,
 } from './migrate.js';
 
+import { checkForUpdate, runUpdate } from '../updater.js';
+
+// Handle "clawbridge-agent update" command
+if (process.argv[2] === 'update') {
+  await runUpdate();
+}
+
+// Silent version check on startup (non-blocking)
+checkForUpdate().catch(() => {});
+
 // ─── Brand helpers ────────────────────────────────────────────────────────────
 
 const USE_ANSI = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR;
