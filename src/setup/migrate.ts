@@ -535,21 +535,7 @@ function readMemoryEntries(dbPath: string, groupSlug?: string): MemoryEntry[] {
   }
 }
 
-// ─── OneCLI token migration ───────────────────────────────────────────────────
-
-function migrateOneCLITokens(): boolean {
-  const onecliDir = path.join(HOME, '.config', 'onecli');
-  if (!fs.existsSync(onecliDir)) return false;
-  try {
-    const destDir = path.join(HOME, '.config', 'onecli');
-    // If source and dest are the same machine (which they are for local migration),
-    // the tokens are already present — nothing to do.
-    // For cross-machine scenarios, copy would be needed.
-    return fs.existsSync(destDir) && fs.readdirSync(destDir).length > 0;
-  } catch {
-    return false;
-  }
-}
+// OneCLI removed in v2.0.33 — credentials now injected directly from ~/.clawbridge/.env
 
 // ─── Migration ───────────────────────────────────────────────────────────────
 
@@ -600,7 +586,6 @@ export interface MigrationResult {
   hindsightRetained: number;
   hindsightFailed: number;
   hindsightQueued: number;
-  onecliMigrated: boolean;
   scheduledTasksMigrated: number;
 }
 
@@ -618,7 +603,6 @@ export async function runMigration(
     hindsightRetained: 0,
     hindsightFailed: 0,
     hindsightQueued: 0,
-    onecliMigrated: false,
     scheduledTasksMigrated: 0,
   };
 
@@ -764,14 +748,7 @@ export async function runMigration(
     }
   }
 
-  // 6. OneCLI token migration
-  emit('onecli', 'Checking OneCLI tokens…');
-  result.onecliMigrated = migrateOneCLITokens();
-  if (result.onecliMigrated) {
-    emit('onecli', '  OneCLI tokens present ✓');
-  } else {
-    emit('onecli', '  OneCLI tokens not found (skip)');
-  }
+  // 6. (OneCLI token migration removed in v2.0.33)
 
   // 7. Write manifest
   fs.mkdirSync(CLAWBRIDGE_HOME, { recursive: true });
@@ -1174,15 +1151,6 @@ export async function verifyMigration(
     }
   }
 
-  // ── OneCLI tokens ─────────────────────────────────────────────────────────
-  {
-    const onecliPresent = migrationResult?.onecliMigrated ?? migrateOneCLITokens();
-    checks.push({
-      label: 'OneCLI',
-      passed: true, // non-fatal
-      message: onecliPresent ? 'OneCLI tokens: ✓' : 'OneCLI tokens: ⚠ not found',
-    });
-  }
 
   const failed = checks.filter((c) => !c.passed);
   return { passed: failed.length === 0, checks };
