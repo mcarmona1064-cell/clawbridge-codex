@@ -18,14 +18,14 @@ function c(code: string, s: string): string {
   return USE_COLOR ? `\x1b[${code}m${s}\x1b[0m` : s;
 }
 
-const green  = (s: string) => c('32', s);
-const red    = (s: string) => c('31', s);
-const dim    = (s: string) => c('2', s);
-const bold   = (s: string) => c('1', s);
-const cyan   = (s: string) => c('36', s);
+const green = (s: string) => c('32', s);
+const red = (s: string) => c('31', s);
+const dim = (s: string) => c('2', s);
+const bold = (s: string) => c('1', s);
+const cyan = (s: string) => c('36', s);
 
-const CHECK  = green('✅');
-const CROSS  = red('❌');
+const CHECK = green('✅');
+const CROSS = red('❌');
 
 // ─── .env reader ─────────────────────────────────────────────────────────────
 
@@ -40,12 +40,17 @@ function readDotEnv(): Map<string, string> {
       const eq = t.indexOf('=');
       if (eq === -1) continue;
       let val = t.slice(eq + 1).trim();
-      if (val.length >= 2 && ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))) {
+      if (
+        val.length >= 2 &&
+        ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))
+      ) {
         val = val.slice(1, -1);
       }
       map.set(t.slice(0, eq).trim(), val);
     }
-  } catch { /* file missing */ }
+  } catch {
+    /* file missing */
+  }
   return map;
 }
 
@@ -103,13 +108,7 @@ interface ContainerInfo {
 }
 
 function checkContainers(): void {
-  const required = [
-    'hindsight-api',
-    'hindsight-db',
-    'nango-server',
-    'nango-db',
-    'nango-redis',
-  ];
+  const required = ['hindsight-api', 'hindsight-db'];
 
   let containers: ContainerInfo[] = [];
   try {
@@ -118,15 +117,23 @@ function checkContainers(): void {
       timeout: 8000,
     });
     if (r.status === 0) {
-      containers = r.stdout.trim().split('\n').filter(Boolean).map((line) => {
-        const [name, ...rest] = line.split('\t');
-        return { name: name.trim(), status: rest.join('\t').trim() };
-      });
+      containers = r.stdout
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [name, ...rest] = line.split('\t');
+          return { name: name.trim(), status: rest.join('\t').trim() };
+        });
     }
-  } catch { /* docker not available */ }
+  } catch {
+    /* docker not available */
+  }
 
   for (const name of required) {
-    const found = containers.find((c) => c.name === name || c.name.endsWith(`_${name}_1`) || c.name.endsWith(`-${name}-1`));
+    const found = containers.find(
+      (c) => c.name === name || c.name.endsWith(`_${name}_1`) || c.name.endsWith(`-${name}-1`),
+    );
     if (found) {
       const isUp = found.status.toLowerCase().startsWith('up');
       if (isUp) {
@@ -153,7 +160,11 @@ async function checkHindsightHealth(env: Map<string, string>): Promise<void> {
     clearTimeout(timer);
     const body = await res.text();
     let parsed: unknown;
-    try { parsed = JSON.parse(body); } catch { parsed = body; }
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      parsed = body;
+    }
     const status = (parsed as Record<string, string>)?.status;
     if (status === 'healthy') {
       pass('Hindsight health', body.slice(0, 80));
@@ -166,28 +177,12 @@ async function checkHindsightHealth(env: Map<string, string>): Promise<void> {
   }
 }
 
-async function checkNango(): Promise<void> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch('http://localhost:3003/health', { signal: controller.signal });
-    clearTimeout(timer);
-    pass('Nango health', `HTTP ${res.status}`);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Nango might 404 but still respond — that's ok
-    if (msg.includes('404') || msg.includes('ECONNREFUSED')) {
-      fail('Nango health', `unreachable (${msg})`, 'check: docker logs nango-server');
-    } else {
-      pass('Nango health', `responded (${msg})`);
-    }
-  }
-}
-
 function checkLaunchd(): void {
   try {
     const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
-    const plists = fs.readdirSync(launchAgentsDir).filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+    const plists = fs
+      .readdirSync(launchAgentsDir)
+      .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
     if (plists.length === 0) {
       fail('LaunchD service', 'no com.clawbridge-v2-* plist found', 'run: clawbridge setup');
       return;
@@ -195,7 +190,11 @@ function checkLaunchd(): void {
     const label = plists[0].replace(/\.plist$/, '');
     const r = spawnSync('launchctl', ['list', label], { encoding: 'utf-8', timeout: 5000 });
     if (r.status !== 0 || r.stdout.includes('Could not find service')) {
-      fail('LaunchD service', `${label} not loaded`, `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`);
+      fail(
+        'LaunchD service',
+        `${label} not loaded`,
+        `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`,
+      );
       return;
     }
     // Parse PID from launchctl list output
@@ -210,7 +209,11 @@ function checkLaunchd(): void {
       if (lastExit === '0') {
         pass('LaunchD service', `loaded, last exit 0  ${dim(label)}`);
       } else {
-        fail('LaunchD service', `loaded but not running (LastExitStatus=${lastExit})`, `check: tail -f ~/.clawbridge/logs/agent.log`);
+        fail(
+          'LaunchD service',
+          `loaded but not running (LastExitStatus=${lastExit})`,
+          `check: tail -f ~/.clawbridge/logs/agent.log`,
+        );
       }
     }
   } catch (err: unknown) {
@@ -275,7 +278,7 @@ export async function runDoctor(): Promise<void> {
   const version = checkVersion();
 
   const divider = USE_COLOR ? `\x1b[2m${'═'.repeat(32)}\x1b[0m` : '═'.repeat(32);
-  const thin    = USE_COLOR ? `\x1b[2m${'─'.repeat(32)}\x1b[0m` : '─'.repeat(32);
+  const thin = USE_COLOR ? `\x1b[2m${'─'.repeat(32)}\x1b[0m` : '─'.repeat(32);
 
   console.log('');
   console.log(bold(cyan('ClawBridge Doctor')) + `  ${dim('v' + version)}`);
@@ -299,7 +302,6 @@ export async function runDoctor(): Promise<void> {
   console.log(bold('Services'));
   checkContainers();
   await checkHindsightHealth(env);
-  await checkNango();
 
   // ── Storage ──────────────────────────────────────────────────────────────
   console.log('');

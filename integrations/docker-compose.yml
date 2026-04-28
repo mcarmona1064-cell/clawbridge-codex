@@ -1,72 +1,8 @@
 networks:
-  clawbridge-nango:
+  clawbridge:
     driver: bridge
 
 services:
-  nango-db:
-    image: postgres:16-alpine
-    container_name: nango-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${NANGO_DB_USER}
-      POSTGRES_PASSWORD: ${NANGO_DB_PASSWORD}
-      POSTGRES_DB: ${NANGO_DB_NAME}
-    ports:
-      - "5432:5432"
-    volumes:
-      - nango-db-data:/var/lib/postgresql/data
-    networks:
-      - clawbridge-nango
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${NANGO_DB_USER} -d ${NANGO_DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  nango-redis:
-    image: redis:7-alpine
-    container_name: nango-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - nango-redis-data:/data
-    networks:
-      - clawbridge-nango
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  nango-server:
-    image: nangohq/nango-server:hosted
-    platform: linux/amd64
-    container_name: nango-server
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      - NANGO_DB_HOST=${NANGO_DB_HOST}
-      - NANGO_DB_PORT=${NANGO_DB_PORT}
-      - NANGO_DB_USER=${NANGO_DB_USER}
-      - NANGO_DB_PASSWORD=${NANGO_DB_PASSWORD}
-      - NANGO_DB_NAME=${NANGO_DB_NAME}
-      - NANGO_REDIS_URL=${NANGO_REDIS_URL}
-      - NANGO_SECRET_KEY=${NANGO_SECRET_KEY}
-      - NANGO_ENCRYPTION_KEY=${NANGO_ENCRYPTION_KEY}
-      - SERVER_URL=${SERVER_URL}
-      - CONNECT_URL=${CONNECT_URL}
-    ports:
-      - "3003:8080"
-      - "3009:3009"
-    networks:
-      - clawbridge-nango
-    depends_on:
-      nango-db:
-        condition: service_healthy
-      nango-redis:
-        condition: service_healthy
-
   # ── Hindsight memory (optional — enables semantic per-client memory) ──────────
   hindsight-db:
     image: pgvector/pgvector:pg17
@@ -82,7 +18,7 @@ services:
     volumes:
       - hindsight-db-data:/var/lib/postgresql/data
     networks:
-      - clawbridge-nango
+      - clawbridge
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hindsight -d hindsight"]
       interval: 10s
@@ -101,7 +37,7 @@ services:
       hindsight-db:
         condition: service_healthy
     networks:
-      - clawbridge-nango
+      - clawbridge
     environment:
       HINDSIGHT_API_DATABASE_URL: postgresql://hindsight:${HINDSIGHT_DB_PASSWORD}@hindsight-db:5432/hindsight
       # LLM — uses your Claude subscription OAuth token
@@ -122,6 +58,4 @@ services:
       HINDSIGHT_API_LOG_LEVEL: info
 
 volumes:
-  nango-db-data:
-  nango-redis-data:
   hindsight-db-data:

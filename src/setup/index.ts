@@ -227,25 +227,6 @@ function buildEnvFile(cfg: FreshConfig, existingEnv?: Map<string, string>): stri
     );
   }
 
-  // Nango integration platform — preserve existing secrets to avoid breaking OAuth connections
-  const nangoDbPassword = existingEnv?.get('NANGO_DB_PASSWORD') ?? crypto.randomBytes(16).toString('hex');
-  const nangoSecretKey = existingEnv?.get('NANGO_SECRET_KEY') ?? crypto.randomBytes(16).toString('hex');
-  const nangoEncryptionKey = existingEnv?.get('NANGO_ENCRYPTION_KEY') ?? crypto.randomBytes(32).toString('base64');
-  lines.push(
-    '# Nango integration platform',
-    'NANGO_DB_HOST=nango-db',
-    'NANGO_DB_PORT=5432',
-    'NANGO_DB_USER=nango',
-    `NANGO_DB_PASSWORD=${nangoDbPassword}`,
-    'NANGO_DB_NAME=nango',
-    'NANGO_REDIS_URL=redis://nango-redis:6379',
-    `NANGO_SECRET_KEY=${nangoSecretKey}`,
-    `NANGO_ENCRYPTION_KEY=${nangoEncryptionKey}`,
-    'SERVER_URL=http://localhost:3003',
-    'CONNECT_URL=http://localhost:3006',
-    '',
-  );
-
   return lines.join('\n') + '\n';
 }
 
@@ -562,7 +543,7 @@ async function runFreshInstall(): Promise<void> {
 
   // Start portal if portal/docker-compose.yml exists in package dir
   // Run from the package's portal/ dir so ./api and ./app volume paths resolve correctly.
-  // Pass --env-file so NANGO_SECRET_KEY and other vars from ~/.clawbridge/.env are available.
+  // Pass --env-file so vars from ~/.clawbridge/.env are available.
   try {
     const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
     const portalDir = path.join(packageRoot, 'portal');
@@ -981,7 +962,7 @@ async function runMigrationFlow(): Promise<void> {
 
   // Start portal if portal/docker-compose.yml exists in package dir
   // Run from the package's portal/ dir so ./api and ./app volume paths resolve correctly.
-  // Pass --env-file so NANGO_SECRET_KEY and other vars from ~/.clawbridge/.env are available.
+  // Pass --env-file so vars from ~/.clawbridge/.env are available.
   try {
     const packageRoot2 = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
     const portalDir2 = path.join(packageRoot2, 'portal');
