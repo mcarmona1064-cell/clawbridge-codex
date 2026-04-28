@@ -476,7 +476,11 @@ async function runFreshInstall(): Promise<void> {
   const srcCompose = path.join(packageIntegrationsDir, 'docker-compose.yml');
   const destCompose = path.join(clawbridgeDir, 'docker-compose.yml');
   if (fs.existsSync(srcCompose)) {
-    try { fs.unlinkSync(destCompose); } catch { /* not present */ }
+    try {
+      fs.unlinkSync(destCompose);
+    } catch {
+      /* not present */
+    }
     fs.symlinkSync(srcCompose, destCompose);
     p.log.success('docker-compose.yml linked to package source');
   }
@@ -516,26 +520,32 @@ async function runFreshInstall(): Promise<void> {
     } else if (result.status === 0) {
       composeSuccess = true;
       s2.stop(k.green('ClawBridge is running.'));
-    // Wait for Hindsight to be healthy (A9)
-    {
-      const hindsightUrl = envContent.includes('HINDSIGHT_URL=') 
-        ? (envContent.split('\n').find(l => l.startsWith('HINDSIGHT_URL=')) ?? '').split('=')[1]?.trim() || 'http://localhost:8888'
-        : 'http://localhost:8888';
-      p.log.step('Waiting for Hindsight to be ready…');
-      let hindsightHealthy = false;
-      for (let i = 0; i < 30; i++) {
-        try {
-          const r = await fetch(`${hindsightUrl}/health`);
-          if (r.ok) { hindsightHealthy = true; break; }
-        } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 1000));
+      // Wait for Hindsight to be healthy (A9)
+      {
+        const hindsightUrl = envContent.includes('HINDSIGHT_URL=')
+          ? (envContent.split('\n').find((l) => l.startsWith('HINDSIGHT_URL=')) ?? '').split('=')[1]?.trim() ||
+            'http://localhost:8888'
+          : 'http://localhost:8888';
+        p.log.step('Waiting for Hindsight to be ready…');
+        let hindsightHealthy = false;
+        for (let i = 0; i < 30; i++) {
+          try {
+            const r = await fetch(`${hindsightUrl}/health`);
+            if (r.ok) {
+              hindsightHealthy = true;
+              break;
+            }
+          } catch {
+            /* not up yet */
+          }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        if (hindsightHealthy) {
+          p.log.success('Hindsight is ready');
+        } else {
+          p.log.warn('Hindsight did not become healthy in 30s — check: docker logs hindsight-api');
+        }
       }
-      if (hindsightHealthy) {
-        p.log.success('Hindsight is ready');
-      } else {
-        p.log.warn('Hindsight did not become healthy in 30s — check: docker logs hindsight-api');
-      }
-    }
     } else {
       s2.stop(k.yellow('docker compose returned an error — check output below.'));
       if (result.stderr) console.error(result.stderr);
@@ -848,7 +858,11 @@ async function runMigrationFlow(): Promise<void> {
   const srcCompose = path.join(packageIntegrationsDir, 'docker-compose.yml');
   const destCompose = path.join(clawbridgeDir, 'docker-compose.yml');
   if (fs.existsSync(srcCompose)) {
-    try { fs.unlinkSync(destCompose); } catch { /* not present */ }
+    try {
+      fs.unlinkSync(destCompose);
+    } catch {
+      /* not present */
+    }
     fs.symlinkSync(srcCompose, destCompose);
   }
 
@@ -936,9 +950,14 @@ async function runMigrationFlow(): Promise<void> {
         for (let i = 0; i < 30; i++) {
           try {
             const r = await fetch(`${hUrl}/health`);
-            if (r.ok) { hHealthy = true; break; }
-          } catch { /* not up yet */ }
-          await new Promise(r => setTimeout(r, 1000));
+            if (r.ok) {
+              hHealthy = true;
+              break;
+            }
+          } catch {
+            /* not up yet */
+          }
+          await new Promise((r) => setTimeout(r, 1000));
         }
         if (hHealthy) {
           p.log.success('Hindsight is ready');

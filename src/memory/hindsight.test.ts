@@ -42,7 +42,7 @@ vi.mock('@vectorize-io/hindsight-client', () => ({
     }
   },
   recallResponseToPromptString: (r: { text?: string } | string): string =>
-    typeof r === 'string' ? r : r?.text ?? '',
+    typeof r === 'string' ? r : (r?.text ?? ''),
 }));
 
 import { recallToSessionFile, retainTurn, MEMORY_CONTEXT_FILENAME } from './hindsight.js';
@@ -91,9 +91,7 @@ describe('recallToSessionFile', () => {
   it('does not throw when Hindsight client throws', async () => {
     recallMock.mockRejectedValue(new Error('connection refused'));
 
-    await expect(
-      recallToSessionFile('global', TEST_DIR, 'q', { sessionId: 'sess-1' }),
-    ).resolves.toBeUndefined();
+    await expect(recallToSessionFile('global', TEST_DIR, 'q', { sessionId: 'sess-1' })).resolves.toBeUndefined();
   });
 });
 
@@ -127,12 +125,9 @@ describe('retainTurn', () => {
   it('does not throw when Hindsight client throws', async () => {
     retainMock.mockRejectedValue(new Error('500 internal'));
     await expect(
-      retainTurn(
-        'global',
-        'a substantive user message that exceeds the noise threshold',
-        'a substantive agent reply',
-        { sessionId: 'sess-1' },
-      ),
+      retainTurn('global', 'a substantive user message that exceeds the noise threshold', 'a substantive agent reply', {
+        sessionId: 'sess-1',
+      }),
     ).resolves.toBeUndefined();
   });
 });
