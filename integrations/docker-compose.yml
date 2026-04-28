@@ -106,11 +106,11 @@ services:
       HINDSIGHT_API_DATABASE_URL: postgresql://hindsight:${HINDSIGHT_DB_PASSWORD}@hindsight-db:5432/hindsight
       # LLM — uses your Claude subscription OAuth token
       HINDSIGHT_API_LLM_PROVIDER: anthropic
-      HINDSIGHT_API_LLM_API_KEY: ${CLAUDE_CODE_OAUTH_TOKEN}
-      # Haiku for extraction (cheap + fast), Sonnet for reflection (better reasoning)
+      HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY:-${CLAUDE_CODE_OAUTH_TOKEN}}
+      # Haiku for all LLM ops — keeps reflect off the main OAuth token rate limit
       HINDSIGHT_API_RETAIN_LLM_MODEL: claude-haiku-4-5-20251001
       HINDSIGHT_API_CONSOLIDATION_LLM_MODEL: claude-haiku-4-5-20251001
-      HINDSIGHT_API_REFLECT_LLM_MODEL: claude-sonnet-4-5-20250929
+      HINDSIGHT_API_REFLECT_LLM_MODEL: claude-haiku-4-5-20251001
       # Full image includes local embeddings + reranker — no OpenAI needed
       HINDSIGHT_API_EMBEDDINGS_PROVIDER: local
       HINDSIGHT_API_RERANKER_PROVIDER: local

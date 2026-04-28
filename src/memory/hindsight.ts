@@ -8,11 +8,17 @@
  * - Strict tag matching (any_strict) to prevent cross-client data leakage
  */
 
+import fs from 'fs';
+import path from 'path';
+
 import { HindsightClient, HindsightError, recallResponseToPromptString } from '@vectorize-io/hindsight-client';
 
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import type { MemorySegment } from './types.js';
+
+/** Filename written into the session directory for the container to pick up. */
+export const MEMORY_CONTEXT_FILENAME = '.memory_context.md';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -183,6 +189,80 @@ export async function hindsightRecall(
       log.error('[hindsight] recall unexpected error', { err: e });
     }
     return ''; // Graceful degradation — session continues without memory context
+  }
+}
+
+/**
+ * Recall and write the result to `<sessionDir>/.memory_context.md` so the
+ * container's prompt builder can pick it up on the next turn. Always
+ * overwrites — never accumulates stale context across turns. When recall
+ * yields nothing or Hindsight is unavailable, removes any existing file.
+ *
+ * Caller should fire-and-forget; this never throws on Hindsight or filesystem
+ * errors (logs and returns).
+ */
+export async function recallToSessionFile(
+  clientSlug: string,
+  sessionDirPath: string,
+  query: string,
+  opts: { userId?: string; sessionId?: string; maxTokens?: number } = {},
+): Promise<void> {
+  const target = path.join(sessionDirPath, MEMORY_CONTEXT_FILENAME);
+
+  try {
+    const text = await hindsightRecall(clientSlug, query, opts);
+    if (!text) {
+      // Clear any stale file from a prior turn so the container doesn't
+      // silently use last-turn's recall.
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+      return;
+    }
+    fs.writeFileSync(target, text, 'utf-8');
+    log.info('[hindsight] recall written to session', {
+      sessionId: opts.sessionId,
+      chars: text.length,
+    });
+  } catch (err) {
+    log.warn('[hindsight] recallToSessionFile failed', { sessionId: opts.sessionId, err });
+    // Best-effort cleanup — leave no half-written file.
+    try {
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Retain a single conversation turn (user message + agent reply) into the
+ * client's Hindsight bank. Fire-and-forget; never throws. Skips when
+ * Hindsight is unavailable, when either side of the turn is empty, or when
+ * the combined text is below the minimum-useful length threshold.
+ */
+export async function retainTurn(
+  clientSlug: string,
+  userText: string,
+  agentText: string,
+  opts: { userId?: string; sessionId?: string } = {},
+): Promise<void> {
+  const u = userText.trim();
+  const a = agentText.trim();
+  if (!u || !a) return;
+
+  // Below this length, retain noise outweighs signal — skip "ok", "thanks", etc.
+  const turn = `User: ${u}\n\nAgent: ${a}`;
+  if (turn.length < 40) return;
+
+  try {
+    if (!(await isHindsightAvailable())) return;
+    await hindsightRetain(clientSlug, turn, {
+      userId: opts.userId,
+      sessionId: opts.sessionId,
+      context: 'clawbridge-turn',
+    });
+    log.info('[hindsight] turn retained', { sessionId: opts.sessionId, chars: turn.length });
+  } catch (err) {
+    log.warn('[hindsight] retainTurn failed', { sessionId: opts.sessionId, err });
   }
 }
 

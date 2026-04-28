@@ -263,7 +263,26 @@ export class ClaudeProvider implements AgentProvider {
     const stream = new MessageStream();
     stream.push(input.prompt);
 
-    const instructions = input.systemContext?.instructions;
+    // Hindsight recall — host writes /workspace/.memory_context.md before each
+    // turn (via src/memory/hindsight.ts: recallToSessionFile). Prepend its
+    // contents to the system prompt so recalled memories shape the agent's
+    // reply. Read failure is non-fatal — proceed with no memory context.
+    let memoryContext = '';
+    try {
+      const memPath = '/workspace/.memory_context.md';
+      if (fs.existsSync(memPath)) {
+        const content = fs.readFileSync(memPath, 'utf-8').trim();
+        if (content) {
+          memoryContext = content;
+          log(`memory_context loaded (${content.length} chars)`);
+        }
+      }
+    } catch (err) {
+      log(`failed to read .memory_context.md: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    const baseInstructions = input.systemContext?.instructions;
+    const instructions = [memoryContext, baseInstructions].filter((s) => s && s.length > 0).join('\n\n') || undefined;
 
     const sdkResult = sdkQuery({
       prompt: stream,

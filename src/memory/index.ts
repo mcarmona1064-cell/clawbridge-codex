@@ -14,4 +14,7 @@ export {
   ensureClientBank,
   isHindsightAvailable,
   bankId,
+  recallToSessionFile,
+  retainTurn,
+  MEMORY_CONTEXT_FILENAME,
 } from './hindsight.js';

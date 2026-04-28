@@ -16,16 +16,27 @@ import { getMessagingGroupByPlatform } from './db/messaging-groups.js';
 import {
   getDueOutboundMessages,
   getDeliveredIds,
+  getLatestInboundChatContent,
   markDelivered,
   markDeliveryFailed,
   migrateDeliveredTable,
 } from './db/session-db.js';
 import { log } from './log.js';
 import { normalizeOptions } from './channels/ask-question.js';
+import { retainTurn } from './memory/index.js';
 import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './session-manager.js';
 import { pauseTypingRefreshAfterDelivery, setTypingAdapter } from './modules/typing/index.js';
 import type { OutboundFile } from './channels/adapter.js';
 import type { Session } from './types.js';
+
+function extractText(jsonContent: string): string {
+  try {
+    const parsed = JSON.parse(jsonContent);
+    return typeof parsed?.text === 'string' ? parsed.text : '';
+  } catch {
+    return '';
+  }
+}
 
 const ACTIVE_POLL_MS = 1000;
 const SWEEP_POLL_MS = 60_000;
@@ -201,6 +212,20 @@ async function drainSession(session: Session): Promise<void> {
         // shouldn't get a gap in their typing indicator for them.
         if (msg.kind !== 'system' && msg.channel_type !== 'agent') {
           pauseTypingRefreshAfterDelivery(session.id);
+
+          // Hindsight retain — pair this user-facing reply with the most
+          // recent inbound chat from the same session. Fire-and-forget;
+          // never block delivery on memory writes.
+          const userContent = getLatestInboundChatContent(inDb);
+          if (userContent) {
+            const userText = extractText(userContent);
+            const agentText = extractText(msg.content);
+            if (userText && agentText) {
+              void retainTurn('global', userText, agentText, { sessionId: session.id }).catch((err) =>
+                log.warn('[hindsight] retainTurn threw', { sessionId: session.id, err }),
+              );
+            }
+          }
         }
       } catch (err) {
         const attempts = (deliveryAttempts.get(msg.id) ?? 0) + 1;

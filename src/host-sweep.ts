@@ -49,7 +49,6 @@ import {
   MemoryManager,
   runReflectionAgent,
   generateCrossClientReport,
-  hindsightRetain,
   hindsightReflect,
   isHindsightAvailable,
 } from './memory/index.js';
@@ -171,6 +170,16 @@ async function runNightlyMemoryDecay(): Promise<void> {
     log.info('[memory] Nightly decay complete', { clients: clientIds.size });
   } catch (err) {
     log.error('[memory] Nightly decay failed', { err });
+  }
+
+  // Hindsight reflect — synthesize behavioral patterns nightly
+  if (await isHindsightAvailable()) {
+    try {
+      await hindsightReflect('global', 'key user preferences, communication style, and recurring patterns');
+      log.info('[hindsight] Nightly reflect complete');
+    } catch (err) {
+      log.warn('[hindsight] Nightly reflect failed', { err });
+    }
   }
 }
 

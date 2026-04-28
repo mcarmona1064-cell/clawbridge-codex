@@ -145,6 +145,23 @@ export function getMessageForRetry(
     .get(messageId, status) as { id: string; tries: number; processAfter: string | null } | undefined;
 }
 
+/**
+ * Most recent inbound chat content for a session, used to pair with an
+ * outbound reply when retaining a turn into Hindsight. Returns the JSON
+ * string from messages_in.content; caller parses. Excludes system kinds.
+ */
+export function getLatestInboundChatContent(db: Database.Database): string | null {
+  const row = db
+    .prepare(
+      `SELECT content FROM messages_in
+       WHERE kind IN ('chat', 'chat-sdk')
+       ORDER BY seq DESC
+       LIMIT 1`,
+    )
+    .get() as { content: string } | undefined;
+  return row?.content ?? null;
+}
+
 export function syncProcessingAcks(inDb: Database.Database, outDb: Database.Database): void {
   const completed = outDb
     .prepare("SELECT message_id FROM processing_ack WHERE status IN ('completed', 'failed')")
