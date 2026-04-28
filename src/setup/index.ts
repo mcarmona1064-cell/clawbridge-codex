@@ -35,12 +35,20 @@ import {
   type VerificationCheck,
 } from './migrate.js';
 
-import { checkForUpdate, runUpdate } from '../updater.js';
+import { checkForUpdate, runUpgrade } from '../updater.js';
 import { getLaunchdLabel } from '../install-slug.js';
 
-// Handle "clawbridge-agent update" command
-if (process.argv[2] === 'update') {
-  await runUpdate();
+// Handle "clawbridge doctor" command
+if (process.argv[2] === 'doctor') {
+  const { runDoctor } = await import('../doctor.js');
+  await runDoctor();
+  process.exit(0);
+}
+
+// Handle "clawbridge upgrade" / "clawbridge update" command
+if (process.argv[2] === 'upgrade' || process.argv[2] === 'update') {
+  await runUpgrade();
+  process.exit(0);
 }
 
 // Handle "clawbridge chat" command
