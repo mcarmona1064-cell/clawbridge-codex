@@ -105,8 +105,9 @@ services:
     environment:
       HINDSIGHT_API_DATABASE_URL: postgresql://hindsight:${HINDSIGHT_DB_PASSWORD}@hindsight-db:5432/hindsight
       # LLM — uses your Claude subscription OAuth token
-      HINDSIGHT_API_LLM_PROVIDER: anthropic
+      HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_LLM_PROVIDER:-claude-code}
       HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY:-${CLAUDE_CODE_OAUTH_TOKEN}}
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
       # Haiku for all LLM ops — keeps reflect off the main OAuth token rate limit
       HINDSIGHT_API_RETAIN_LLM_MODEL: claude-haiku-4-5-20251001
       HINDSIGHT_API_CONSOLIDATION_LLM_MODEL: claude-haiku-4-5-20251001
