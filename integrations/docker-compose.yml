@@ -111,7 +111,7 @@ services:
       # Haiku for all LLM ops — keeps reflect off the main OAuth token rate limit
       HINDSIGHT_API_RETAIN_LLM_MODEL: claude-haiku-4-5-20251001
       HINDSIGHT_API_CONSOLIDATION_LLM_MODEL: claude-haiku-4-5-20251001
-      HINDSIGHT_API_REFLECT_LLM_MODEL: claude-haiku-4-5-20251001
+      HINDSIGHT_API_REFLECT_LLM_MODEL: claude-sonnet-4-5-20250929
       # Full image includes local embeddings + reranker — no OpenAI needed
       HINDSIGHT_API_EMBEDDINGS_PROVIDER: local
       HINDSIGHT_API_RERANKER_PROVIDER: local
