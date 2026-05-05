@@ -34,7 +34,7 @@
 - fix: portal Docker volume permission — bind mount instead of named volume
 
 ## v2.0.28 — 2026-04-27
-- fix: Cyndra removed from migration options (fresh install only, OpenClaw + NanoClaw)
+- fix: legacy migration option removed (fresh install only, OpenClaw + NanoClaw)
 
 ## v2.0.27 — 2026-04-27
 - fix: fileURLToPath() for all import.meta.url path resolution

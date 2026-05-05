@@ -61,7 +61,7 @@ bash clawbridge.sh
 - 📞 Voice agents via Retell AI
 - 👁 Vision & document analysis via Claude
 - 🔒 Container-isolated, self-hosted — your data stays yours
-- 🚀 Migrate from OpenClaw or NanoClaw/Cyndra in minutes
+- 🚀 Migrate from OpenClaw or NanoClaw in minutes
 
 ## Architecture
 

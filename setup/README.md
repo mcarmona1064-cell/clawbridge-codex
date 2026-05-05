@@ -100,18 +100,17 @@ Migrated data lands in `~/.clawbridge/`:
 
 ---
 
-## Migrate from NanoClaw / Cyndra
+## Migrate from NanoClaw
 
 ```bash
 npx clawbridge-agent setup
-# → select "Migrate from NanoClaw / Cyndra"
+# → select "Migrate from NanoClaw"
 ```
 
-Same flow as OpenClaw migration. NanoClaw and Cyndra use a near-identical schema to ClawBridge, so message history migrates as a direct copy without transformation.
+Same flow as OpenClaw migration. NanoClaw uses a near-identical schema to ClawBridge, so message history migrates as a direct copy without transformation.
 
 Auto-detected paths:
 - `~/.nanoclaw/`, `~/nanoclaw/`
-- `~/.cyndra/`, `~/cyndra/`
 
 ---
 
