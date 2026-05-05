@@ -1,6 +1,6 @@
 {
   "name": "clawbridge-agent",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "AI agent platform for ClawBridge Agency. Self-hosted, secure, customizable.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -17,13 +17,25 @@
     "scripts",
     "integrations/docker-compose.yml",
     "integrations/auth-portal",
-    "integrations/mcp-server",
     "integrations/start.sh",
     "launchd",
     "setup",
-    "portal",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "portal/README.md",
+    "portal/docker-compose.yml",
+    "portal/api/src",
+    "portal/api/package.json",
+    "portal/api/tsconfig.json",
+    "portal/app/src",
+    "portal/app/package.json",
+    "portal/app/next.config.js",
+    "portal/app/postcss.config.js",
+    "portal/app/tailwind.config.js",
+    "portal/app/tsconfig.json",
+    "integrations/mcp-server/src",
+    "integrations/mcp-server/package.json",
+    "integrations/mcp-server/tsconfig.json"
   ],
   "publishConfig": {
     "access": "public"
