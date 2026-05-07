@@ -606,16 +606,55 @@ async function runFreshInstall(): Promise<void> {
     // portal is optional — don't fail setup
   }
 
-  const imageBuilt = await buildContainerImage();
-  if (!imageBuilt) {
-    p.log.warn('⚠️  Agent container image not built — your bot will not respond to messages until you run: clawbridge build-image');
-  }
+  await buildContainerImageWithRetry();
   await registerLaunchd(cfg.agentName);
 
   // Telegram channel verification (after everything is running)
   let botUsername: string | undefined;
   if (composeSuccess && telegramToken) {
     botUsername = await verifyTelegramChannel(telegramToken);
+  }
+
+  // ── Auto health check before completion ─────────────────────────────────
+  if (composeSuccess) {
+    const hs = p.spinner();
+    hs.start('Running setup verification…');
+    const checks: Array<{ label: string; ok: boolean; fix?: string }> = [];
+
+    // Docker daemon
+    const dockerCheck = spawnSync('docker', ['info'], { stdio: 'pipe', encoding: 'utf-8', timeout: 5000 });
+    checks.push({ label: 'Docker daemon', ok: dockerCheck.status === 0 });
+
+    // Container image
+    const { getDefaultContainerImage } = await import('../install-slug.js');
+    const imageTag = getDefaultContainerImage();
+    let imageOk = false;
+    try {
+      const ir = spawnSync('docker', ['image', 'inspect', imageTag], { stdio: 'pipe', encoding: 'utf-8', timeout: 5000 });
+      imageOk = ir.status === 0;
+    } catch { /* */ }
+    checks.push({ label: 'Agent image', ok: imageOk, fix: 'run: clawbridge build-image' });
+
+    // Hindsight
+    let hindsightOk = false;
+    try {
+      const hr = await fetch('http://localhost:8888/health');
+      hindsightOk = hr.ok;
+    } catch { /* */ }
+    checks.push({ label: 'Hindsight memory', ok: hindsightOk, fix: 'run: docker compose up -d' });
+
+    // Launchd service
+    const launchCheck = spawnSync('launchctl', ['list', cfg.agentName.toLowerCase()], { stdio: 'pipe', encoding: 'utf-8', timeout: 3000 });
+    checks.push({ label: 'Launchd service', ok: launchCheck.status === 0, fix: 'run: clawbridge doctor' });
+
+    hs.stop('Setup verification:');
+    for (const c of checks) {
+      if (c.ok) {
+        p.log.success(c.label);
+      } else {
+        p.log.warn(`${c.label}${c.fix ? ' — ' + c.fix : ''}`);
+      }
+    }
   }
 
   if (composeSuccess) {
@@ -1048,10 +1087,7 @@ async function runMigrationFlow(): Promise<void> {
     p.log.success(`${label} marked as deactivated.`);
   }
 
-  const imageBuilt = await buildContainerImage();
-  if (!imageBuilt) {
-    p.log.warn('⚠️  Agent container image not built — run: clawbridge build-image');
-  }
+  await buildContainerImageWithRetry();
   await registerLaunchd(migratedCfg.agentName);
 
   p.outro(k.green('✅ Migration done!') + `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`);
@@ -1076,6 +1112,37 @@ async function askManualPath(): Promise<MigrationSource> {
 }
 
 // ─── Container image build ────────────────────────────────────────────────────
+
+async function buildContainerImageWithRetry(): Promise<boolean> {
+  while (true) {
+    const ok = await buildContainerImage();
+    if (ok) return true;
+
+    // Check if Docker is running
+    const dockerCheck = spawnSync('docker', ['info'], { stdio: 'pipe', encoding: 'utf-8', timeout: 5000 });
+    const dockerRunning = dockerCheck.status === 0;
+
+    if (!dockerRunning) {
+      p.log.warn('Docker Desktop is not running. Please start it and press Enter to retry.');
+      const retry = ensure(
+        await p.confirm({ message: 'Docker Desktop started? Retry image build?', initialValue: true }),
+      ) as boolean;
+      if (!retry) {
+        p.log.warn('⚠️  Image not built — run: clawbridge build-image once Docker is running');
+        return false;
+      }
+      continue;
+    }
+
+    const retry = ensure(
+      await p.confirm({ message: 'Image build failed. Retry?', initialValue: true }),
+    ) as boolean;
+    if (!retry) {
+      p.log.warn('⚠️  Image not built — run: clawbridge build-image to finish setup');
+      return false;
+    }
+  }
+}
 
 async function buildContainerImage(): Promise<boolean> {
   try {
