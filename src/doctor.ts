@@ -150,20 +150,42 @@ function checkContainers(): void {
 
 function checkContainerImage(): void {
   try {
-    // Derive the image tag from the installed launchd plist (source of truth for
-    // this install's slug), not from process.cwd() which gives the wrong slug
+    // Derive the image tag from the installed service registration (source of truth
+    // for this install's slug), not from process.cwd() which gives the wrong slug
     // when doctor is run from any directory other than the package root.
     let imageTag: string | undefined;
-    try {
-      const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
-      const plist = fs
-        .readdirSync(launchAgentsDir)
-        .find((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
-      if (plist) {
-        const slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
-        imageTag = `clawbridge-agent-v2-${slug}:latest`;
+
+    // macOS: read slug from ~/Library/LaunchAgents/com.clawbridge-v2-<slug>.plist
+    if (process.platform === 'darwin') {
+      try {
+        const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
+        const plist = fs
+          .readdirSync(launchAgentsDir)
+          .find((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+        if (plist) {
+          const slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
+          imageTag = `clawbridge-agent-v2-${slug}:latest`;
+        }
+      } catch { /* fall through */ }
+    }
+
+    // Linux/VPS: read slug from systemd user unit clawbridge-v2-<slug>.service
+    if (!imageTag && process.platform === 'linux') {
+      const unitDirs = [path.join(os.homedir(), '.config', 'systemd', 'user'), '/etc/systemd/system'];
+      for (const dir of unitDirs) {
+        try {
+          const unit = fs
+            .readdirSync(dir)
+            .find((f) => f.startsWith('clawbridge-v2-') && f.endsWith('.service'));
+          if (unit) {
+            const slug = unit.replace(/^clawbridge-v2-/, '').replace(/\.service$/, '');
+            imageTag = `clawbridge-agent-v2-${slug}:latest`;
+            break;
+          }
+        } catch { /* dir may not exist */ }
       }
-    } catch { /* fall through to default */ }
+    }
+
     if (!imageTag) imageTag = getDefaultContainerImage();
     const r = spawnSync('docker', ['image', 'inspect', imageTag], {
       encoding: 'utf-8',
