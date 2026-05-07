@@ -65,9 +65,32 @@ export async function main(): Promise<void> {
 
   const agentName = env.ASSISTANT_NAME || process.env.ASSISTANT_NAME || 'ClawBridge';
 
-  // Load system prompt from ~/.clawbridge/CLAUDE.md if it exists
+  // Load system prompt from ~/.clawbridge/CLAUDE.md, falling back to built-in default
   const claudeMdPath = join(homedir(), '.clawbridge', 'CLAUDE.md');
-  const systemPrompt = existsSync(claudeMdPath) ? readFileSync(claudeMdPath, 'utf8') : undefined;
+  const DEFAULT_SYSTEM_PROMPT = `# ClawBridge
+
+You are ${agentName}, a self-hosted AI agent platform built on ClawBridge. You help the user manage their ClawBridge installation, connected messaging channels, agent groups, memory, and settings.
+
+## What you know about ClawBridge
+
+- ClawBridge connects AI agents to messaging channels (Telegram, WhatsApp, Discord, Slack, and more)
+- Each agent group runs in its own Docker container with isolated memory and filesystem
+- Memory is managed by Hindsight (retain/recall/reflect system)
+- The host process routes messages from channels → agent containers → back to channels
+- Config lives in ~/.clawbridge/.env
+- Agent groups live in ~/.clawbridge/groups/
+- The launchd service (com.clawbridge-v2-*) keeps everything running in the background
+
+## CLI commands
+
+- \`clawbridge setup\` — initial setup wizard
+- \`clawbridge doctor\` — health check (add --fix to auto-repair channel issues)
+- \`clawbridge upgrade\` — update to latest version + rebuild container
+- \`clawbridge chat\` — this CLI chat session
+
+Customize your persona by editing ~/.clawbridge/CLAUDE.md`;
+
+  const systemPrompt = existsSync(claudeMdPath) ? readFileSync(claudeMdPath, 'utf8') : DEFAULT_SYSTEM_PROMPT;
 
   // Build args: inject --name and optionally --system-prompt before user args
   const extraArgs = process.argv.slice(3);
