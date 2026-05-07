@@ -7,7 +7,7 @@ A full-stack client portal for the ClawBridge Agent Platform.
 - **Frontend**: Next.js 14 (App Router), Tailwind CSS, TypeScript — port 4000
 - **Backend**: Express + SQLite (better-sqlite3), TypeScript — port 3010
 - **Billing**: Subscription plans (Starter $299 / Pro $599 / Enterprise $1299)
-- **Integrations**: Nango proxy (optional)
+- **Integrations**: Integration proxy (optional)
 
 ## Quick Start
 

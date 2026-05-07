@@ -19,7 +19,7 @@
 - If you had `ONECLI_URL` / `ONECLI_API_KEY` in your .env, they are no longer used. Ensure `CLAUDE_CODE_OAUTH_TOKEN` is set instead.
 
 ## v2.0.32 — 2026-04-27
-- fix: Nango port mapping 3003→8080
+- fix: integration server port mapping 3003→8080
 - fix: portal retry hint on failure
 
 ## v2.0.31 — 2026-04-27

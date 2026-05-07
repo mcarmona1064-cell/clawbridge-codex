@@ -4,20 +4,12 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { Nango } from "@nangohq/node";
 import { z } from "zod";
 
 import Anthropic from "@anthropic-ai/sdk";
 
-const secretKey = process.env.NANGO_SECRET_KEY;
-const serverUrl = process.env.NANGO_SERVER_URL ?? "http://localhost:3003";
-
-if (!secretKey) {
-  console.error("NANGO_SECRET_KEY env var is required");
-  process.exit(1);
-}
-
-const nango = new Nango({ secretKey, host: serverUrl });
+const integrationServerUrl = process.env.INTEGRATION_SERVER_URL ?? "http://localhost:3003";
+const integrationSecretKey = process.env.INTEGRATION_SECRET_KEY ?? "";
 
 // ---------------------------------------------------------------------------
 // Portal DB helper — fetch client Anthropic API key
@@ -47,34 +39,40 @@ const server = new Server(
 // Helper
 // ---------------------------------------------------------------------------
 
-async function nangoGet<T = unknown>(
+async function integrationGet<T = unknown>(
   integration: string,
   connectionId: string,
   endpoint: string,
   params?: Record<string, string>
 ): Promise<T> {
-  const res = await nango.get({
-    providerConfigKey: integration,
-    connectionId,
-    endpoint,
-    params,
+  const query = params ? "?" + new URLSearchParams(params).toString() : "";
+  const res = await fetch(`${integrationServerUrl}/proxy/${integration}${endpoint}${query}`, {
+    headers: {
+      Authorization: `Bearer ${integrationSecretKey}`,
+      "Connection-Id": connectionId,
+    },
   });
-  return res.data as T;
+  if (!res.ok) throw new Error(`Integration GET failed: ${res.status}`);
+  return res.json() as Promise<T>;
 }
 
-async function nangoPost<T = unknown>(
+async function integrationPost<T = unknown>(
   integration: string,
   connectionId: string,
   endpoint: string,
   data: unknown
 ): Promise<T> {
-  const res = await nango.post({
-    providerConfigKey: integration,
-    connectionId,
-    endpoint,
-    data,
+  const res = await fetch(`${integrationServerUrl}/proxy/${integration}${endpoint}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${integrationSecretKey}`,
+      "Connection-Id": connectionId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
   });
-  return res.data as T;
+  if (!res.ok) throw new Error(`Integration POST failed: ${res.status}`);
+  return res.json() as Promise<T>;
 }
 
 function connectionNotFound(integration: string, clientId: string): string {
@@ -355,7 +353,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "list_connections": {
         const { client_id } = args as { client_id: string };
-        const connections = await nango.listConnections(client_id);
+        const res = await fetch(`${integrationServerUrl}/connection?connection_id=${encodeURIComponent(client_id)}`, {
+          headers: { Authorization: `Bearer ${integrationSecretKey}` },
+        });
+        const connections = res.ok ? await res.json() : { error: `Status ${res.status}` };
         return {
           content: [
             {
@@ -371,16 +372,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           client_id: string;
           integration: string;
         };
-        const session = await nango.createConnectSession({
-          end_user: { id: client_id },
-          allowed_integrations: [integration],
+        const res = await fetch(`${integrationServerUrl}/api/connect`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${integrationSecretKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ client_id, integration }),
         });
-        const connectUrl = `${serverUrl.replace("3003", "3009")}/connect?session_token=${session.data.token}`;
+        const data = res.ok ? await res.json() : { error: `Status ${res.status}` };
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ url: connectUrl, session_token: session.data.token }),
+              text: JSON.stringify(data, null, 2),
             },
           ],
         };
@@ -400,7 +405,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           end_date ??
           new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
         try {
-          const data = await nangoGet(
+          const data = await integrationGet(
             "google-calendar",
             client_id,
             "/calendar/v3/calendars/primary/events",
@@ -427,7 +432,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           end: { dateTime: end },
         };
         try {
-          const data = await nangoPost(
+          const data = await integrationPost(
             "google-calendar",
             client_id,
             "/calendar/v3/calendars/primary/events",
@@ -456,7 +461,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .replace(/\//g, "_")
           .replace(/=+$/, "");
         try {
-          const data = await nangoPost("gmail", client_id, "/gmail/v1/users/me/messages/send", { raw });
+          const data = await integrationPost("gmail", client_id, "/gmail/v1/users/me/messages/send", { raw });
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
         } catch {
           return { content: [{ type: "text", text: connectionNotFound("Gmail", client_id) }] };
@@ -466,7 +471,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "read_inbox": {
         const { client_id, limit = 10 } = args as { client_id: string; limit?: number };
         try {
-          const list = await nangoGet<{ messages?: { id: string }[] }>(
+          const list = await integrationGet<{ messages?: { id: string }[] }>(
             "gmail",
             client_id,
             "/gmail/v1/users/me/messages",
@@ -475,7 +480,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const ids = (list.messages ?? []).slice(0, limit);
           const messages = await Promise.all(
             ids.map(({ id }) =>
-              nangoGet("gmail", client_id, `/gmail/v1/users/me/messages/${id}`, {
+              integrationGet("gmail", client_id, `/gmail/v1/users/me/messages/${id}`, {
                 format: "metadata",
                 metadataHeaders: "Subject,From,Date",
               })
@@ -492,7 +497,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "get_hubspot_contacts": {
         const { client_id, limit = 20 } = args as { client_id: string; limit?: number };
         try {
-          const data = await nangoGet(
+          const data = await integrationGet(
             "hubspot",
             client_id,
             "/crm/v3/objects/contacts",
@@ -513,7 +518,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           phone?: string;
         };
         try {
-          const data = await nangoPost("hubspot", client_id, "/crm/v3/objects/contacts", {
+          const data = await integrationPost("hubspot", client_id, "/crm/v3/objects/contacts", {
             properties: { email, firstname, lastname, phone },
           });
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
@@ -530,7 +535,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           stage?: string;
         };
         try {
-          const data = await nangoPost("hubspot", client_id, "/crm/v3/objects/deals", {
+          const data = await integrationPost("hubspot", client_id, "/crm/v3/objects/deals", {
             properties: { dealname, amount, dealstage: stage },
           });
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
@@ -548,7 +553,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           message: string;
         };
         try {
-          const data = await nangoPost("slack", client_id, "/api/chat.postMessage", {
+          const data = await integrationPost("slack", client_id, "/api/chat.postMessage", {
             channel,
             text: message,
           });
@@ -561,7 +566,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "list_slack_channels": {
         const { client_id } = args as { client_id: string };
         try {
-          const data = await nangoGet("slack", client_id, "/api/conversations.list", {
+          const data = await integrationGet("slack", client_id, "/api/conversations.list", {
             types: "public_channel,private_channel",
             limit: "200",
           });
@@ -576,7 +581,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "search_notion": {
         const { client_id, query } = args as { client_id: string; query: string };
         try {
-          const data = await nangoPost("notion", client_id, "/v1/search", { query });
+          const data = await integrationPost("notion", client_id, "/v1/search", { query });
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
         } catch {
           return { content: [{ type: "text", text: connectionNotFound("Notion", client_id) }] };
@@ -591,7 +596,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: string;
         };
         try {
-          const data = await nangoPost("notion", client_id, "/v1/pages", {
+          const data = await integrationPost("notion", client_id, "/v1/pages", {
             parent: { type: "page_id", page_id: parent_page_id },
             properties: {
               title: {

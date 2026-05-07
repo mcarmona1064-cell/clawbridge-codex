@@ -1,37 +1,29 @@
 # ClawBridge Integrations
 
-Powered by [Nango](https://www.nango.dev/) — self-hosted OAuth + API proxy giving ClawBridge agents access to 700+ integrations.
+This folder contains the integration layer that gives ClawBridge agents access to third-party APIs via OAuth.
 
 ## What This Is
 
-This folder contains:
-
 | Component | Path | Purpose |
 |-----------|------|---------|
-| Nango stack | `docker-compose.yml` | Self-hosted Nango (Postgres + Redis + server) |
 | MCP server | `mcp-server/` | Exposes integration tools to agents over MCP |
 | Auth portal | `auth-portal/` | Web UI for clients to connect their accounts |
 
-Agents call tools on the MCP server (e.g. `send_email`, `create_calendar_event`). The MCP server calls Nango, which holds the OAuth tokens and proxies requests to the upstream APIs. Clients authorize their accounts once via the auth portal.
+Agents call tools on the MCP server (e.g. `send_email`, `create_calendar_event`). The MCP server proxies requests to the integration server, which holds the OAuth tokens and proxies requests to the upstream APIs. Clients authorize their accounts once via the auth portal.
 
 ---
 
 ## Quick Start
 
-### 1. Start Nango
+### 1. Configure environment
 
 ```bash
 cd integrations
 cp .env.example .env
 # Edit .env:
-#   NANGO_SECRET_KEY   — set to any secret string
-#   NANGO_ENCRYPTION_KEY — openssl rand -base64 32
-#   NANGO_DB_PASSWORD  — set a strong password
-
-docker compose up -d
+#   INTEGRATION_SECRET_KEY   — set to any secret string
+#   INTEGRATION_SERVER_URL   — URL of your integration server
 ```
-
-Nango UI is at **http://localhost:3003** — use it to add integration credentials (OAuth client ID/secret).
 
 ### 2. Start everything
 
@@ -59,8 +51,8 @@ cd integrations/mcp-server && npm install && npm run dev
       "command": "node",
       "args": ["--loader", "tsx", "/path/to/integrations/mcp-server/src/index.ts"],
       "env": {
-        "NANGO_SECRET_KEY": "your-secret-key",
-        "NANGO_SERVER_URL": "http://localhost:3003"
+        "INTEGRATION_SECRET_KEY": "your-secret-key",
+        "INTEGRATION_SERVER_URL": "http://localhost:3003"
       }
     }
   }
@@ -72,8 +64,8 @@ cd integrations/mcp-server && npm install && npm run dev
 ## How the MCP Server Connects to the Agent
 
 1. The MCP server runs as a **stdio** process — the agent (Claude Code or any MCP client) spawns it.
-2. Each tool call includes a `client_id` — this maps to a Nango `connection_id`, identifying which client's tokens to use.
-3. Nango injects the OAuth access token and proxies the request to the upstream API.
+2. Each tool call includes a `client_id` — this maps to a `connection_id`, identifying which client's tokens to use.
+3. The integration server injects the OAuth access token and proxies the request to the upstream API.
 4. The MCP server returns raw API JSON to the agent.
 
 ---
@@ -82,17 +74,16 @@ cd integrations/mcp-server && npm install && npm run dev
 
 1. Send the client to the auth portal: `http://localhost:3010?client_id=THEIR_ID`
 2. The client clicks **Connect** next to any integration.
-3. The portal calls `/api/connect`, which creates a Nango session and redirects the client through OAuth.
-4. After authorization, the token is stored in Nango. The agent can now use that client's integration.
+3. The portal calls `/api/connect`, which creates a session and redirects the client through OAuth.
+4. After authorization, the token is stored. The agent can now use that client's integration.
 
 ---
 
 ## How to Add a New Integration
 
-1. **Set up in Nango**: In the Nango dashboard (http://localhost:3003), add a new integration provider and enter your OAuth credentials.
+1. Add the integration provider to your integration server and enter your OAuth credentials.
 2. **Add a card in the portal**: Add an entry to the `FEATURED` array in `auth-portal/index.html`.
-3. **Add tools in the MCP server**: In `mcp-server/src/index.ts`, add a tool definition to `TOOLS` and a case in the `CallToolRequestSchema` handler. Use `nangoGet` or `nangoPost` with the provider key and real API endpoint.
-4. No restart of Nango needed — it handles new providers dynamically.
+3. **Add tools in the MCP server**: In `mcp-server/src/index.ts`, add a tool definition to `TOOLS` and a case in the `CallToolRequestSchema` handler. Use `integrationGet` or `integrationPost` with the provider key and real API endpoint.
 
 ---
 
@@ -118,12 +109,8 @@ cd integrations/mcp-server && npm install && npm run dev
 
 | Variable | Description |
 |----------|-------------|
-| `NANGO_SECRET_KEY` | Secret key for Nango API auth — set to any strong random string |
-| `NANGO_ENCRYPTION_KEY` | AES encryption key for stored tokens — `openssl rand -base64 32` |
-| `NANGO_DB_*` | PostgreSQL connection settings |
-| `NANGO_REDIS_URL` | Redis URL for Nango job queue |
-| `SERVER_URL` | Public URL of Nango server (used for OAuth callbacks) |
-| `CONNECT_URL` | Public URL of Nango Connect (auth flow) |
+| `INTEGRATION_SECRET_KEY` | Secret key for integration server API auth |
+| `INTEGRATION_SERVER_URL` | URL of the integration server (default: `http://localhost:3003`) |
 
 ---
 
