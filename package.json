@@ -1,6 +1,6 @@
 {
   "name": "clawbridge-agent",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "AI agent platform for ClawBridge Agency. Self-hosted, secure, customizable.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -76,7 +76,7 @@
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "node -e \"console.log('\\n\u2705 ClawBridge Agent installed. Run: clawbridge-agent setup\\n')\""
+    "postinstall": "node -e \"console.log('\\n✅ ClawBridge Agent installed. Run: clawbridge-agent setup\\n')\""
   },
   "dependencies": {
     "@clack/core": "^1.2.0",

@@ -174,8 +174,6 @@ interface FreshConfig {
   oauthToken: string;
   telegramToken?: string;
   channels: string[];
-  adminEmail: string;
-  adminPassword: string;
   hindsightDbPassword?: string;
   hindsightApiKey?: string;
   hindsightUrl?: string;
@@ -192,10 +190,6 @@ function buildEnvFile(cfg: FreshConfig, existingEnv?: Map<string, string>): stri
     '# Claude Auth (Claude Pro/Max subscription)',
     '# Get this token by running: claude setup-token',
     `CLAUDE_CODE_OAUTH_TOKEN=${cfg.oauthToken}`,
-    '',
-    '# Admin portal',
-    `ADMIN_EMAIL=${cfg.adminEmail}`,
-    `ADMIN_PASSWORD=${cfg.adminPassword}`,
     '',
   ];
 
@@ -432,9 +426,6 @@ async function runFreshInstall(): Promise<void> {
   // Step 4 — Agent name
   const agentName = await promptAgentName();
 
-  // Step 5 — Admin credentials
-  const { email: adminEmail, password: adminPassword } = await promptAdminCreds();
-
   // Step 8 — Hindsight (optional)
   const { dbPassword: hindsightDbPassword, apiKey: hindsightApiKey, url: hindsightUrl } = await promptHindsight();
 
@@ -444,8 +435,6 @@ async function runFreshInstall(): Promise<void> {
     oauthToken: oauthToken.trim(),
     telegramToken,
     channels: channelChoices,
-    adminEmail,
-    adminPassword,
     hindsightDbPassword,
     hindsightApiKey,
     hindsightUrl,
@@ -576,13 +565,58 @@ async function runFreshInstall(): Promise<void> {
   await buildContainerImage();
   await registerLaunchd(cfg.agentName);
 
+  // Telegram channel verification
+  let botUsername: string | undefined;
+  if (composeSuccess && telegramToken) {
+    try {
+      const meRes = await fetch(`https://api.telegram.org/bot${telegramToken}/getMe`);
+      if (meRes.ok) {
+        const meJson = (await meRes.json()) as { result?: { username?: string } };
+        botUsername = meJson.result?.username;
+      }
+    } catch { /* ignore */ }
+
+    if (botUsername) {
+      p.note(
+        `Open Telegram and send any message to @${botUsername}\nI'll wait here to confirm it's working…`,
+        '📱 Verify Telegram connection'
+      );
+      let connected = false;
+      let offset = 0;
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const updRes = await fetch(`https://api.telegram.org/bot${telegramToken}/getUpdates?offset=${offset}&timeout=1`);
+          if (updRes.ok) {
+            const updJson = (await updRes.json()) as { result?: Array<{ update_id: number }> };
+            const updates = updJson.result ?? [];
+            if (updates.length > 0) {
+              offset = updates[updates.length - 1].update_id + 1;
+              connected = true;
+              break;
+            }
+          }
+        } catch { /* not up yet */ }
+      }
+      if (connected) {
+        p.log.success('✅ Telegram is connected! Your bot is receiving messages.');
+      } else {
+        p.log.warn('No message received in 60s — verify by messaging your bot manually.');
+      }
+    }
+  }
+
   if (composeSuccess) {
-    p.outro(k.green('✅ ClawBridge is running!') + `  Portal: ${k.bold('http://localhost:4000')}`);
+    const lines = [''];
+    lines.push(`  ${k.bold('Portal')}     http://localhost:4000`);
+    if (botUsername) lines.push(`  ${k.bold('Telegram')}   @${botUsername}  ← message me to start`);
+    lines.push(`  ${k.bold('Docs')}       https://docs.clawbridge.dev`);
+    lines.push('');
+    p.outro(k.green('✅ ClawBridge is running!') + lines.join('\n'));
   } else {
     p.outro(
       k.red('✗ Docker compose failed') +
-        ` — your .env is saved at ~/.clawbridge/.env
-  To start manually: cd ~/.clawbridge && docker compose up -d`,
+        ` — your .env is saved at ~/.clawbridge/.env\n  To start manually: cd ~/.clawbridge && docker compose up -d`,
     );
   }
 }
@@ -893,8 +927,6 @@ async function runMigrationFlow(): Promise<void> {
     oauthToken: migratedOauthToken,
     telegramToken: sourceEnv.get('TELEGRAM_BOT_TOKEN'),
     channels: migratedChannels,
-    adminEmail: migratedAdminEmail,
-    adminPassword: migratedAdminPassword,
     hindsightDbPassword: migratedHindsightDbPw ?? sourceEnv.get('HINDSIGHT_DB_PASSWORD'),
     hindsightApiKey: migratedHindsightApiKey ?? sourceEnv.get('HINDSIGHT_API_KEY'),
     hindsightUrl: migratedHindsightUrl ?? sourceEnv.get('HINDSIGHT_URL'),

@@ -114,6 +114,7 @@ export function decideStuckAction(args: {
 
 let running = false;
 let lastDecayDate = ''; // YYYY-MM-DD of last nightly decay run
+let lastReflectDate = ''; // YYYY-MM-DD of last evening reflect run
 let lastWeeklyReportDate = ''; // YYYY-Www of last weekly cross-client report
 
 export function startHostSweep(): void {
@@ -140,6 +141,9 @@ async function sweep(): Promise<void> {
 
   // Nightly memory decay — runs once at/after 2am each calendar day
   await runNightlyMemoryDecay();
+
+  // Evening reflect — runs once between 19:00 and 20:00 each day
+  await runEveningReflect();
 
   // Weekly cross-client report — runs Sunday midnight
   await runWeeklyCrossClientReport();
@@ -171,15 +175,22 @@ async function runNightlyMemoryDecay(): Promise<void> {
   } catch (err) {
     log.error('[memory] Nightly decay failed', { err });
   }
+}
 
-  // Hindsight reflect — synthesize behavioral patterns nightly
-  if (await isHindsightAvailable()) {
-    try {
-      await hindsightReflect('global', 'key user preferences, communication style, and recurring patterns');
-      log.info('[hindsight] Nightly reflect complete');
-    } catch (err) {
-      log.warn('[hindsight] Nightly reflect failed', { err });
-    }
+async function runEveningReflect(): Promise<void> {
+  const now = new Date();
+  // Run once between 19:00 and 20:00 local time each day
+  if (now.getHours() !== 19) return;
+  const today = now.toISOString().slice(0, 10);
+  if (lastReflectDate === today) return;
+  lastReflectDate = today;
+
+  if (!(await isHindsightAvailable())) return;
+  try {
+    await hindsightReflect('global', 'key user preferences, communication style, and recurring patterns');
+    log.info('[hindsight] Evening reflect complete');
+  } catch (err) {
+    log.warn('[hindsight] Evening reflect failed', { err });
   }
 }
 
