@@ -69,6 +69,36 @@ function reconcileDockerComposeSymlink(): void {
   }
 }
 
+
+function rebuildContainerImage(): boolean {
+  try {
+    const npmRootResult = spawnSync('npm', ['root', '-g'], { encoding: 'utf-8', timeout: 10000 });
+    if (npmRootResult.status !== 0) {
+      console.log('  ⚠  Could not determine npm global root — skipping container rebuild.');
+      return false;
+    }
+    const globalRoot = npmRootResult.stdout.trim();
+    const buildScript = path.join(globalRoot, 'clawbridge-agent', 'container', 'build.sh');
+    if (!fs.existsSync(buildScript)) {
+      console.log(`  ⚠  build.sh not found at ${buildScript} — skipping container rebuild.`);
+      return false;
+    }
+    const result = spawnSync('bash', [buildScript], {
+      stdio: 'inherit',
+      encoding: 'utf-8',
+      timeout: 5 * 60 * 1000, // 5 minutes
+    });
+    if (result.status !== 0) {
+      console.log('  ⚠  Container image build failed. Run manually: clawbridge build');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.log(`  ⚠  Container rebuild error: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+}
+
 function detectLaunchdLabel(): string | null {
   try {
     const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
@@ -153,6 +183,13 @@ export async function runUpgrade(): Promise<void> {
   console.log('\nReconciling docker-compose symlink…');
   reconcileDockerComposeSymlink();
 
+  // Rebuild container image
+  console.log('\nRebuilding agent container image (this takes ~2 min)…');
+  const rebuilt = rebuildContainerImage();
+  if (rebuilt) {
+    console.log('  ✓ Container image rebuilt successfully');
+  }
+
   // Restart launchd service
   const label = detectLaunchdLabel();
   if (label) {
@@ -160,6 +197,15 @@ export async function runUpgrade(): Promise<void> {
     restartLaunchdService(label);
   } else {
     console.log('\n⚠  No launchd service found — restart manually if needed.');
+  }
+
+  // Health check
+  console.log('\nRunning health check…');
+  try {
+    const { runDoctor } = await import('./doctor.js');
+    await runDoctor();
+  } catch {
+    console.log('  ⚠  Could not run health check — run `clawbridge doctor` manually.');
   }
 
   console.log(`\n✓ ClawBridge upgraded: ${currentVersion} → ${latestVersion}`);
