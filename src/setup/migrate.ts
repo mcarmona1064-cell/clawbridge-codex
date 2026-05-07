@@ -735,16 +735,92 @@ export async function runMigration(
     emit('credentials', 'Migrating channel credentials…');
     const envSrc = path.join(source.path, '.env');
     if (fs.existsSync(envSrc)) {
-      fs.copyFileSync(envSrc, path.join(CLAWBRIDGE_HOME, '.env.migrated'));
-      emit('credentials', '  .env saved to ~/.clawbridge/.env.migrated — review before applying');
+      const envMigratedPath = path.join(CLAWBRIDGE_HOME, '.env.migrated');
+      fs.copyFileSync(envSrc, envMigratedPath);
+      emit('credentials', '  .env saved to ~/.clawbridge/.env.migrated');
+
+      // Try to merge relevant channel tokens into ClawBridge .env
+      const srcEnvContent = fs.readFileSync(envSrc, 'utf-8');
+      const clawbridgeEnvPath = path.join(CLAWBRIDGE_HOME, '.env');
+      const MIGRATABLE_KEYS = [
+        'TELEGRAM_BOT_TOKEN',
+        'TELEGRAM_CHAT_ID',
+        'WHATSAPP_SESSION',
+        'DISCORD_TOKEN',
+        'DISCORD_GUILD_ID',
+        'SLACK_BOT_TOKEN',
+        'SLACK_APP_TOKEN',
+        'RETELL_API_KEY',
+      ];
+      if (fs.existsSync(clawbridgeEnvPath)) {
+        const existingEnv = fs.readFileSync(clawbridgeEnvPath, 'utf-8');
+        const linesToAdd: string[] = [];
+        for (const key of MIGRATABLE_KEYS) {
+          const match = srcEnvContent.match(new RegExp(`^${key}=(.*)$`, 'm'));
+          if (match && !existingEnv.includes(`${key}=`)) {
+            linesToAdd.push(`${key}=${match[1]}`);
+          }
+        }
+        if (linesToAdd.length > 0) {
+          fs.appendFileSync(
+            clawbridgeEnvPath,
+            `\n# Migrated from ${source.type}\n${linesToAdd.join('\n')}\n`,
+          );
+          emit('credentials', `  Merged ${linesToAdd.length} channel credential(s) into .env`);
+        }
+      }
     }
+
+    // 5a. WhatsApp Baileys session — check multiple common paths, copy first found
+    let whatsappCopied = false;
+    const whatsappPaths = [
+      'config/whatsapp',
+      'session',
+      'auth_info_baileys',
+      'whatsapp-session',
+      'store/whatsapp',
+      'data/whatsapp',
+      '.wwebjs_auth',
+    ];
+    for (const rel of whatsappPaths) {
+      const srcDir = path.join(source.path, rel);
+      if (fs.existsSync(srcDir) && fs.statSync(srcDir).isDirectory()) {
+        copyDirRecursive(srcDir, path.join(CLAWBRIDGE_HOME, 'credentials', 'whatsapp'));
+        emit('credentials', `  Copied WhatsApp session from ${rel}`);
+        whatsappCopied = true;
+        break; // only copy first found to avoid overwriting with empty
+      }
+    }
+
+    // 5b. Other channel credentials (skip whatsapp if already copied above)
     for (const rel of ['config/telegram', 'config/whatsapp', 'config/discord']) {
+      if (whatsappCopied && rel === 'config/whatsapp') continue;
       const srcDir = path.join(source.path, rel);
       if (fs.existsSync(srcDir)) {
         const channelName = path.basename(rel);
         copyDirRecursive(srcDir, path.join(CLAWBRIDGE_HOME, 'credentials', channelName));
         emit('credentials', `  Copied ${channelName} credentials`);
       }
+    }
+  }
+
+  // 5c. Registered groups config
+  emit('groups', 'Migrating registered groups config…');
+  const registeredGroupsSrcPaths = [
+    path.join(source.path, 'data', 'registered_groups.json'),
+    path.join(source.path, 'store', 'groups.json'),
+    path.join(source.path, 'config', 'groups.json'),
+    path.join(source.path, 'registered_groups.json'),
+  ];
+  for (const srcPath of registeredGroupsSrcPaths) {
+    if (fs.existsSync(srcPath)) {
+      const destDataDir = path.join(CLAWBRIDGE_HOME, 'data');
+      fs.mkdirSync(destDataDir, { recursive: true });
+      const destPath = path.join(destDataDir, 'registered_groups.migrated.json');
+      fs.copyFileSync(srcPath, destPath);
+      emit('groups', '  Registered groups saved to ~/.clawbridge/data/registered_groups.migrated.json');
+      emit('groups', '  ⚠ Review and rename to registered_groups.json to activate');
+      break;
     }
   }
 
@@ -813,15 +889,43 @@ export function deactivateSource(source: MigrationSource): void {
       2,
     ),
   );
-  const stopCmds: Record<MigrationSourceType, string[]> = {
-    openclaw: ['systemctl', '--user', 'stop', 'openclaw'],
-    nanoclaw: ['systemctl', '--user', 'stop', 'nanoclaw'],
+  const isMac = process.platform === 'darwin';
+  const stopCmds: Record<MigrationSourceType, string[][]> = {
+    openclaw: isMac
+      ? [
+          ['launchctl', 'unload', path.join(os.homedir(), 'Library/LaunchAgents/com.openclaw.plist')],
+          ['launchctl', 'stop', 'com.openclaw'],
+        ]
+      : [['systemctl', '--user', 'stop', 'openclaw']],
+    nanoclaw: isMac
+      ? [
+          ['launchctl', 'unload', path.join(os.homedir(), 'Library/LaunchAgents/com.nanoclaw.plist')],
+          ['launchctl', 'stop', 'com.nanoclaw'],
+        ]
+      : [['systemctl', '--user', 'stop', 'nanoclaw']],
   };
-  try {
-    const [cmd, ...args] = stopCmds[source.type];
-    spawnSync(cmd, args, { stdio: 'ignore' });
-  } catch {
-    // service may not be registered — ignore
+  // Try each command, ignore failures
+  for (const cmd of stopCmds[source.type]) {
+    try {
+      spawnSync(cmd[0], cmd.slice(1), { stdio: 'ignore' });
+    } catch {
+      // service may not be registered — ignore
+    }
+  }
+  // Scan LaunchAgents dir for any matching plists (handles non-standard names)
+  if (isMac) {
+    const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
+    try {
+      const plists = fs
+        .readdirSync(launchAgentsDir)
+        .filter((f) => f.toLowerCase().includes('openclaw') || f.toLowerCase().includes('nanoclaw'));
+      for (const plist of plists) {
+        const plistPath = path.join(launchAgentsDir, plist);
+        spawnSync('launchctl', ['unload', plistPath], { stdio: 'ignore' });
+      }
+    } catch {
+      // LaunchAgents dir may not exist — ignore
+    }
   }
 }
 
@@ -1148,6 +1252,75 @@ export async function verifyMigration(
       });
     } else {
       checks.push({ label: 'Credentials', passed: true, message: 'Credentials: .env.migrated present ✓' });
+    }
+  }
+
+  // ── WhatsApp credentials ─────────────────────────────────────────────────
+  if (selections.includes('credentials')) {
+    const waCredDir = path.join(CLAWBRIDGE_HOME, 'credentials', 'whatsapp');
+    const waExists = fs.existsSync(waCredDir) && fs.readdirSync(waCredDir).length > 0;
+    if (!waExists) {
+      // Non-fatal: WhatsApp may not have been configured in source
+      const waSource = ['config/whatsapp', 'session', 'auth_info_baileys', 'whatsapp-session', 'store/whatsapp', 'data/whatsapp', '.wwebjs_auth']
+        .some((rel) => fs.existsSync(path.join(source.path, rel)));
+      if (waSource) {
+        checks.push({ label: 'WhatsApp Credentials', passed: false, message: 'WhatsApp credentials: source found but not copied ⚠' });
+      }
+    } else {
+      checks.push({ label: 'WhatsApp Credentials', passed: true, message: 'WhatsApp credentials: present ✓' });
+    }
+  }
+
+  // ── Registered groups ─────────────────────────────────────────────────────
+  const registeredGroupsMigrated = path.join(CLAWBRIDGE_HOME, 'data', 'registered_groups.migrated.json');
+  const registeredGroupsActive = path.join(CLAWBRIDGE_HOME, 'data', 'registered_groups.json');
+  if (fs.existsSync(registeredGroupsMigrated)) {
+    checks.push({
+      label: 'Registered Groups',
+      passed: true,
+      message: 'Registered groups: saved as registered_groups.migrated.json — review and rename to activate ⚠',
+    });
+  } else if (fs.existsSync(registeredGroupsActive)) {
+    checks.push({ label: 'Registered Groups', passed: true, message: 'Registered groups: active ✓' });
+  }
+
+  // ── .env channel tokens ───────────────────────────────────────────────────
+  if (selections.includes('credentials')) {
+    const clawbridgeEnvPath = path.join(CLAWBRIDGE_HOME, '.env');
+    if (fs.existsSync(clawbridgeEnvPath)) {
+      const envContent = fs.readFileSync(clawbridgeEnvPath, 'utf-8');
+      const hasSomeToken = [
+        /TELEGRAM_BOT_TOKEN=/,
+        /DISCORD_TOKEN=/,
+        /SLACK_BOT_TOKEN=/,
+        /WHATSAPP_SESSION=/,
+      ].some((pat) => pat.test(envContent));
+      if (!hasSomeToken) {
+        checks.push({
+          label: '.env Tokens',
+          passed: false,
+          message: '.env: no channel tokens found — run setup to configure channels',
+        });
+      } else {
+        checks.push({ label: '.env Tokens', passed: true, message: '.env: channel tokens present ✓' });
+      }
+    }
+  }
+
+  // ── Service stopped ───────────────────────────────────────────────────────
+  {
+    const deactivatedMarker = path.join(source.path, '.clawbridge-deactivated');
+    if (fs.existsSync(deactivatedMarker)) {
+      checks.push({ label: 'Source Deactivated', passed: true, message: `Source ${source.type} deactivated ✓` });
+    }
+    // Check whether the systemd/launchd service is still running
+    const isMac = process.platform === 'darwin';
+    if (!isMac) {
+      const result = spawnSync('systemctl', ['--user', 'is-active', source.type], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const isActive = (result.stdout ?? '').trim() === 'active';
+      if (isActive) {
+        checks.push({ label: 'Service', passed: false, message: `${source.type} systemd service still active — stop it to avoid conflicts` });
+      }
     }
   }
 
