@@ -45,6 +45,27 @@ import type { AgentGroup, Session } from './types.js';
 /** Active containers tracked by session ID. */
 const activeContainers = new Map<string, { process: ChildProcess; containerName: string }>();
 
+/** Send a Telegram alert when a container fails to start (image not found). */
+async function sendContainerFailureAlert(hint: string): Promise<void> {
+  try {
+    const env = readEnvFile(['TELEGRAM_BOT_TOKEN', 'TELEGRAM_ALERT_CHAT_ID', 'TELEGRAM_CHAT_ID']);
+    const token = env['TELEGRAM_BOT_TOKEN'];
+    const chatId = env['TELEGRAM_ALERT_CHAT_ID'] || env['TELEGRAM_CHAT_ID'];
+    if (!token || !chatId) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `⚠️ <b>ClawBridge startup error</b>\n\n${hint}`,
+        parse_mode: 'HTML',
+      }),
+    });
+  } catch {
+    /* non-critical */
+  }
+}
+
 /**
  * In-flight wake promises, keyed by session id. Deduplicates concurrent
  * `wakeContainer` calls while the first spawn is still mid-setup (async
@@ -164,13 +185,13 @@ async function spawnContainer(session: Session): Promise<void> {
       } catch {
         imageExists = false;
       }
-      log.error('Container spawn failed (exit 125)', {
-        hint: !imageExists
-          ? `Image "${imageTag}" not found — run: clawbridge build-image`
-          : !mountExists
-            ? `Mount path "${agentRunnerSrc}" not found — reinstall: npm install -g clawbridge-agent@latest`
-            : 'Docker runtime error — check: docker ps',
-      });
+      const hint = !imageExists
+        ? `Image "${imageTag}" not found — run: <code>clawbridge build-image</code>`
+        : !mountExists
+          ? `Mount path not found — reinstall: <code>npm install -g clawbridge-agent@latest</code>`
+          : 'Docker runtime error — check: <code>docker ps</code>';
+      log.error('Container spawn failed (exit 125)', { hint });
+      void sendContainerFailureAlert(hint);
     }
   });
 

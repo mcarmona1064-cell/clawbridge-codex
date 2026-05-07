@@ -606,7 +606,10 @@ async function runFreshInstall(): Promise<void> {
     // portal is optional — don't fail setup
   }
 
-  await buildContainerImage();
+  const imageBuilt = await buildContainerImage();
+  if (!imageBuilt) {
+    p.log.warn('⚠️  Agent container image not built — your bot will not respond to messages until you run: clawbridge build-image');
+  }
   await registerLaunchd(cfg.agentName);
 
   // Telegram channel verification (after everything is running)
@@ -1045,7 +1048,10 @@ async function runMigrationFlow(): Promise<void> {
     p.log.success(`${label} marked as deactivated.`);
   }
 
-  await buildContainerImage();
+  const imageBuilt = await buildContainerImage();
+  if (!imageBuilt) {
+    p.log.warn('⚠️  Agent container image not built — run: clawbridge build-image');
+  }
   await registerLaunchd(migratedCfg.agentName);
 
   p.outro(k.green('✅ Migration done!') + `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`);
@@ -1071,28 +1077,34 @@ async function askManualPath(): Promise<MigrationSource> {
 
 // ─── Container image build ────────────────────────────────────────────────────
 
-async function buildContainerImage(): Promise<void> {
+async function buildContainerImage(): Promise<boolean> {
   try {
     const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
     const buildScript = path.join(packageRoot, 'container', 'build.sh');
     if (!fs.existsSync(buildScript)) {
       p.log.warn('container/build.sh not found — image build skipped');
-      return;
+      return false;
     }
-    p.log.step('Building agent container image…');
+    const s = p.spinner();
+    s.start('Building agent container image (this takes 1–2 min on first run)…');
     const result = spawnSync('bash', [buildScript], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',
       cwd: path.join(packageRoot, 'container'),
+      timeout: 300_000, // 5 min max
     });
     if (result.status === 0) {
-      p.log.success('Container image built successfully.');
+      s.stop(k.green('Container image built.'));
+      return true;
     } else {
-      p.log.warn('Image build failed — run: clawbridge build-image');
+      s.stop(k.red('Image build failed.'));
       if (result.stderr) console.error(result.stderr);
+      p.log.warn('To retry: clawbridge build-image');
+      return false;
     }
   } catch (err) {
-    p.log.warn('Image build failed — run: clawbridge build-image');
+    p.log.warn(`Image build error — run: clawbridge build-image\n${err instanceof Error ? err.message : String(err)}`);
+    return false;
   }
 }
 

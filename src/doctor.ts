@@ -9,6 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getDefaultContainerImage } from './install-slug.js';
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -144,6 +145,28 @@ function checkContainers(): void {
     } else {
       fail(name, 'container not found', 'run: clawbridge upgrade');
     }
+  }
+}
+
+function checkContainerImage(): void {
+  try {
+    const imageTag = getDefaultContainerImage();
+    const r = spawnSync('docker', ['image', 'inspect', imageTag], {
+      encoding: 'utf-8',
+      timeout: 8000,
+      stdio: 'pipe',
+    });
+    if (r.status === 0) {
+      pass('Agent image', imageTag);
+    } else {
+      fail(
+        'Agent image',
+        `"${imageTag}" not found`,
+        'run: clawbridge build-image',
+      );
+    }
+  } catch {
+    fail('Agent image', 'docker unavailable', 'start Docker Desktop');
   }
 }
 
@@ -301,6 +324,7 @@ export async function runDoctor(): Promise<void> {
   console.log('');
   console.log(bold('Services'));
   checkContainers();
+  checkContainerImage();
   await checkHindsightHealth(env);
 
   // ── Storage ──────────────────────────────────────────────────────────────
