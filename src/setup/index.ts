@@ -245,29 +245,83 @@ function parseEnvFile(envPath: string): Map<string, string> {
 
 // ─── Shared prompt helpers ────────────────────────────────────────────────────
 
-async function promptClaudeToken(existingValue?: string): Promise<string> {
+async function setupClaudeAuth(existingValue?: string): Promise<string> {
   if (existingValue) {
     p.log.success('Claude OAuth token found in source ✓');
     return existingValue;
   }
-  p.log.message(
-    dim(
-      '  To authenticate with Claude, run this in a separate terminal:\n' +
-        '    claude setup-token\n' +
-        '  then paste the token below.',
-    ),
-  );
-  const token = ensure(
+
+  // 1. Check if claude CLI is installed
+  const claudeCheck = spawnSync('which', ['claude'], { encoding: 'utf8' });
+  if (claudeCheck.status !== 0) {
+    p.log.info('Claude Code is not installed. Installing now...');
+    const s = p.spinner();
+    s.start('Installing Claude Code (npm install -g @anthropic-ai/claude-code)…');
+    const installResult = spawnSync('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+    if (installResult.status !== 0) {
+      s.stop(k.red('Failed to install Claude Code.'));
+      p.log.error('Please install manually: npm install -g @anthropic-ai/claude-code');
+      process.exit(1);
+    }
+    s.stop(k.green('Claude Code installed ✓'));
+  } else {
+    p.log.success('Claude Code detected ✓');
+  }
+
+  // 2. Check if already authenticated (try reading credentials)
+  const existingToken = tryReadClaudeToken();
+  if (existingToken) {
+    p.log.success('Claude authentication found ✓');
+    return existingToken;
+  }
+
+  // 3. Run claude setup-token interactively
+  p.log.message(dim('  Your browser will open to authenticate with Claude.\n  Complete the login, then return here.'));
+  p.log.message(dim('  Running: claude setup-token'));
+
+  // Run interactively so user sees the browser flow
+  spawnSync('claude', ['setup-token'], { stdio: 'inherit', encoding: 'utf8' });
+
+  // 4. Try reading the token that claude just saved
+  const token = tryReadClaudeToken();
+  if (token) {
+    p.log.success('Claude authenticated successfully ✓');
+    return token;
+  }
+
+  // 5. Fallback: ask user to paste token once
+  p.log.message(dim('  Could not read token automatically. Please paste it below.'));
+  const pasted = ensure(
     await p.password({
       message: 'Paste your Claude OAuth token',
       validate: validateOAuthToken,
     }),
   ) as string;
-  const s = p.spinner();
-  s.start('Validating Claude token…');
-  const ok = testOAuthToken(token.trim());
-  s.stop(ok ? k.green('Claude token looks good.') : k.yellow('Could not verify token (offline?) — continuing anyway.'));
-  return token.trim();
+  return pasted.trim();
+}
+
+function tryReadClaudeToken(): string | null {
+  try {
+    // claude setup-token saves to ~/.claude/.credentials.json
+    const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
+    if (fs.existsSync(credPath)) {
+      const creds = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+      // Try known key shapes
+      const token =
+        creds?.claudeAiOauth?.accessToken ||
+        creds?.claudeAiOauth?.longLivedToken ||
+        creds?.oauthToken ||
+        creds?.token ||
+        null;
+      if (token && typeof token === 'string' && token.length > 20) return token;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 async function promptAgentName(existingValue?: string): Promise<string> {
@@ -435,7 +489,7 @@ async function runFreshInstall(): Promise<void> {
   p.log.step('Starting fresh install…');
 
   // Step 1 — Claude OAuth token
-  const oauthToken = await promptClaudeToken();
+  const oauthToken = await setupClaudeAuth();
 
   // Step 2 — Channels
   type ChannelOption = { value: string; label: string; hint?: string };
@@ -630,9 +684,15 @@ async function runFreshInstall(): Promise<void> {
     const imageTag = getDefaultContainerImage();
     let imageOk = false;
     try {
-      const ir = spawnSync('docker', ['image', 'inspect', imageTag], { stdio: 'pipe', encoding: 'utf-8', timeout: 5000 });
+      const ir = spawnSync('docker', ['image', 'inspect', imageTag], {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
       imageOk = ir.status === 0;
-    } catch { /* */ }
+    } catch {
+      /* */
+    }
     checks.push({ label: 'Agent image', ok: imageOk, fix: 'run: clawbridge build-image' });
 
     // Hindsight
@@ -640,11 +700,17 @@ async function runFreshInstall(): Promise<void> {
     try {
       const hr = await fetch('http://localhost:8888/health');
       hindsightOk = hr.ok;
-    } catch { /* */ }
+    } catch {
+      /* */
+    }
     checks.push({ label: 'Hindsight memory', ok: hindsightOk, fix: 'run: docker compose up -d' });
 
     // Launchd service
-    const launchCheck = spawnSync('launchctl', ['list', cfg.agentName.toLowerCase()], { stdio: 'pipe', encoding: 'utf-8', timeout: 3000 });
+    const launchCheck = spawnSync('launchctl', ['list', cfg.agentName.toLowerCase()], {
+      stdio: 'pipe',
+      encoding: 'utf-8',
+      timeout: 3000,
+    });
     checks.push({ label: 'Launchd service', ok: launchCheck.status === 0, fix: 'run: clawbridge doctor' });
 
     hs.stop('Setup verification:');
@@ -944,7 +1010,7 @@ async function runMigrationFlow(): Promise<void> {
   }
 
   // Step A — Claude OAuth token
-  const migratedOauthToken = await promptClaudeToken(sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'));
+  const migratedOauthToken = await setupClaudeAuth(sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'));
 
   // Step B — Agent name
   const migratedAgentName = await promptAgentName(sourceEnv.get('ASSISTANT_NAME') ?? sourceEnv.get('AGENT_NAME'));
@@ -1134,9 +1200,7 @@ async function buildContainerImageWithRetry(): Promise<boolean> {
       continue;
     }
 
-    const retry = ensure(
-      await p.confirm({ message: 'Image build failed. Retry?', initialValue: true }),
-    ) as boolean;
+    const retry = ensure(await p.confirm({ message: 'Image build failed. Retry?', initialValue: true })) as boolean;
     if (!retry) {
       p.log.warn('⚠️  Image not built — run: clawbridge build-image to finish setup');
       return false;
