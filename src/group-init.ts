@@ -9,11 +9,48 @@ import type { AgentGroup } from './types.js';
 const DEFAULT_SETTINGS_JSON =
   JSON.stringify(
     {
-      env: {
-        CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-        CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-      },
+        "env": {
+            "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+            "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
+            "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0"
+        },
+        "permissions": {
+            "allow": [
+                "Bash(ls*)",
+                "Bash(ls -* *)",
+                "Bash(cat *)",
+                "Bash(head *)",
+                "Bash(tail *)",
+                "Bash(grep *)",
+                "Bash(grep -* *)",
+                "Bash(find *)",
+                "Bash(wc *)",
+                "Bash(echo *)",
+                "Bash(pwd)",
+                "Bash(which *)",
+                "Bash(file *)",
+                "Bash(stat *)",
+                "Bash(du *)",
+                "Bash(df *)",
+                "Bash(ps *)",
+                "Bash(env)",
+                "Bash(printenv *)",
+                "Bash(sort *)",
+                "Bash(uniq *)",
+                "Bash(cut *)",
+                "Bash(awk *)",
+                "Bash(sed -n *)",
+                "Bash(jq *)",
+                "Bash(python3 -c *)",
+                "Bash(node -e *)",
+                "Bash(date*)",
+                "Bash(id)",
+                "Bash(whoami)",
+                "Bash(uname *)",
+                "Read(*)",
+                "Glob(*)"
+            ]
+        }
     },
     null,
     2,
