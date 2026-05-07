@@ -178,14 +178,16 @@ export async function runUpgrade(): Promise<void> {
       spawnSync('launchctl', ['kill', 'TERM', `gui/${uid}/${serviceLabel}`], { encoding: 'utf-8', timeout: 10000 });
       serviceStopped = true;
       console.log('  ✓ Service stopped');
-    } catch { /* proceed anyway */ }
+    } catch {
+      /* proceed anyway */
+    }
   } else if (process.platform === 'linux') {
     console.log('\nStopping ClawBridge service before upgrade…');
     // Try systemd user service
     const unitDirs = [path.join(os.homedir(), '.config', 'systemd', 'user'), '/etc/systemd/system'];
     for (const dir of unitDirs) {
       try {
-        const files = fs.readdirSync(dir).filter(f => f.startsWith('clawbridge-v2-') && f.endsWith('.service'));
+        const files = fs.readdirSync(dir).filter((f) => f.startsWith('clawbridge-v2-') && f.endsWith('.service'));
         if (files.length > 0) {
           const unit = files[0];
           const scope = dir.includes(os.homedir()) ? ['--user'] : [];
@@ -194,10 +196,33 @@ export async function runUpgrade(): Promise<void> {
           console.log(`  ✓ Service stopped: ${unit}`);
           break;
         }
-      } catch { /* dir may not exist */ }
+      } catch {
+        /* dir may not exist */
+      }
     }
     if (!serviceStopped) {
       console.log('  ℹ No systemd service found — proceeding without stopping');
+    }
+  }
+
+  // Linux ENOTEMPTY workaround: npm arborist reuses the same temp name as both
+  // the new-version staging dir and the old-version backup — pre-removing the
+  // existing install dir avoids the rename collision entirely.
+  // Safe because Node has already loaded the module into memory before files are removed.
+  if (process.platform === 'linux') {
+    const npmRootForClean = spawnSync('npm', ['root', '-g'], { encoding: 'utf-8', timeout: 10000 });
+    if (npmRootForClean.status === 0) {
+      const globalRoot = npmRootForClean.stdout.trim();
+      try {
+        fs.rmSync(path.join(globalRoot, 'clawbridge-agent'), { recursive: true, force: true });
+      } catch { /* ignore */ }
+      try {
+        for (const entry of fs.readdirSync(globalRoot)) {
+          if (entry.startsWith('.clawbridge-agent-')) {
+            fs.rmSync(path.join(globalRoot, entry), { recursive: true, force: true });
+          }
+        }
+      } catch { /* ignore */ }
     }
   }
 
@@ -214,7 +239,9 @@ export async function runUpgrade(): Promise<void> {
       try {
         const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
         spawnSync('launchctl', ['kickstart', `gui/${uid}/${serviceLabel}`], { encoding: 'utf-8', timeout: 10000 });
-      } catch { /* best effort */ }
+      } catch {
+        /* best effort */
+      }
     }
     console.error('\n✗ Upgrade failed. Try manually: npm install -g clawbridge-agent@latest');
     process.exit(1);
