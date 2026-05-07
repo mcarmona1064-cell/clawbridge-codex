@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { findByName, getAllDestinations } from '../destinations.js';
+import { getInboundDb } from '../db/connection.js';
 import { getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
 import { registerTools } from './server.js';
@@ -17,6 +18,28 @@ import type { McpToolDefinition } from './types.js';
 
 function log(msg: string): void {
   console.error(`[mcp-tools] ${msg}`);
+}
+
+/**
+ * Read the current reply_to_session from the a2a_context table in inbound.db.
+ * Returns null when:
+ *   - this is not an agent-to-agent session (no a2a_context row)
+ *   - the table doesn't exist (older session DB — graceful degradation)
+ *   - any other read error
+ *
+ * Called by send_message when routing to an agent destination so the child
+ * automatically threads its reply back to the correct parent session (Path 2).
+ */
+function getA2aReplyToSession(): string | null {
+  try {
+    const db = getInboundDb();
+    const row = db
+      .prepare('SELECT reply_to_session FROM a2a_context WHERE id = 1')
+      .get() as { reply_to_session: string | null } | undefined;
+    return row?.reply_to_session ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function generateId(): string {
@@ -117,13 +140,25 @@ export const sendMessage: McpToolDefinition = {
     if ('error' in routing) return err(routing.error);
 
     const id = generateId();
+
+    // Step 7: when sending to an agent destination, thread reply_to_session
+    // into the content JSON so the host's agent-route.ts can route the reply
+    // directly back to the correct parent session (Path 2 cross-container routing).
+    let messageContent: Record<string, unknown> = { text };
+    if (routing.channel_type === 'agent') {
+      const replyToSession = getA2aReplyToSession();
+      if (replyToSession) {
+        messageContent = { text, reply_to_session: replyToSession };
+      }
+    }
+
     const seq = writeMessageOut({
       id,
       kind: 'chat',
       platform_id: routing.platform_id,
       channel_type: routing.channel_type,
       thread_id: routing.thread_id,
-      content: JSON.stringify({ text }),
+      content: JSON.stringify(messageContent),
     });
 
     log(`send_message: #${seq} → ${routing.resolvedName}`);

@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS messages_in (
   platform_id    TEXT,
   channel_type   TEXT,
   thread_id      TEXT,
+  reply_to_session  TEXT,   -- for channel_type='agent': specific parent session to reply to
   content        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_in_series ON messages_in(series_id);
@@ -207,6 +208,17 @@ CREATE TABLE IF NOT EXISTS session_routing (
   channel_type TEXT,
   platform_id  TEXT,
   thread_id    TEXT
+);
+
+-- A2A context written by the host when waking a container for an agent-to-agent
+-- message that carries a reply_to_session. Single-row table (id=1).
+-- The container MCP tools read this to thread replies back to the correct
+-- parent session without needing reply_to_session passed through every call.
+CREATE TABLE IF NOT EXISTS a2a_context (
+  id                   INTEGER PRIMARY KEY CHECK (id = 1),
+  reply_to_session     TEXT,
+  parent_agent_group_id  TEXT,
+  updated_at           INTEGER NOT NULL
 );
 `;
 

@@ -47,6 +47,13 @@ export interface ContainerConfig {
   agentGroupId?: string;
   /** Max messages per prompt. Falls back to code default if unset. */
   maxMessagesPerPrompt?: number;
+  /**
+   * Allow the agent in this group to run shell commands on the host via the
+   * `host_exec` MCP tool. Default `false`. Flip to `true` only for groups you
+   * trust to operate the host itself (system administration, the "main" bot).
+   * The MCP tool is a no-op error response when this is false.
+   */
+  allowHostExec?: boolean;
 }
 
 function emptyConfig(): ContainerConfig {
@@ -87,6 +94,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       assistantName: raw.assistantName,
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
+      allowHostExec: raw.allowHostExec ?? false,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

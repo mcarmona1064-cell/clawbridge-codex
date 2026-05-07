@@ -159,11 +159,7 @@ function checkContainerImage(): void {
     if (r.status === 0) {
       pass('Agent image', imageTag);
     } else {
-      fail(
-        'Agent image',
-        `"${imageTag}" not found`,
-        'run: clawbridge build-image',
-      );
+      fail('Agent image', `"${imageTag}" not found`, 'run: clawbridge build-image');
     }
   } catch {
     fail('Agent image', 'docker unavailable', 'start Docker Desktop');

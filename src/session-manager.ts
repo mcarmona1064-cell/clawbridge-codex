@@ -203,6 +203,8 @@ export function writeSessionMessage(
      * a trigger-1 message does arrive.
      */
     trigger?: 0 | 1;
+    /** For channel_type='agent': the parent session the child should reply to. */
+    replyToSession?: string | null;
   },
 ): void {
   // Extract base64 attachment data, save to inbox, replace with file paths
@@ -221,6 +223,7 @@ export function writeSessionMessage(
       processAfter: message.processAfter ?? null,
       recurrence: message.recurrence ?? null,
       trigger: message.trigger ?? 1,
+      replyToSession: message.replyToSession ?? null,
     });
   } finally {
     db.close();

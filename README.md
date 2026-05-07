@@ -56,7 +56,7 @@ bash clawbridge.sh
 ## Features
 
 - 🤖 Multi-channel AI agents (Telegram, WhatsApp, Discord, Slack, iMessage, 15+ more)
-- 🔌 700+ integrations via Nango (Google, HubSpot, Slack…)
+- 🔌 Connect your tools — Google, HubSpot, Slack, and more
 - 📊 Client portal with analytics & ROI dashboard
 - 📞 Voice agents via Retell AI
 - 👁 Vision & document analysis via Claude

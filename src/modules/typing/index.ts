@@ -19,6 +19,7 @@
  */
 import fs from 'fs';
 
+import { log } from '../../log.js';
 import { heartbeatPath } from '../../session-manager.js';
 
 const TYPING_REFRESH_MS = 4000;
@@ -97,6 +98,7 @@ export function startTypingRefresh(
   platformId: string,
   threadId: string | null,
 ): void {
+  log.info('Typing refresh started', { sessionId, channelType, platformId, threadId });
   const existing = typingRefreshers.get(sessionId);
   if (existing) {
     // Already refreshing. Fire an immediate tick for the new inbound

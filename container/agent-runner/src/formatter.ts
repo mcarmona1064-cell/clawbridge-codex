@@ -176,7 +176,14 @@ function formatSingleChat(msg: MessageInRow): string {
       ? ` from="unknown:${escapeXml(msg.channel_type || '')}:${escapeXml(msg.platform_id || '')}"`
       : '';
 
-  return `<message${idAttr}${fromAttr} sender="${escapeXml(sender)}" time="${escapeXml(time)}"${replyAttr}>${replyPrefix}${escapeXml(text)}${attachmentsSuffix}</message>`;
+  // For agent-to-agent messages, expose reply_to_session so the child agent
+  // knows which parent session to direct its reply to (Path 2 routing).
+  const replyToSessionAttr =
+    msg.channel_type === 'agent' && msg.reply_to_session
+      ? ` reply_to_session="${escapeXml(msg.reply_to_session)}"`
+      : '';
+
+  return `<message${idAttr}${fromAttr} sender="${escapeXml(sender)}" time="${escapeXml(time)}"${replyAttr}${replyToSessionAttr}>${replyPrefix}${escapeXml(text)}${attachmentsSuffix}</message>`;
 }
 
 function formatTaskMessage(msg: MessageInRow): string {

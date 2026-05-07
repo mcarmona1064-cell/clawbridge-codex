@@ -44,6 +44,28 @@ interface TgMessageEntity {
   length: number;
 }
 
+interface TgVoice {
+  file_id: string;
+  file_unique_id: string;
+  duration: number;
+  mime_type?: string;
+  file_size?: number;
+}
+
+interface TgAudio extends TgVoice {
+  performer?: string;
+  title?: string;
+  file_name?: string;
+}
+
+interface TgVideoNote {
+  file_id: string;
+  file_unique_id: string;
+  duration: number;
+  length: number;
+  file_size?: number;
+}
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
@@ -53,6 +75,16 @@ interface TgMessage {
   caption?: string;
   entities?: TgMessageEntity[];
   caption_entities?: TgMessageEntity[];
+  voice?: TgVoice;
+  audio?: TgAudio;
+  video_note?: TgVideoNote;
+}
+
+interface TgFile {
+  file_id: string;
+  file_unique_id: string;
+  file_size?: number;
+  file_path?: string;
 }
 
 interface TgUpdate {
@@ -153,6 +185,53 @@ async function tgPost<T>(token: string, method: string, body: Record<string, unk
   return json.result as T;
 }
 
+async function tgDownloadFile(token: string, fileId: string): Promise<{ data: Buffer; filename: string } | null> {
+  const info = await tgGet<TgFile>(token, 'getFile', { file_id: fileId });
+  if (!info.file_path) return null;
+  const url = `${API_BASE}/file/bot${token}/${info.file_path}`;
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    throw new NetworkError(`fetch failed for file download: ${(err as Error).message}`);
+  }
+  if (!res.ok) throw new Error(`Telegram file download failed: ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const filename = (info.file_path.split('/').pop() ?? `${fileId}.bin`).replace(/\.oga$/, '.ogg');
+  return { data: buf, filename };
+}
+
+const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+const GROQ_MODEL = 'whisper-large-v3-turbo';
+
+async function transcribeWithGroq(
+  apiKey: string,
+  audio: { data: Buffer; filename: string },
+  mimeType: string,
+): Promise<string> {
+  const form = new FormData();
+  const blob = new Blob([new Uint8Array(audio.data)], { type: mimeType });
+  form.append('file', blob, audio.filename);
+  form.append('model', GROQ_MODEL);
+  form.append('response_format', 'text');
+
+  let res: Response;
+  try {
+    res = await fetch(GROQ_TRANSCRIBE_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+  } catch (err) {
+    throw new NetworkError(`Groq transcription network error: ${(err as Error).message}`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Groq transcription failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+  return (await res.text()).trim();
+}
+
 async function tgPostMultipart<T>(
   token: string,
   method: string,
@@ -178,7 +257,7 @@ async function tgPostMultipart<T>(
 }
 
 function createAdapter(): ChannelAdapter | null {
-  const { TELEGRAM_BOT_TOKEN: token } = readEnvFile(['TELEGRAM_BOT_TOKEN']);
+  const { TELEGRAM_BOT_TOKEN: token, GROQ_API_KEY: groqKey } = readEnvFile(['TELEGRAM_BOT_TOKEN', 'GROQ_API_KEY']);
   if (!token) return null;
 
   let running = false;
@@ -222,8 +301,36 @@ function createAdapter(): ChannelAdapter | null {
     }
   }
 
+  async function transcribeVoice(msg: TgMessage): Promise<string | null> {
+    const media = msg.voice ?? msg.audio ?? msg.video_note;
+    if (!media) return null;
+    if (!groqKey) {
+      log.warn('Telegram: voice/audio received but GROQ_API_KEY not set — dropping', {
+        chatId: msg.chat.id,
+        duration: media.duration,
+      });
+      return null;
+    }
+    try {
+      const file = await tgDownloadFile(token, media.file_id);
+      if (!file) return null;
+      const mime =
+        ('mime_type' in media && media.mime_type) ||
+        (msg.voice ? 'audio/ogg' : msg.video_note ? 'video/mp4' : 'audio/mpeg');
+      const transcript = await transcribeWithGroq(groqKey, file, mime);
+      return transcript;
+    } catch (err) {
+      log.error('Telegram: voice transcription failed', { err: (err as Error).message });
+      return null;
+    }
+  }
+
   async function handleMessage(msg: TgMessage, config: ChannelSetup): Promise<void> {
-    const text = msg.text ?? msg.caption ?? '';
+    let text = msg.text ?? msg.caption ?? '';
+    if (!text && (msg.voice || msg.audio || msg.video_note)) {
+      const transcript = await transcribeVoice(msg);
+      if (transcript) text = `[voice] ${transcript}`;
+    }
     if (!text) return; // photo/sticker/etc without text — ignore for v1
     const platformId = platformIdFor(msg.chat.id);
     const isGroup = msg.chat.type !== 'private';
@@ -324,7 +431,8 @@ function createAdapter(): ChannelAdapter | null {
         await tgPost(token, 'sendChatAction', { chat_id: chatId, action: 'typing' });
       } catch (err) {
         // Typing indicators are nice-to-have — never fail the request over them.
-        log.debug('Telegram setTyping failed', { err: (err as Error).message });
+        // Logged at INFO so silent API failures (rate limits, network blips) are visible.
+        log.info('Telegram setTyping failed', { err: (err as Error).message, chatId });
       }
     },
   };

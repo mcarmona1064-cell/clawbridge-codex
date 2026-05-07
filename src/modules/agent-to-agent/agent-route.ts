@@ -25,7 +25,8 @@ import { getAgentGroup } from '../../db/agent-groups.js';
 import { getSession } from '../../db/sessions.js';
 import { wakeContainer } from '../../container-runner.js';
 import { log } from '../../log.js';
-import { resolveSession, sessionDir, writeSessionMessage } from '../../session-manager.js';
+import { inboundDbPath, resolveSession, sessionDir, writeSessionMessage } from '../../session-manager.js';
+import { openInboundDb as openInboundDbWriter } from '../../db/session-db.js';
 import type { Session } from '../../types.js';
 import { hasDestination } from './db/agent-destinations.js';
 
@@ -136,7 +137,40 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
   if (!getAgentGroup(targetAgentGroupId)) {
     throw new Error(`target agent group ${targetAgentGroupId} not found for message ${msg.id}`);
   }
-  const { session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared');
+  // Step 3b: if the outbound message carries reply_to_session (set by the child
+  // agent's MCP send_message tool when it knows it's replying to a parent),
+  // route directly to that session instead of the agent-shared session. This
+  // ensures the reply lands in the exact parent session that originated the
+  // request, even when the parent agent has multiple concurrent sessions.
+  let targetSession: Session;
+  let replyToSessionId: string | null = null;
+  try {
+    const parsedContent = JSON.parse(msg.content) as Record<string, unknown>;
+    if (typeof parsedContent.reply_to_session === 'string') {
+      replyToSessionId = parsedContent.reply_to_session;
+    }
+  } catch {
+    // non-JSON content — fall through to agent-shared
+  }
+
+  if (replyToSessionId) {
+    const directSession = getSession(replyToSessionId);
+    if (directSession && directSession.agent_group_id === targetAgentGroupId) {
+      targetSession = directSession;
+      log.info('agent-route: reply_to_session found, routing directly to parent session', {
+        replyToSession: replyToSessionId,
+        targetAgentGroupId,
+      });
+    } else {
+      log.warn('agent-route: reply_to_session points to unknown/mismatched session, falling back to agent-shared', {
+        replyToSessionId,
+        targetAgentGroupId,
+      });
+      ({ session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared'));
+    }
+  } else {
+    ({ session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared'));
+  }
   const a2aMsgId = `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // If the source message references files (via `send_file`), forward the
@@ -154,7 +188,14 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
     channelType: 'agent',
     threadId: null,
     content: forwardedContent,
+    // Step 3a: stamp the parent session so the child knows where to reply.
+    replyToSession: session.id,
   });
+
+  // Step 5: upsert a2a_context in the child's inbound.db so MCP tools can
+  // read reply_to_session without it being threaded through every call.
+  upsertA2aContext(targetAgentGroupId, targetSession.id, session.id, session.agent_group_id);
+
   log.info('Agent message routed', {
     from: session.agent_group_id,
     to: targetAgentGroupId,
@@ -211,6 +252,43 @@ function forwardFileAttachments(
   parsed.attachments = [...existing, ...attachments];
 
   return JSON.stringify(parsed);
+}
+
+/**
+ * Upsert the a2a_context singleton row in the target session's inbound.db.
+ * The container's MCP tools read this to include reply_to_session in outbound
+ * messages without needing it threaded through every function call.
+ *
+ * Must open-write-close per the cross-mount invariant (see session-manager.ts).
+ */
+function upsertA2aContext(
+  targetAgentGroupId: string,
+  targetSessionId: string,
+  replyToSession: string,
+  parentAgentGroupId: string,
+): void {
+  const dbPath = inboundDbPath(targetAgentGroupId, targetSessionId);
+  const db = openInboundDbWriter(dbPath);
+  try {
+    db.pragma('journal_mode = DELETE');
+    db.exec(`CREATE TABLE IF NOT EXISTS a2a_context (
+      id                     INTEGER PRIMARY KEY CHECK (id = 1),
+      reply_to_session       TEXT,
+      parent_agent_group_id  TEXT,
+      updated_at             INTEGER NOT NULL
+    )`);
+    db.prepare(
+      `INSERT INTO a2a_context (id, reply_to_session, parent_agent_group_id, updated_at)
+       VALUES (1, ?, ?, unixepoch())
+       ON CONFLICT(id) DO UPDATE SET
+         reply_to_session      = excluded.reply_to_session,
+         parent_agent_group_id = excluded.parent_agent_group_id,
+         updated_at            = excluded.updated_at`,
+    ).run(replyToSession, parentAgentGroupId);
+  } finally {
+    db.close();
+  }
+  log.debug('a2a_context upserted', { targetSessionId, replyToSession, parentAgentGroupId });
 }
 
 function countForwardedFiles(contentStr: string): number {

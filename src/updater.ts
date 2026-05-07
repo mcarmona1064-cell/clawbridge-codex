@@ -57,7 +57,11 @@ function reconcileDockerComposeSymlink(): void {
       return;
     }
     const destCompose = path.join(os.homedir(), '.clawbridge', 'docker-compose.yml');
-    try { fs.unlinkSync(destCompose); } catch { /* not present */ }
+    try {
+      fs.unlinkSync(destCompose);
+    } catch {
+      /* not present */
+    }
     fs.symlinkSync(newComposeSrc, destCompose);
     console.log(`  ✓ docker-compose.yml → ${newComposeSrc}`);
   } catch (err) {
@@ -68,7 +72,8 @@ function reconcileDockerComposeSymlink(): void {
 function detectLaunchdLabel(): string | null {
   try {
     const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
-    const plists = fs.readdirSync(launchAgentsDir)
+    const plists = fs
+      .readdirSync(launchAgentsDir)
       .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
     if (plists.length === 0) return null;
     return plists[0].replace(/\.plist$/, '');

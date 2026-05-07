@@ -12,6 +12,7 @@ import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
+import { startHostExecWatcher, stopHostExecWatcher } from './modules/host-exec/index.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
 import { initErrorHandler } from './error-handler.js';
 import { startHealthCheck, stopHealthCheck } from './health-check.js';
@@ -209,6 +210,9 @@ async function main(): Promise<void> {
   startHostSweep();
   log.info('Host sweep started');
 
+  // 6b. Start host_exec watcher (file-IPC for the container's host_exec MCP tool).
+  startHostExecWatcher();
+
   // 7. Start health monitoring
   startHealthCheck();
 
@@ -227,6 +231,7 @@ async function shutdown(signal: string): Promise<void> {
   }
   stopDeliveryPolls();
   stopHostSweep();
+  stopHostExecWatcher();
   stopHealthCheck();
   await teardownChannelAdapters();
   process.exit(0);

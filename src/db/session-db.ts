@@ -100,14 +100,17 @@ export function insertMessage(
      * Host countDueMessages gates on this; container reads everything.
      */
     trigger?: 0 | 1;
+    /** For channel_type='agent': the parent session the child should reply to. */
+    replyToSession?: string | null;
   },
 ): void {
   db.prepare(
-    `INSERT INTO messages_in (id, seq, kind, timestamp, status, platform_id, channel_type, thread_id, content, process_after, recurrence, series_id, trigger)
-     VALUES (@id, @seq, @kind, @timestamp, 'pending', @platformId, @channelType, @threadId, @content, @processAfter, @recurrence, @id, @trigger)`,
+    `INSERT INTO messages_in (id, seq, kind, timestamp, status, platform_id, channel_type, thread_id, reply_to_session, content, process_after, recurrence, series_id, trigger)
+     VALUES (@id, @seq, @kind, @timestamp, 'pending', @platformId, @channelType, @threadId, @replyToSession, @content, @processAfter, @recurrence, @id, @trigger)`,
   ).run({
     ...message,
     trigger: message.trigger ?? 1,
+    replyToSession: message.replyToSession ?? null,
     seq: nextEvenSeq(db),
   });
 }
@@ -300,5 +303,8 @@ export function migrateMessagesInTable(db: Database.Database): void {
     // All pre-existing rows got written with the old "every inbound wakes
     // the agent" semantics, so backfill 1 and default 1 for new inserts.
     db.prepare('ALTER TABLE messages_in ADD COLUMN trigger INTEGER NOT NULL DEFAULT 1').run();
+  }
+  if (!cols.has('reply_to_session')) {
+    db.prepare('ALTER TABLE messages_in ADD COLUMN reply_to_session TEXT').run();
   }
 }

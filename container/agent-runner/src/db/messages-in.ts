@@ -24,6 +24,8 @@ export interface MessageInRow {
   platform_id: string | null;
   channel_type: string | null;
   thread_id: string | null;
+  /** For channel_type='agent': the parent session the child should reply to. */
+  reply_to_session: string | null;
   content: string;
 }
 
