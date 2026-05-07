@@ -69,7 +69,6 @@ function reconcileDockerComposeSymlink(): void {
   }
 }
 
-
 function rebuildContainerImage(): boolean {
   try {
     const npmRootResult = spawnSync('npm', ['root', '-g'], { encoding: 'utf-8', timeout: 10000 });
@@ -167,6 +166,41 @@ export async function runUpgrade(): Promise<void> {
     }
   }
 
+  // Stop the running service before installing to avoid ENOTEMPTY on Linux
+  // (npm can't rename the package dir while the process has open file handles)
+  const serviceLabel = detectLaunchdLabel();
+  let serviceStopped = false;
+
+  if (process.platform === 'darwin' && serviceLabel) {
+    console.log('\nStopping ClawBridge service before upgrade…');
+    try {
+      const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+      spawnSync('launchctl', ['kill', 'TERM', `gui/${uid}/${serviceLabel}`], { encoding: 'utf-8', timeout: 10000 });
+      serviceStopped = true;
+      console.log('  ✓ Service stopped');
+    } catch { /* proceed anyway */ }
+  } else if (process.platform === 'linux') {
+    console.log('\nStopping ClawBridge service before upgrade…');
+    // Try systemd user service
+    const unitDirs = [path.join(os.homedir(), '.config', 'systemd', 'user'), '/etc/systemd/system'];
+    for (const dir of unitDirs) {
+      try {
+        const files = fs.readdirSync(dir).filter(f => f.startsWith('clawbridge-v2-') && f.endsWith('.service'));
+        if (files.length > 0) {
+          const unit = files[0];
+          const scope = dir.includes(os.homedir()) ? ['--user'] : [];
+          spawnSync('systemctl', [...scope, 'stop', unit], { encoding: 'utf-8', timeout: 10000 });
+          serviceStopped = true;
+          console.log(`  ✓ Service stopped: ${unit}`);
+          break;
+        }
+      } catch { /* dir may not exist */ }
+    }
+    if (!serviceStopped) {
+      console.log('  ℹ No systemd service found — proceeding without stopping');
+    }
+  }
+
   // Install
   console.log('\nInstalling…');
   const installResult = spawnSync('npm', ['install', '-g', 'clawbridge-agent@latest'], {
@@ -175,6 +209,13 @@ export async function runUpgrade(): Promise<void> {
   });
 
   if (installResult.status !== 0) {
+    // If stopped, try to restart before exiting
+    if (serviceStopped && serviceLabel && process.platform === 'darwin') {
+      try {
+        const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+        spawnSync('launchctl', ['kickstart', `gui/${uid}/${serviceLabel}`], { encoding: 'utf-8', timeout: 10000 });
+      } catch { /* best effort */ }
+    }
     console.error('\n✗ Upgrade failed. Try manually: npm install -g clawbridge-agent@latest');
     process.exit(1);
   }
