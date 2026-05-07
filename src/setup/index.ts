@@ -332,6 +332,50 @@ async function promptHindsight(existingUrl?: string): Promise<{ dbPassword?: str
   return { dbPassword, apiKey, url };
 }
 
+// ─── Telegram channel verification ───────────────────────────────────────────
+
+async function verifyTelegramChannel(token: string): Promise<string | undefined> {
+  // Get bot username first
+  let botUsername: string | undefined;
+  try {
+    const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    if (meRes.ok) {
+      const meData = await meRes.json() as { ok: boolean; result?: { username?: string } };
+      botUsername = meData.result?.username;
+    }
+  } catch {
+    /* ignore — username is optional */
+  }
+
+  p.note(
+    `Open Telegram, send any message to your bot (${botUsername ? '@' + botUsername : 'your bot'}).\nI'll wait here to confirm it's working.`,
+    'Telegram verification',
+  );
+
+  // Poll getUpdates for up to 60 seconds
+  let offset: number | undefined;
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    try {
+      const url = `https://api.telegram.org/bot${token}/getUpdates${offset !== undefined ? `?offset=${offset}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json() as { ok: boolean; result?: Array<{ update_id: number }> };
+        if (data.ok && data.result && data.result.length > 0) {
+          p.log.success('✅ Telegram is connected! Your bot is receiving messages.');
+          return botUsername;
+        }
+      }
+    } catch {
+      /* network hiccup — keep polling */
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  p.log.warn('No message received in 60s — Telegram may still work, but verify manually by messaging your bot.');
+  return botUsername;
+}
+
 // ─── Docker pre-flight check ─────────────────────────────────────────────────
 
 function checkDockerPrerequisites(): void {
@@ -426,7 +470,7 @@ async function runFreshInstall(): Promise<void> {
   // Step 4 — Agent name
   const agentName = await promptAgentName();
 
-  // Step 8 — Hindsight (optional)
+  // Step 5 — Hindsight (optional)
   const { dbPassword: hindsightDbPassword, apiKey: hindsightApiKey, url: hindsightUrl } = await promptHindsight();
 
   // Generate .env
@@ -565,58 +609,30 @@ async function runFreshInstall(): Promise<void> {
   await buildContainerImage();
   await registerLaunchd(cfg.agentName);
 
-  // Telegram channel verification
+  // Telegram channel verification (after everything is running)
   let botUsername: string | undefined;
   if (composeSuccess && telegramToken) {
-    try {
-      const meRes = await fetch(`https://api.telegram.org/bot${telegramToken}/getMe`);
-      if (meRes.ok) {
-        const meJson = (await meRes.json()) as { result?: { username?: string } };
-        botUsername = meJson.result?.username;
-      }
-    } catch { /* ignore */ }
-
-    if (botUsername) {
-      p.note(
-        `Open Telegram and send any message to @${botUsername}\nI'll wait here to confirm it's working…`,
-        '📱 Verify Telegram connection'
-      );
-      let connected = false;
-      let offset = 0;
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const updRes = await fetch(`https://api.telegram.org/bot${telegramToken}/getUpdates?offset=${offset}&timeout=1`);
-          if (updRes.ok) {
-            const updJson = (await updRes.json()) as { result?: Array<{ update_id: number }> };
-            const updates = updJson.result ?? [];
-            if (updates.length > 0) {
-              offset = updates[updates.length - 1].update_id + 1;
-              connected = true;
-              break;
-            }
-          }
-        } catch { /* not up yet */ }
-      }
-      if (connected) {
-        p.log.success('✅ Telegram is connected! Your bot is receiving messages.');
-      } else {
-        p.log.warn('No message received in 60s — verify by messaging your bot manually.');
-      }
-    }
+    botUsername = await verifyTelegramChannel(telegramToken);
   }
 
   if (composeSuccess) {
-    const lines = [''];
-    lines.push(`  ${k.bold('Portal')}     http://localhost:4000`);
-    if (botUsername) lines.push(`  ${k.bold('Telegram')}   @${botUsername}  ← message me to start`);
-    lines.push(`  ${k.bold('Docs')}       https://docs.clawbridge.dev`);
-    lines.push('');
-    p.outro(k.green('✅ ClawBridge is running!') + lines.join('\n'));
+    const outroLines = [
+      k.green('✅ ClawBridge is running!'),
+      '',
+      `  • Portal:    ${k.bold('http://localhost:4000')}`,
+    ];
+    if (botUsername) {
+      outroLines.push(`  • Telegram:  ${k.bold('@' + botUsername)}  ← message me to start`);
+    } else if (telegramToken) {
+      outroLines.push(`  • Telegram:  configured ← message your bot to start`);
+    }
+    outroLines.push(`  • Docs:      ${k.bold('https://docs.clawbridge.dev')}`);
+    p.outro(outroLines.join('\n'));
   } else {
     p.outro(
       k.red('✗ Docker compose failed') +
-        ` — your .env is saved at ~/.clawbridge/.env\n  To start manually: cd ~/.clawbridge && docker compose up -d`,
+        ` — your .env is saved at ~/.clawbridge/.env
+  To start manually: cd ~/.clawbridge && docker compose up -d`,
     );
   }
 }
@@ -901,10 +917,6 @@ async function runMigrationFlow(): Promise<void> {
   if (existingAdminEmail && existingAdminPassword) {
     p.log.success('Admin credentials found in source ✓');
   }
-  const { email: migratedAdminEmail, password: migratedAdminPassword } = await promptAdminCreds({
-    email: existingAdminEmail,
-    password: existingAdminPassword,
-  });
 
   // Step E — Hindsight (skip if already configured in source)
   const {

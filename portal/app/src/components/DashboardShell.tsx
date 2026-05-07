@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import clsx from 'clsx';
 import {
@@ -11,12 +11,10 @@ import {
   GitBranch,
   BarChart2,
   Settings,
-  LogOut,
   ChevronLeft,
   ChevronRight,
   Bell,
 } from 'lucide-react';
-import { clearToken } from '@/lib/auth';
 
 const navItems = [
   { href: '/dashboard',              label: 'Overview',   icon: LayoutDashboard },
@@ -55,13 +53,7 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ children, alertCount = 2 }: DashboardShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-
-  function handleLogout() {
-    clearToken();
-    router.push('/login');
-  }
 
   return (
     <div className="min-h-screen bg-[#080B10] flex">
@@ -113,7 +105,7 @@ export default function DashboardShell({ children, alertCount = 2 }: DashboardSh
           })}
         </nav>
 
-        {/* Collapse toggle + Logout */}
+        {/* Collapse toggle */}
         <div className="p-2 border-t border-[#252C38] space-y-0.5">
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -129,17 +121,6 @@ export default function DashboardShell({ children, alertCount = 2 }: DashboardSh
                 Collapse
               </>
             )}
-          </button>
-          <button
-            onClick={handleLogout}
-            title={collapsed ? 'Sign out' : undefined}
-            className={clsx(
-              'flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-[14px] font-semibold text-[#8892A0] hover:text-[#C8D0DC] hover:bg-[#1A1F28] transition-colors',
-              collapsed && 'justify-center'
-            )}
-          >
-            <LogOut size={15} strokeWidth={2} />
-            {!collapsed && 'Sign out'}
           </button>
         </div>
       </aside>
