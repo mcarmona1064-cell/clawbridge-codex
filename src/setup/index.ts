@@ -340,7 +340,7 @@ async function verifyTelegramChannel(token: string): Promise<string | undefined>
   try {
     const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
     if (meRes.ok) {
-      const meData = await meRes.json() as { ok: boolean; result?: { username?: string } };
+      const meData = (await meRes.json()) as { ok: boolean; result?: { username?: string } };
       botUsername = meData.result?.username;
     }
   } catch {
@@ -360,7 +360,7 @@ async function verifyTelegramChannel(token: string): Promise<string | undefined>
       const url = `https://api.telegram.org/bot${token}/getUpdates${offset !== undefined ? `?offset=${offset}` : ''}`;
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json() as { ok: boolean; result?: Array<{ update_id: number }> };
+        const data = (await res.json()) as { ok: boolean; result?: Array<{ update_id: number }> };
         if (data.ok && data.result && data.result.length > 0) {
           p.log.success('✅ Telegram is connected! Your bot is receiving messages.');
           return botUsername;
@@ -616,11 +616,7 @@ async function runFreshInstall(): Promise<void> {
   }
 
   if (composeSuccess) {
-    const outroLines = [
-      k.green('✅ ClawBridge is running!'),
-      '',
-      `  • Portal:    ${k.bold('http://localhost:4000')}`,
-    ];
+    const outroLines = [k.green('✅ ClawBridge is running!'), '', `  • Portal:    ${k.bold('http://localhost:4000')}`];
     if (botUsername) {
       outroLines.push(`  • Telegram:  ${k.bold('@' + botUsername)}  ← message me to start`);
     } else if (telegramToken) {
