@@ -291,6 +291,232 @@ function checkConfigFile(env: Map<string, string>): void {
   }
 }
 
+// ─── Channel checks ───────────────────────────────────────────────────────────
+
+async function fixAndVerifyChannel(
+  channelName: string,
+  verify: () => Promise<boolean>,
+): Promise<void> {
+  console.log(`  🔄 Auto-fix: restarting ClawBridge service for ${channelName}…`);
+
+  // Restart service
+  try {
+    const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
+    const plists = fs.readdirSync(launchAgentsDir)
+      .filter(f => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+    if (plists.length > 0) {
+      const label = plists[0].replace(/\.plist$/, '');
+      const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+      spawnSync('launchctl', ['kickstart', '-k', `gui/${uid}/${label}`], {
+        encoding: 'utf-8', timeout: 15000,
+      });
+    }
+  } catch { /* ignore restart errors — we'll verify below */ }
+
+  // Poll until channel responds or timeout
+  const maxAttempts = 5;
+  const delays = [5000, 10000, 10000, 15000, 20000]; // escalating wait
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const waitSec = Math.round((delays[attempt - 1] ?? 10000) / 1000);
+    process.stdout.write(`  ⏳ Waiting ${waitSec}s for ${channelName} to reconnect (attempt ${attempt}/${maxAttempts})…`);
+    await new Promise(r => setTimeout(r, delays[attempt - 1] ?? 10000));
+    process.stdout.write('\r' + ' '.repeat(80) + '\r');
+
+    const connected = await verify();
+    if (connected) {
+      console.log(`  ✅ ${channelName} reconnected successfully!`);
+      return;
+    }
+  }
+
+  console.log(`  ❌ ${channelName} still not responding after ${maxAttempts} attempts. Check logs: tail -f ~/.clawbridge/logs/agent.log`);
+}
+
+async function verifyTelegram(token: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: controller.signal });
+    const data = await res.json() as { ok: boolean };
+    return data.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function checkTelegram(env: Map<string, string>, autoFix: boolean): Promise<void> {
+  const token = env.get('TELEGRAM_BOT_TOKEN');
+  if (!token) return; // not configured — skip silently
+
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: controller.signal });
+    const data = await res.json() as { ok: boolean; result?: { username: string; first_name: string } };
+    if (data.ok && data.result) {
+      pass('Telegram', `@${data.result.username} (${data.result.first_name})`);
+    } else {
+      fail('Telegram', 'bot token invalid or bot unreachable', 'check TELEGRAM_BOT_TOKEN in ~/.clawbridge/.env');
+      if (autoFix) {
+        await fixAndVerifyChannel('Telegram', () => verifyTelegram(token));
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    fail('Telegram', `unreachable (${msg})`, 'check internet connection or TELEGRAM_BOT_TOKEN');
+    if (autoFix) {
+      await fixAndVerifyChannel('Telegram', () => verifyTelegram(token));
+    }
+  }
+}
+
+async function checkWhatsApp(env: Map<string, string>): Promise<void> {
+  const phoneNumberId = env.get('WHATSAPP_PHONE_NUMBER_ID');
+  const accessToken = env.get('WHATSAPP_ACCESS_TOKEN');
+
+  if (!phoneNumberId && !accessToken) return; // not configured
+
+  if (!phoneNumberId) {
+    fail('WhatsApp', 'WHATSAPP_PHONE_NUMBER_ID missing', 'check WHATSAPP_PHONE_NUMBER_ID in ~/.clawbridge/.env');
+    return;
+  }
+  if (!accessToken) {
+    fail('WhatsApp', 'WHATSAPP_ACCESS_TOKEN missing', 'check WHATSAPP_ACCESS_TOKEN in ~/.clawbridge/.env');
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name`,
+      {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    const data = await res.json() as { display_phone_number?: string; verified_name?: string; error?: { message: string } };
+    if (res.ok && data.display_phone_number) {
+      pass('WhatsApp', `${data.verified_name ?? ''} (${data.display_phone_number})`);
+    } else {
+      const errMsg = data.error?.message ?? `HTTP ${res.status}`;
+      fail('WhatsApp', `API error: ${errMsg}`, 'check WHATSAPP_ACCESS_TOKEN in ~/.clawbridge/.env');
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    fail('WhatsApp', `unreachable (${msg})`, 'check internet connection or WHATSAPP_ACCESS_TOKEN');
+  }
+}
+
+async function verifyDiscord(token: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('https://discord.com/api/v10/users/@me', {
+      signal: controller.signal,
+      headers: { Authorization: `Bot ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function checkDiscord(env: Map<string, string>, autoFix: boolean): Promise<void> {
+  const token = env.get('DISCORD_TOKEN') || env.get('DISCORD_BOT_TOKEN');
+  if (!token) return;
+
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('https://discord.com/api/v10/users/@me', {
+      signal: controller.signal,
+      headers: { Authorization: `Bot ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json() as { username: string; discriminator: string };
+      pass('Discord', `${data.username}#${data.discriminator}`);
+    } else {
+      fail('Discord', `bot token rejected (HTTP ${res.status})`, 'check DISCORD_BOT_TOKEN in ~/.clawbridge/.env');
+      if (autoFix) {
+        await fixAndVerifyChannel('Discord', () => verifyDiscord(token));
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    fail('Discord', `unreachable (${msg})`, 'check internet connection');
+    if (autoFix) {
+      await fixAndVerifyChannel('Discord', () => verifyDiscord(token));
+    }
+  }
+}
+
+async function verifySlack(token: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('https://slack.com/api/auth.test', {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json() as { ok: boolean };
+    return data.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function checkSlack(env: Map<string, string>, autoFix: boolean): Promise<void> {
+  const token = env.get('SLACK_BOT_TOKEN');
+  if (!token) return;
+
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('https://slack.com/api/auth.test', {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json() as { ok: boolean; bot_id?: string; team?: string; error?: string };
+    if (data.ok) {
+      pass('Slack', `${data.team ?? ''} (bot_id: ${data.bot_id ?? 'unknown'})`);
+    } else {
+      fail('Slack', `auth failed: ${data.error ?? 'unknown'}`, 'check SLACK_BOT_TOKEN in ~/.clawbridge/.env');
+      if (autoFix) {
+        await fixAndVerifyChannel('Slack', () => verifySlack(token));
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    fail('Slack', `unreachable (${msg})`, 'check internet connection');
+    if (autoFix) {
+      await fixAndVerifyChannel('Slack', () => verifySlack(token));
+    }
+  }
+}
+
+async function checkChannels(env: Map<string, string>, autoFix: boolean): Promise<void> {
+  const hasAnyChannel = [
+    'TELEGRAM_BOT_TOKEN',
+    'DISCORD_TOKEN',
+    'DISCORD_BOT_TOKEN',
+    'SLACK_BOT_TOKEN',
+    'WHATSAPP_PHONE_NUMBER_ID',
+    'WHATSAPP_ACCESS_TOKEN',
+  ].some(k => env.get(k));
+
+  if (!hasAnyChannel) {
+    console.log(`  ${dim('No channels configured — run: clawbridge setup')}`);
+    return;
+  }
+
+  await checkTelegram(env, autoFix);
+  await checkWhatsApp(env);
+  await checkDiscord(env, autoFix);
+  await checkSlack(env, autoFix);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export async function runDoctor(): Promise<void> {
@@ -304,6 +530,11 @@ export async function runDoctor(): Promise<void> {
   console.log(divider);
 
   const env = readDotEnv();
+
+  const autoFix = process.argv.includes('--fix');
+  if (autoFix) {
+    console.log(dim('  (auto-fix mode enabled)'));
+  }
 
   // ── System ───────────────────────────────────────────────────────────────
   console.log('');
@@ -322,6 +553,11 @@ export async function runDoctor(): Promise<void> {
   checkContainers();
   checkContainerImage();
   await checkHindsightHealth(env);
+
+  // ── Channels ─────────────────────────────────────────────────────────────
+  console.log('');
+  console.log(bold('Channels'));
+  await checkChannels(env, autoFix);
 
   // ── Storage ──────────────────────────────────────────────────────────────
   console.log('');
