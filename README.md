@@ -26,32 +26,22 @@ ClawBridge provides that same core functionality, but in a codebase small enough
 ## Quick Start
 
 ```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/other2368-byte/clawbridge-agent/main/clawbridge.sh)
+```
+
+One command — installs Node, pnpm, and Docker if missing, then walks you through setup interactively. Works on a fresh machine.
+
+Or if you already have Node installed:
+
+```bash
 npx clawbridge-agent setup
 ```
 
-The interactive wizard walks you through fresh install or migration from OpenClaw/NanoClaw in minutes.
-
-Or migrate from an existing install:
+To migrate from an existing install:
 
 ```bash
 npx clawbridge-agent setup --migrate
 ```
-
-**From a local checkout:**
-
-```bash
-git clone https://github.com/other2368-byte/clawbridge-agent.git clawbridge-v2
-cd clawbridge-v2
-pnpm run setup:wizard
-```
-
-`clawbridge.sh` is also available for automated/scripted installs:
-
-```bash
-bash clawbridge.sh
-```
-
-`clawbridge.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if missing, writes your Claude credential to `~/.clawbridge/.env`, builds the agent container, and pairs your first channel (Telegram, Discord, WhatsApp, or a local CLI). If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
 
 ## Features
 
@@ -244,3 +234,4 @@ See [CHANGELOG.md](CHANGELOG.md) for breaking changes, or the [full release hist
 ## License
 
 MIT
+
