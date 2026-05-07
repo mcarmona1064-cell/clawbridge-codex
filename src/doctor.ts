@@ -150,7 +150,21 @@ function checkContainers(): void {
 
 function checkContainerImage(): void {
   try {
-    const imageTag = getDefaultContainerImage();
+    // Derive the image tag from the installed launchd plist (source of truth for
+    // this install's slug), not from process.cwd() which gives the wrong slug
+    // when doctor is run from any directory other than the package root.
+    let imageTag: string | undefined;
+    try {
+      const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
+      const plist = fs
+        .readdirSync(launchAgentsDir)
+        .find((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+      if (plist) {
+        const slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
+        imageTag = `clawbridge-agent-v2-${slug}:latest`;
+      }
+    } catch { /* fall through to default */ }
+    if (!imageTag) imageTag = getDefaultContainerImage();
     const r = spawnSync('docker', ['image', 'inspect', imageTag], {
       encoding: 'utf-8',
       timeout: 8000,
@@ -293,25 +307,26 @@ function checkConfigFile(env: Map<string, string>): void {
 
 // ─── Channel checks ───────────────────────────────────────────────────────────
 
-async function fixAndVerifyChannel(
-  channelName: string,
-  verify: () => Promise<boolean>,
-): Promise<void> {
+async function fixAndVerifyChannel(channelName: string, verify: () => Promise<boolean>): Promise<void> {
   console.log(`  🔄 Auto-fix: restarting ClawBridge service for ${channelName}…`);
 
   // Restart service
   try {
     const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
-    const plists = fs.readdirSync(launchAgentsDir)
-      .filter(f => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+    const plists = fs
+      .readdirSync(launchAgentsDir)
+      .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
     if (plists.length > 0) {
       const label = plists[0].replace(/\.plist$/, '');
       const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
       spawnSync('launchctl', ['kickstart', '-k', `gui/${uid}/${label}`], {
-        encoding: 'utf-8', timeout: 15000,
+        encoding: 'utf-8',
+        timeout: 15000,
       });
     }
-  } catch { /* ignore restart errors — we'll verify below */ }
+  } catch {
+    /* ignore restart errors — we'll verify below */
+  }
 
   // Poll until channel responds or timeout
   const maxAttempts = 5;
@@ -319,8 +334,10 @@ async function fixAndVerifyChannel(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const waitSec = Math.round((delays[attempt - 1] ?? 10000) / 1000);
-    process.stdout.write(`  ⏳ Waiting ${waitSec}s for ${channelName} to reconnect (attempt ${attempt}/${maxAttempts})…`);
-    await new Promise(r => setTimeout(r, delays[attempt - 1] ?? 10000));
+    process.stdout.write(
+      `  ⏳ Waiting ${waitSec}s for ${channelName} to reconnect (attempt ${attempt}/${maxAttempts})…`,
+    );
+    await new Promise((r) => setTimeout(r, delays[attempt - 1] ?? 10000));
     process.stdout.write('\r' + ' '.repeat(80) + '\r');
 
     const connected = await verify();
@@ -330,7 +347,9 @@ async function fixAndVerifyChannel(
     }
   }
 
-  console.log(`  ❌ ${channelName} still not responding after ${maxAttempts} attempts. Check logs: tail -f ~/.clawbridge/logs/agent.log`);
+  console.log(
+    `  ❌ ${channelName} still not responding after ${maxAttempts} attempts. Check logs: tail -f ~/.clawbridge/logs/agent.log`,
+  );
 }
 
 async function verifyTelegram(token: string): Promise<boolean> {
@@ -338,7 +357,7 @@ async function verifyTelegram(token: string): Promise<boolean> {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: controller.signal });
-    const data = await res.json() as { ok: boolean };
+    const data = (await res.json()) as { ok: boolean };
     return data.ok === true;
   } catch {
     return false;
@@ -353,7 +372,7 @@ async function checkTelegram(env: Map<string, string>, autoFix: boolean): Promis
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: controller.signal });
-    const data = await res.json() as { ok: boolean; result?: { username: string; first_name: string } };
+    const data = (await res.json()) as { ok: boolean; result?: { username: string; first_name: string } };
     if (data.ok && data.result) {
       pass('Telegram', `@${data.result.username} (${data.result.first_name})`);
     } else {
@@ -396,7 +415,11 @@ async function checkWhatsApp(env: Map<string, string>): Promise<void> {
         headers: { Authorization: `Bearer ${accessToken}` },
       },
     );
-    const data = await res.json() as { display_phone_number?: string; verified_name?: string; error?: { message: string } };
+    const data = (await res.json()) as {
+      display_phone_number?: string;
+      verified_name?: string;
+      error?: { message: string };
+    };
     if (res.ok && data.display_phone_number) {
       pass('WhatsApp', `${data.verified_name ?? ''} (${data.display_phone_number})`);
     } else {
@@ -435,7 +458,7 @@ async function checkDiscord(env: Map<string, string>, autoFix: boolean): Promise
       headers: { Authorization: `Bot ${token}` },
     });
     if (res.ok) {
-      const data = await res.json() as { username: string; discriminator: string };
+      const data = (await res.json()) as { username: string; discriminator: string };
       pass('Discord', `${data.username}#${data.discriminator}`);
     } else {
       fail('Discord', `bot token rejected (HTTP ${res.status})`, 'check DISCORD_BOT_TOKEN in ~/.clawbridge/.env');
@@ -460,7 +483,7 @@ async function verifySlack(token: string): Promise<boolean> {
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json() as { ok: boolean };
+    const data = (await res.json()) as { ok: boolean };
     return data.ok === true;
   } catch {
     return false;
@@ -478,7 +501,7 @@ async function checkSlack(env: Map<string, string>, autoFix: boolean): Promise<v
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await res.json() as { ok: boolean; bot_id?: string; team?: string; error?: string };
+    const data = (await res.json()) as { ok: boolean; bot_id?: string; team?: string; error?: string };
     if (data.ok) {
       pass('Slack', `${data.team ?? ''} (bot_id: ${data.bot_id ?? 'unknown'})`);
     } else {
@@ -504,7 +527,7 @@ async function checkChannels(env: Map<string, string>, autoFix: boolean): Promis
     'SLACK_BOT_TOKEN',
     'WHATSAPP_PHONE_NUMBER_ID',
     'WHATSAPP_ACCESS_TOKEN',
-  ].some(k => env.get(k));
+  ].some((k) => env.get(k));
 
   if (!hasAnyChannel) {
     console.log(`  ${dim('No channels configured — run: clawbridge setup')}`);

@@ -58,6 +58,12 @@ if (process.argv[2] === 'chat') {
   process.exit(0);
 }
 
+if (process.argv[2] === 'build-image') {
+  console.log('Building ClawBridge agent container image…');
+  const ok = await buildContainerImage();
+  process.exit(ok ? 0 : 1);
+}
+
 // Silent version check on startup (non-blocking)
 checkForUpdate().catch(() => {});
 
