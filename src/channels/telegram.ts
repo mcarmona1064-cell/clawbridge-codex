@@ -17,6 +17,7 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import type { ChannelAdapter, ChannelSetup, InboundMessage, OutboundFile, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
+import { interceptPairingMessage } from './telegram-pairing.js';
 
 const API_BASE = 'https://api.telegram.org';
 const LONG_POLL_TIMEOUT_S = 25;
@@ -334,6 +335,9 @@ function createAdapter(): ChannelAdapter | null {
     if (!text) return; // photo/sticker/etc without text — ignore for v1
     const platformId = platformIdFor(msg.chat.id);
     const isGroup = msg.chat.type !== 'private';
+    // Intercept pairing codes during setup — swallow the message if consumed.
+    const adminUserId = msg.from ? String(msg.from.id) : undefined;
+    if (interceptPairingMessage(text, platformId, isGroup, adminUserId)) return;
     const isMention = detectMention(msg, botUsername) || msg.chat.type === 'private';
 
     const inbound: InboundMessage = {
