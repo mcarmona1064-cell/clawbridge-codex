@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 
 import {
+  AGENT_PROVIDER,
   CODEX_CONTAINER_IMAGE,
   CONTAINER_IMAGE,
   CONTAINER_IMAGE_BASE,
@@ -233,7 +234,7 @@ export function resolveProviderName(
   agentGroupProvider: string | null | undefined,
   containerConfigProvider: string | null | undefined,
 ): string {
-  return (sessionProvider || agentGroupProvider || containerConfigProvider || 'claude').toLowerCase();
+  return (sessionProvider || agentGroupProvider || containerConfigProvider || AGENT_PROVIDER).toLowerCase();
 }
 
 function resolveProviderContribution(

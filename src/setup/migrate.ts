@@ -762,10 +762,7 @@ export async function runMigration(
           }
         }
         if (linesToAdd.length > 0) {
-          fs.appendFileSync(
-            clawbridgeEnvPath,
-            `\n# Migrated from ${source.type}\n${linesToAdd.join('\n')}\n`,
-          );
+          fs.appendFileSync(clawbridgeEnvPath, `\n# Migrated from ${source.type}\n${linesToAdd.join('\n')}\n`);
           emit('credentials', `  Merged ${linesToAdd.length} channel credential(s) into .env`);
         }
       }
@@ -1261,10 +1258,21 @@ export async function verifyMigration(
     const waExists = fs.existsSync(waCredDir) && fs.readdirSync(waCredDir).length > 0;
     if (!waExists) {
       // Non-fatal: WhatsApp may not have been configured in source
-      const waSource = ['config/whatsapp', 'session', 'auth_info_baileys', 'whatsapp-session', 'store/whatsapp', 'data/whatsapp', '.wwebjs_auth']
-        .some((rel) => fs.existsSync(path.join(source.path, rel)));
+      const waSource = [
+        'config/whatsapp',
+        'session',
+        'auth_info_baileys',
+        'whatsapp-session',
+        'store/whatsapp',
+        'data/whatsapp',
+        '.wwebjs_auth',
+      ].some((rel) => fs.existsSync(path.join(source.path, rel)));
       if (waSource) {
-        checks.push({ label: 'WhatsApp Credentials', passed: false, message: 'WhatsApp credentials: source found but not copied ⚠' });
+        checks.push({
+          label: 'WhatsApp Credentials',
+          passed: false,
+          message: 'WhatsApp credentials: source found but not copied ⚠',
+        });
       }
     } else {
       checks.push({ label: 'WhatsApp Credentials', passed: true, message: 'WhatsApp credentials: present ✓' });
@@ -1289,12 +1297,9 @@ export async function verifyMigration(
     const clawbridgeEnvPath = path.join(CLAWBRIDGE_HOME, '.env');
     if (fs.existsSync(clawbridgeEnvPath)) {
       const envContent = fs.readFileSync(clawbridgeEnvPath, 'utf-8');
-      const hasSomeToken = [
-        /TELEGRAM_BOT_TOKEN=/,
-        /DISCORD_TOKEN=/,
-        /SLACK_BOT_TOKEN=/,
-        /WHATSAPP_SESSION=/,
-      ].some((pat) => pat.test(envContent));
+      const hasSomeToken = [/TELEGRAM_BOT_TOKEN=/, /DISCORD_TOKEN=/, /SLACK_BOT_TOKEN=/, /WHATSAPP_SESSION=/].some(
+        (pat) => pat.test(envContent),
+      );
       if (!hasSomeToken) {
         checks.push({
           label: '.env Tokens',
@@ -1316,10 +1321,17 @@ export async function verifyMigration(
     // Check whether the systemd/launchd service is still running
     const isMac = process.platform === 'darwin';
     if (!isMac) {
-      const result = spawnSync('systemctl', ['--user', 'is-active', source.type], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const result = spawnSync('systemctl', ['--user', 'is-active', source.type], {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
       const isActive = (result.stdout ?? '').trim() === 'active';
       if (isActive) {
-        checks.push({ label: 'Service', passed: false, message: `${source.type} systemd service still active — stop it to avoid conflicts` });
+        checks.push({
+          label: 'Service',
+          passed: false,
+          message: `${source.type} systemd service still active — stop it to avoid conflicts`,
+        });
       }
     }
   }

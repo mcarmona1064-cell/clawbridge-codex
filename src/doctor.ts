@@ -10,6 +10,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDefaultContainerImage } from './install-slug.js';
+import { AGENT_PROVIDER } from './config.js';
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -566,7 +567,6 @@ async function checkChannels(env: Map<string, string>, autoFix: boolean): Promis
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-
 function checkCodex(env: Map<string, string>): void {
   // Only check if any agent group uses codex provider
   // We detect this by looking for codex CLI on PATH — if it's installed,
@@ -612,7 +612,9 @@ function checkCodex(env: Map<string, string>): void {
         const slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
         codexImageTag = `clawbridge-agent-v2-${slug}-codex:latest`;
       }
-    } catch { /* non-macOS or no plist */ }
+    } catch {
+      /* non-macOS or no plist */
+    }
 
     if (!codexImageTag) {
       codexImageTag = 'clawbridge-agent-v2-codex:latest';
@@ -630,6 +632,59 @@ function checkCodex(env: Map<string, string>): void {
     }
   } catch {
     fail('Codex image', 'docker unavailable', 'start Docker Desktop');
+  }
+}
+
+function checkProvider(env: Map<string, string>): void {
+  // Report current provider
+  pass('AGENT_PROVIDER', AGENT_PROVIDER);
+
+  if (AGENT_PROVIDER === 'codex') {
+    // Verify codex binary
+    const versionResult = spawnSync('codex', ['--version'], { encoding: 'utf-8', timeout: 8000, stdio: 'pipe' });
+    if (versionResult.status === 0 && versionResult.stdout.trim()) {
+      pass('Codex CLI', versionResult.stdout.trim());
+    } else {
+      fail('Codex CLI', 'installed but --version failed', 'try: npm install -g @openai/codex@latest');
+    }
+
+    // Verify ~/.codex/auth.json
+    const codexCredsPath = path.join(os.homedir(), '.codex', 'auth.json');
+    try {
+      const creds = JSON.parse(fs.readFileSync(codexCredsPath, 'utf-8'));
+      if (creds?.tokens?.access_token || creds?.api_key || creds?.accessToken || creds?.token) {
+        pass('Codex auth', dim('token found'));
+      } else {
+        fail('Codex auth', '~/.codex/auth.json has no token', 'run: codex login --device-auth');
+      }
+    } catch {
+      fail('Codex auth', '~/.codex/auth.json not found', 'run: codex login --device-auth');
+    }
+  } else {
+    // Claude: check CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
+    const oauthToken = env.get('CLAUDE_CODE_OAUTH_TOKEN');
+    const apiKey = env.get('ANTHROPIC_API_KEY');
+    if (oauthToken) {
+      pass('Claude auth', dim('CLAUDE_CODE_OAUTH_TOKEN set'));
+    } else if (apiKey) {
+      pass('Claude auth', dim('ANTHROPIC_API_KEY set'));
+    } else {
+      fail('Claude auth', 'no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY', 'run: claude setup-token');
+    }
+  }
+
+  // Check HINDSIGHT_API_LLM_PROVIDER matches expected value (if HINDSIGHT_URL is set)
+  const hindsightUrl = env.get('HINDSIGHT_URL');
+  if (hindsightUrl) {
+    const expectedLlmProvider = AGENT_PROVIDER === 'codex' ? 'openai-codex' : 'claude-code';
+    const actualLlmProvider = env.get('HINDSIGHT_API_LLM_PROVIDER');
+    if (!actualLlmProvider) {
+      fail('HINDSIGHT_API_LLM_PROVIDER', 'not set (Hindsight LLM will use default)', `set to ${expectedLlmProvider} in ~/.clawbridge/.env`);
+    } else if (actualLlmProvider !== expectedLlmProvider) {
+      fail('HINDSIGHT_API_LLM_PROVIDER', `${actualLlmProvider} (expected ${expectedLlmProvider})`, `update to ${expectedLlmProvider} in ~/.clawbridge/.env`);
+    } else {
+      pass('HINDSIGHT_API_LLM_PROVIDER', dim(actualLlmProvider));
+    }
   }
 }
 
@@ -660,6 +715,11 @@ export async function runDoctor(): Promise<void> {
   console.log('');
   console.log(bold(`Config (${dim('~/.clawbridge/.env')})`));
   checkConfigFile(env);
+
+  // ── Provider ─────────────────────────────────────────────────────────────
+  console.log('');
+  console.log(bold('Provider'));
+  checkProvider(env);
 
   // ── Services ─────────────────────────────────────────────────────────────
   console.log('');

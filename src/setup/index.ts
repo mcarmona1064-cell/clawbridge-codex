@@ -487,7 +487,6 @@ function checkNodePrerequisites(): void {
   // Skip the check to avoid blocking fresh installs that don't have pnpm.
 }
 
-
 // ─── Codex auth ───────────────────────────────────────────────────────────────
 
 async function setupCodexAuth(): Promise<void> {
@@ -520,7 +519,9 @@ async function setupCodexAuth(): Promise<void> {
         p.log.success('Codex authentication found ✓');
         return;
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   // 3. Run codex login --device-auth interactively
@@ -644,6 +645,41 @@ async function runFreshInstall(): Promise<void> {
   }
 
   fs.writeFileSync(envPath, envContent);
+
+  // Append AGENT_PROVIDER to .env
+  fs.appendFileSync(envPath, `
+AGENT_PROVIDER=${providerChoice}
+`);
+
+  // Hindsight auto-config: write LLM provider settings if HINDSIGHT_URL is set
+  // and these vars are not already present
+  if (cfg.hindsightUrl) {
+    const existingForHindsight = parseEnvFile(envPath);
+    const hindsightLines: string[] = [''];
+    const hindsightProviderVars =
+      providerChoice === 'codex'
+        ? {
+            HINDSIGHT_API_LLM_PROVIDER: 'openai-codex',
+            HINDSIGHT_API_LLM_MODEL: 'gpt-5.4-mini',
+            HINDSIGHT_API_RETAIN_LLM_MODEL: 'gpt-5.4-mini',
+            HINDSIGHT_API_REFLECT_LLM_MODEL: 'gpt-5.4-mini',
+          }
+        : {
+            HINDSIGHT_API_LLM_PROVIDER: 'claude-code',
+            HINDSIGHT_API_LLM_MODEL: 'claude-haiku-4-20250514',
+            HINDSIGHT_API_RETAIN_LLM_MODEL: 'claude-haiku-4-20250514',
+            HINDSIGHT_API_REFLECT_LLM_MODEL: 'claude-sonnet-4-20250514',
+          };
+    for (const [key, value] of Object.entries(hindsightProviderVars)) {
+      if (!existingForHindsight.get(key)) {
+        hindsightLines.push(`${key}=${value}`);
+      }
+    }
+    if (hindsightLines.length > 1) {
+      fs.appendFileSync(envPath, hindsightLines.join('\n') + '\n');
+    }
+  }
+
   p.log.success(`.env written to ~/.clawbridge/.env`);
 
   // docker compose up

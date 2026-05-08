@@ -215,14 +215,18 @@ export async function runUpgrade(): Promise<void> {
       const globalRoot = npmRootForClean.stdout.trim();
       try {
         fs.rmSync(path.join(globalRoot, 'clawbridge-agent'), { recursive: true, force: true });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       try {
         for (const entry of fs.readdirSync(globalRoot)) {
           if (entry.startsWith('.clawbridge-agent-')) {
             fs.rmSync(path.join(globalRoot, entry), { recursive: true, force: true });
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
