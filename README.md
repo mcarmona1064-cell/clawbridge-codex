@@ -57,7 +57,7 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 | Custom persona & memory | DIY | Included |
 | Support | Community / GitHub | Direct email |
 
-📩 **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
+🌐 **[clawbridgeagency.com](https://clawbridgeagency.com)** • 📩 **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
 
 ---
 
@@ -233,7 +233,7 @@ Only security fixes, bug fixes, and clear improvements will be accepted to the b
 
 Questions? Ideas? [Join the Discord](https://discord.gg/VDdww8qS42).
 
-Need a managed setup? Email **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
+Need a managed setup? Visit **[clawbridgeagency.com](https://clawbridgeagency.com)** or email **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
 
 ## Changelog
 
