@@ -73,6 +73,7 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 - 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
 - 🛡️ **Prompt injection protection** — built-in skill guards against malicious message injection attacks
 - 🤝 **Multi-agent orchestration** — agents can delegate tasks to other specialist agents, pass files between them, and run parallel workflows
+- ⚡ **In-session subagents** — Claude and Codex spawn parallel subagents natively within a single session for faster task execution, no extra setup needed
 - ⚡ **Skills system** — browser automation, web search, scheduling, self-customization, and more
 - 🚀 **Migrate from OpenClaw or NanoClaw** in minutes
 
