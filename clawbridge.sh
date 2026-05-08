@@ -22,6 +22,14 @@
 
 set -euo pipefail
 
+# ─── bootstrap: if running via bash <(curl ...) re-exec from a cloned copy ───
+if [[ "${BASH_SOURCE[0]}" == /dev/fd/* ]] || [[ ! -f "${BASH_SOURCE[0]%/*}/setup/lib/diagnostics.sh" ]]; then
+  CLONE_DIR="$(mktemp -d)/clawbridge-agent"
+  echo "Downloading ClawBridge..."
+  git clone --depth 1 --quiet https://github.com/other2368-byte/clawbridge-agent.git "$CLONE_DIR"
+  exec bash "$CLONE_DIR/clawbridge.sh" "$@"
+fi
+
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
