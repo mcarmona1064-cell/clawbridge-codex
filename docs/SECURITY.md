@@ -64,18 +64,15 @@ Messages and task operations are verified against group identity:
 | View all tasks | ✓ | Own only |
 | Manage other groups | ✓ | ✗ |
 
-### 5. Credential Isolation (OneCLI Agent Vault)
+### 5. Credential Isolation (.env injection)
 
-Real API credentials **never enter containers**. ClawBridge uses [OneCLI's Agent Vault](https://github.com/onecli/onecli) to proxy outbound requests and inject credentials at the gateway level.
+Real API credentials **never enter containers** directly. ClawBridge reads credentials from `~/.clawbridge/.env` at container spawn time and injects them as environment variables only into the container process — they are not stored in the image or any mount the agent can read.
 
 **How it works:**
-1. Credentials are registered once with `onecli secrets create`, stored and managed by OneCLI
-2. When ClawBridge spawns a container, it calls `applyContainerConfig()` to route outbound HTTPS through the OneCLI gateway
-3. The gateway matches requests by host and path, injects the real credential, and forwards
-4. Agents cannot discover real credentials — not in environment, stdin, files, or `/proc`
-
-**Per-agent policies:**
-Each ClawBridge group gets its own OneCLI agent identity. This allows different credential policies per group (e.g. your sales agent vs. support agent). OneCLI supports rate limits, and time-bound access and approval flows are on the roadmap.
+1. Credentials are stored in `~/.clawbridge/.env` on the host (mode 0600, never committed)
+2. When ClawBridge spawns a container, `container-runner.ts` reads the credential and passes it via `-e` to `docker run`
+3. The credential is available inside the container only for the lifetime of that run
+4. Agents cannot read the host `.env` file — it is not mounted
 
 **NOT Mounted:**
 - Channel auth sessions (`store/auth/`) — host only
@@ -110,7 +107,7 @@ Each ClawBridge group gets its own OneCLI agent identity. This allows different 
 │  • IPC authorization                                              │
 │  • Mount validation (external allowlist)                          │
 │  • Container lifecycle                                            │
-│  • OneCLI Agent Vault (injects credentials, enforces policies)   │
+│  • Credential injection from ~/.clawbridge/.env at spawn time    │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Explicit mounts only, no secrets
@@ -119,7 +116,7 @@ Each ClawBridge group gets its own OneCLI agent identity. This allows different 
 │  • Agent execution                                                │
 │  • Bash commands (sandboxed)                                      │
 │  • File operations (limited to mounts)                            │
-│  • API calls routed through OneCLI Agent Vault                   │
+│  • API calls go directly to upstream services                    │
 │  • No real credentials in environment or filesystem              │
 └──────────────────────────────────────────────────────────────────┘
 ```

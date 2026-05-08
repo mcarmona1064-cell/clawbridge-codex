@@ -16,10 +16,9 @@ Last updated: 2026-04-09
 - Container image rebuilt with tsconfig (`container/agent-runner/tsconfig.json`)
 - E2E verified: host → Docker container → Claude responds → "E2E works!" ✓
 
-### OneCLI Integration
-- `ensureAgent()` call added before `applyContainerConfig()` in `src/container-runner.ts`
-- Without `ensureAgent`, OneCLI rejects unknown agent identifiers and returns false, leaving container with no credentials
-- E2E verified with OneCLI credential injection ✓
+### Credential Injection
+- Credentials are read from `~/.clawbridge/.env` in `src/container-runner.ts` and passed directly to `docker run` via `-e`
+- No proxy or gateway — credentials go directly to upstream API services
 
 ### Channel Barrel
 - `src/index.ts` imports `./channels/index.js` (the barrel)
@@ -95,7 +94,7 @@ Channel adapter → routeInbound() → resolve messaging_group → resolve agent
 | `src/session-manager.ts` | Creates inbound.db + outbound.db per session |
 | `src/delivery.ts` | Polls outbound.db, delivers, handles system actions |
 | `src/host-sweep.ts` | Syncs processing_ack, stale detection, recurrence |
-| `src/container-runner.ts` | Spawns containers, OneCLI ensureAgent + applyContainerConfig |
+| `src/container-runner.ts` | Spawns containers, injects credentials from .env |
 | `setup/register.ts` | Creates entities (agent_group, messaging_group, wiring) |
 | `setup/verify.ts` | Checks central DB for registered groups |
 | `container/agent-runner/src/db/connection.ts` | Two-DB connection layer (inbound read-only, outbound read-write) |

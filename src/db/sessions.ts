@@ -195,7 +195,7 @@ export function getPendingApprovalsByAction(action: string): PendingApproval[] {
 /**
  * Resolve ask_question render metadata (title + normalized options) for any
  * card, regardless of whether it was persisted as a pending_question (generic
- * ask_user_question) or a pending_approval (self-mod / OneCLI credential).
+ * ask_user_question) or a pending_approval (self-mod).
  */
 export function getAskQuestionRender(
   id: string,

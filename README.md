@@ -121,7 +121,7 @@ Both providers are fully isolated — choosing one won't interfere with the othe
 - **Scheduled tasks** — recurring jobs that run Claude or Codex and can message you back
 - **Web access** — search and fetch content from the web
 - **Container isolation** — agents are sandboxed in Docker (macOS/Linux/WSL2), with optional [Docker Sandboxes](docs/docker-sandboxes.md) micro-VM isolation or Apple Container as a macOS-native opt-in
-- **Credential security** — agents never hold raw API keys. Outbound requests route through OneCLI's Agent Vault, which injects credentials at request time and enforces per-agent policies and rate limits.
+- **Credential security** — agents never hold raw API keys. Credentials are injected directly from ~/.clawbridge/.env at container spawn time, so the agent process never sees them as environment variables it can exfiltrate.
 
 ## Usage
 

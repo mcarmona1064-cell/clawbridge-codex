@@ -1,35 +1,24 @@
 /**
- * Step: auth — Verify or register an Anthropic credential in OneCLI.
+ * Step: auth — Verify or write an Anthropic credential to .env.
  *
  * Modes:
- *   --check                   (default) Verify an Anthropic secret exists.
- *   --create --value <token>  Create an Anthropic secret. Errors if one
+ *   --check                   (default) Verify a credential exists in .env.
+ *   --create --value <token>  Write a credential to .env. Errors if one
  *                             already exists unless --force is passed.
  *
- * The actual user-facing prompt (subscription vs API key, paste the token)
- * stays in the /new-setup SKILL.md. This step is just the machine side:
- * it calls `onecli secrets list` / `onecli secrets create` and emits a
- * structured status block. The token value is never logged.
+ * Credentials are stored in .clawbridge/.env and injected at container spawn
+ * time by container-runner.ts. The token value is never logged.
  */
-import { execFileSync } from 'child_process';
-import os from 'os';
+import fs from 'fs';
 import path from 'path';
 
 import { log } from '../src/log.js';
 import { emitStatus } from './status.js';
 
-const LOCAL_BIN = path.join(os.homedir(), '.local', 'bin');
-
 interface Args {
   mode: 'check' | 'create';
   value?: string;
   force: boolean;
-}
-
-function childEnv(): NodeJS.ProcessEnv {
-  const parts = [LOCAL_BIN];
-  if (process.env.PATH) parts.push(process.env.PATH);
-  return { ...process.env, PATH: parts.join(path.delimiter) };
 }
 
 function parseArgs(args: string[]): Args {
@@ -69,118 +58,98 @@ function parseArgs(args: string[]): Args {
   return { mode, value, force };
 }
 
-interface OnecliSecret {
-  id: string;
-  name: string;
-  type: string;
-  hostPattern: string | null;
+const ENV_KEYS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'] as const;
+
+function readEnvFile(envFile: string): Record<string, string> {
+  if (!fs.existsSync(envFile)) return {};
+  const content = fs.readFileSync(envFile, 'utf-8');
+  const result: Record<string, string> = {};
+  for (const line of content.split('\n')) {
+    const m = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+    if (m) result[m[1]] = m[2];
+  }
+  return result;
 }
 
-function listSecrets(): OnecliSecret[] {
-  const out = execFileSync('onecli', ['secrets', 'list'], {
-    encoding: 'utf-8',
-    env: childEnv(),
-    stdio: ['ignore', 'pipe', 'ignore'],
-  });
-  const parsed = JSON.parse(out) as { data?: unknown };
-  return Array.isArray(parsed.data) ? (parsed.data as OnecliSecret[]) : [];
+function writeEnvKey(envFile: string, key: string, value: string): void {
+  let content = '';
+  if (fs.existsSync(envFile)) {
+    content = fs.readFileSync(envFile, 'utf-8');
+  }
+  const lineRegex = new RegExp(`^${key}=.*$`, 'm');
+  const newLine = `${key}=${value}`;
+  if (lineRegex.test(content)) {
+    content = content.replace(lineRegex, newLine);
+  } else {
+    const sep = content && !content.endsWith('\n') ? '\n' : '';
+    content = content + sep + newLine + '\n';
+  }
+  fs.mkdirSync(path.dirname(envFile), { recursive: true });
+  fs.writeFileSync(envFile, content, { mode: 0o600 });
 }
 
-function findAnthropicSecret(secrets: OnecliSecret[]): OnecliSecret | undefined {
-  return secrets.find((s) => s.type === 'anthropic');
-}
-
-function createAnthropicSecret(value: string): void {
-  // `value` is a credential — do not log it, do not echo, do not pass through a shell.
-  execFileSync(
-    'onecli',
-    [
-      'secrets',
-      'create',
-      '--name',
-      'Anthropic',
-      '--type',
-      'anthropic',
-      '--value',
-      value,
-      '--host-pattern',
-      'api.anthropic.com',
-    ],
-    {
-      env: childEnv(),
-      stdio: ['ignore', 'ignore', 'pipe'],
-    },
-  );
+function detectCredentialKey(value: string): 'CLAUDE_CODE_OAUTH_TOKEN' | 'ANTHROPIC_API_KEY' {
+  return value.startsWith('sk-ant-oat') ? 'CLAUDE_CODE_OAUTH_TOKEN' : 'ANTHROPIC_API_KEY';
 }
 
 export async function run(args: string[]): Promise<void> {
   const { mode, value, force } = parseArgs(args);
 
-  let secrets: OnecliSecret[];
-  try {
-    secrets = listSecrets();
-  } catch (err) {
-    log.error('onecli secrets list failed', { err });
-    emitStatus('AUTH', {
-      STATUS: 'failed',
-      ERROR: 'onecli_list_failed',
-      HINT: 'Is OneCLI running? Run `/new-setup` from the onecli step.',
-      LOG: 'logs/setup.log',
-    });
-    process.exit(1);
-  }
-
-  const existing = findAnthropicSecret(secrets);
+  const envFile = path.join(process.cwd(), '.env');
+  const env = readEnvFile(envFile);
+  const existingKey = ENV_KEYS.find((k) => env[k]);
 
   if (mode === 'check') {
     emitStatus('AUTH', {
-      SECRET_PRESENT: !!existing,
-      ANTHROPIC_OK: !!existing,
-      STATUS: existing ? 'success' : 'missing',
-      ...(existing ? { SECRET_NAME: existing.name, SECRET_ID: existing.id } : {}),
+      SECRET_PRESENT: !!existingKey,
+      ANTHROPIC_OK: !!existingKey,
+      STATUS: existingKey ? 'success' : 'missing',
+      ...(existingKey ? { ENV_KEY: existingKey } : {}),
       LOG: 'logs/setup.log',
     });
     return;
   }
 
   // mode === 'create'
-  if (existing && !force) {
+  if (existingKey && !force) {
     emitStatus('AUTH', {
       SECRET_PRESENT: true,
       STATUS: 'skipped',
-      REASON: 'anthropic_secret_already_exists',
-      SECRET_NAME: existing.name,
-      SECRET_ID: existing.id,
-      HINT: 'Re-run with --force to replace, or delete the existing secret first.',
+      REASON: 'credential_already_exists',
+      ENV_KEY: existingKey,
+      HINT: 'Re-run with --force to replace.',
       LOG: 'logs/setup.log',
     });
     return;
   }
 
+  const credKey = detectCredentialKey(value!);
+
   try {
-    createAnthropicSecret(value!);
+    writeEnvKey(envFile, credKey, value!);
+    log.info('Wrote credential to .env', { key: credKey });
   } catch (err) {
-    const e = err as { stderr?: string | Buffer; status?: number };
-    const stderr = typeof e.stderr === 'string' ? e.stderr : e.stderr?.toString('utf-8') ?? '';
-    log.error('onecli secrets create failed', { status: e.status, stderr });
+    const e = err as { message?: string };
+    log.error('Failed to write credential to .env', { err });
     emitStatus('AUTH', {
       STATUS: 'failed',
-      ERROR: 'onecli_create_failed',
-      EXIT_CODE: e.status ?? -1,
+      ERROR: 'env_write_failed',
+      DETAIL: e.message ?? String(err),
       LOG: 'logs/setup.log',
     });
     process.exit(1);
   }
 
   // Re-verify
-  const updated = findAnthropicSecret(listSecrets());
+  const updated = readEnvFile(envFile);
+  const ok = ENV_KEYS.some((k) => updated[k]);
 
   emitStatus('AUTH', {
-    SECRET_PRESENT: !!updated,
-    ANTHROPIC_OK: !!updated,
+    SECRET_PRESENT: ok,
+    ANTHROPIC_OK: ok,
     CREATED: true,
-    STATUS: updated ? 'success' : 'failed',
-    ...(updated ? { SECRET_NAME: updated.name, SECRET_ID: updated.id } : {}),
+    STATUS: ok ? 'success' : 'failed',
+    ENV_KEY: credKey,
     LOG: 'logs/setup.log',
   });
 }

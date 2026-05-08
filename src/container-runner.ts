@@ -463,7 +463,7 @@ async function buildContainerArgs(
     }
   }
 
-  // Inject credentials directly from ~/.clawbridge/.env (OneCLI removed in v2.0.33).
+  // Inject credentials directly from ~/.clawbridge/.env.
   // Skip for Codex — its auth comes from the ~/.codex bind-mount (see src/providers/codex.ts).
   // Forwarding Claude tokens into a Codex container would be a credentials cross-contamination.
   if (provider !== 'codex') {

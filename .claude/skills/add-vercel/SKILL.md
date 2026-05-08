@@ -1,11 +1,11 @@
 ---
 name: add-vercel
-description: Add Vercel deployment capability to ClawBridge agents. Installs the Vercel CLI in agent containers and sets up OneCLI credential injection for api.vercel.com. Use when the user wants agents to deploy web applications to Vercel.
+description: Add Vercel deployment capability to ClawBridge agents. Installs the Vercel CLI in agent containers and configures a Vercel API token for agents. Use when the user wants agents to deploy web applications to Vercel.
 ---
 
 # Add Vercel
 
-This skill gives ClawBridge agents the ability to deploy web applications to Vercel. It installs the Vercel CLI in agent containers and configures OneCLI to inject Vercel credentials automatically.
+This skill gives ClawBridge agents the ability to deploy web applications to Vercel. It installs the Vercel CLI in agent containers and configures a Vercel API token.
 
 **Principle:** Do the work — don't tell the user to do it. Only ask for their input when it genuinely requires manual action (pasting a token).
 
@@ -20,16 +20,6 @@ test -d container/skills/vercel-cli && echo "INSTALLED" || echo "NOT_INSTALLED"
 ```
 
 If `INSTALLED`, skip to Phase 3 (Configure Credentials).
-
-### Check prerequisites
-
-Verify OneCLI is working (required for credential injection):
-
-```bash
-onecli version 2>/dev/null && echo "ONECLI_OK" || echo "ONECLI_MISSING"
-```
-
-If `ONECLI_MISSING`, tell the user to run `/init-onecli` first, then retry `/add-vercel`. Stop here.
 
 ## Phase 2: Install Container Skill
 
