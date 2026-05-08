@@ -72,6 +72,7 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 - 👁 **Vision & document analysis** via Claude
 - 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
 - 🛡️ **Prompt injection protection** — built-in skill guards against malicious message injection attacks
+- 🤝 **Multi-agent orchestration** — agents can delegate tasks to other specialist agents, pass files between them, and run parallel workflows
 - ⚡ **Skills system** — browser automation, web search, scheduling, self-customization, and more
 - 🚀 **Migrate from OpenClaw or NanoClaw** in minutes
 
