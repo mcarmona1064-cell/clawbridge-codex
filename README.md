@@ -71,6 +71,7 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 - 📞 **Voice agents** via Retell AI
 - 👁 **Vision & document analysis** via Claude
 - 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
+- 🛡️ **Prompt injection protection** — built-in skill guards against malicious message injection attacks
 - ⚡ **Skills system** — browser automation, web search, scheduling, self-customization, and more
 - 🚀 **Migrate from OpenClaw or NanoClaw** in minutes
 
@@ -207,7 +208,7 @@ Yes. ClawBridge runs on macOS (local machine) and Linux VPS (Ubuntu, Debian, Cen
 
 **Is this secure?**
 
-Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. Credentials never enter the container raw — they're injected at spawn time and never written to disk inside the container.
+Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. Credentials never enter the container raw — they're injected at spawn time and never written to disk inside the container. For VPS hardening (SSH keys, firewall, fail2ban), see the [VPS hardening guide](docs/vps-hardening.md).
 
 **Do I need to pay per message?**
 
