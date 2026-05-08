@@ -82,18 +82,31 @@ function rebuildContainerImage(): boolean {
       console.log(`  ⚠  build.sh not found at ${buildScript} — skipping container rebuild.`);
       return false;
     }
-    const result = spawnSync('bash', [buildScript], {
+
+    // Detect provider from ~/.clawbridge/.env so we build the correct image.
+    const envPath = path.join(os.homedir(), '.clawbridge', '.env');
+    let provider = 'claude';
+    try {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      const match = envContent.match(/^AGENT_PROVIDER=(.+)$/m);
+      if (match?.[1]?.trim() === 'codex') provider = 'codex';
+    } catch { /* default to claude */ }
+
+    const buildArgs = provider === 'codex' ? ['--codex'] : [];
+    console.log(`  Building ${provider} container image\u2026`);
+
+    const result = spawnSync('bash', [buildScript, ...buildArgs], {
       stdio: 'inherit',
       encoding: 'utf-8',
       timeout: 5 * 60 * 1000, // 5 minutes
     });
     if (result.status !== 0) {
-      console.log('  ⚠  Container image build failed. Run manually: clawbridge build');
+      console.log('  \u26a0  Container image build failed. Run manually: clawbridge build-image');
       return false;
     }
     return true;
   } catch (err) {
-    console.log(`  ⚠  Container rebuild error: ${err instanceof Error ? err.message : String(err)}`);
+    console.log(`  \u26a0  Container rebuild error: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
 }

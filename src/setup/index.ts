@@ -515,7 +515,7 @@ async function setupCodexAuth(): Promise<void> {
   if (fs.existsSync(codexCredsPath)) {
     try {
       const creds = JSON.parse(fs.readFileSync(codexCredsPath, 'utf8'));
-      if (creds?.accessToken || creds?.token) {
+      if (creds?.tokens?.access_token || creds?.api_key || creds?.accessToken || creds?.token) {
         p.log.success('Codex authentication found ✓');
         return;
       }
@@ -647,9 +647,12 @@ async function runFreshInstall(): Promise<void> {
   fs.writeFileSync(envPath, envContent);
 
   // Append AGENT_PROVIDER to .env
-  fs.appendFileSync(envPath, `
+  fs.appendFileSync(
+    envPath,
+    `
 AGENT_PROVIDER=${providerChoice}
-`);
+`,
+  );
 
   // Hindsight auto-config: write LLM provider settings if HINDSIGHT_URL is set
   // and these vars are not already present
@@ -1323,9 +1326,22 @@ async function buildContainerImage(): Promise<boolean> {
       p.log.warn('container/build.sh not found — image build skipped');
       return false;
     }
+
+    // Detect provider from ~/.clawbridge/.env so we build the correct image.
+    // By this point the .env has already been written (fresh install or migration).
+    const envPath = path.join(os.homedir(), '.clawbridge', '.env');
+    let provider = 'claude';
+    try {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const match = envContent.match(/^AGENT_PROVIDER=(.+)$/m);
+      if (match?.[1]?.trim() === 'codex') provider = 'codex';
+    } catch { /* default to claude */ }
+
+    const buildArgs = provider === 'codex' ? ['--codex'] : [];
+
     const s = p.spinner();
-    s.start('Building agent container image (this takes 1–2 min on first run)…');
-    const result = spawnSync('bash', [buildScript], {
+    s.start(`Building ${provider} container image (this takes 1–2 min on first run)…`);
+    const result = spawnSync('bash', [buildScript, ...buildArgs], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',
       cwd: path.join(packageRoot, 'container'),
@@ -1341,7 +1357,8 @@ async function buildContainerImage(): Promise<boolean> {
       return false;
     }
   } catch (err) {
-    p.log.warn(`Image build error — run: clawbridge build-image\n${err instanceof Error ? err.message : String(err)}`);
+    p.log.warn(`Image build error — run: clawbridge build-image
+${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
 }

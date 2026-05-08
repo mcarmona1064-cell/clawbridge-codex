@@ -1,10 +1,14 @@
 #!/bin/bash
 # Build the ClawBridge agent container image.
 #
-# Reads one optional build flag from ../.env:
+# Usage:
+#   build.sh [--codex] [tag]
+#
+# Reads optional build flags from ../.env:
 #   INSTALL_CJK_FONTS=true   — add Chinese/Japanese/Korean fonts (~200MB)
+#   AGENT_PROVIDER=codex     — build the Codex image (same as --codex flag)
 # setup/container.ts reads the same file, so both build paths stay in sync.
-# Callers can also override by exporting INSTALL_CJK_FONTS directly.
+# Callers can also override by exporting these vars directly.
 
 set -e
 
@@ -17,9 +21,37 @@ cd "$SCRIPT_DIR"
 # setup/lib/install-slug.sh + src/install-slug.ts.
 # shellcheck source=../setup/lib/install-slug.sh
 source "$PROJECT_ROOT/setup/lib/install-slug.sh"
-IMAGE_NAME="$(container_image_base)"
-TAG="${1:-latest}"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
+
+# ── Provider / Dockerfile selection ─────────────────────────────────────────
+# Detect provider: --codex flag takes highest priority, then AGENT_PROVIDER env
+# var (exported or from ../.env), defaulting to claude.
+PROVIDER="${AGENT_PROVIDER:-}"
+
+# Parse first positional arg for --codex flag
+if [ "${1:-}" = "--codex" ]; then
+    PROVIDER="codex"
+    shift
+fi
+
+# If AGENT_PROVIDER not set yet, fall back to ../.env
+if [ -z "$PROVIDER" ] && [ -f "../.env" ]; then
+    PROVIDER="$(grep '^AGENT_PROVIDER=' ../.env | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '[:space:]')"
+fi
+
+PROVIDER="${PROVIDER:-claude}"
+
+if [ "$PROVIDER" = "codex" ]; then
+    DOCKERFILE="Dockerfile.codex"
+    IMAGE_SUFFIX="-codex"
+else
+    DOCKERFILE="Dockerfile"
+    IMAGE_SUFFIX=""
+fi
+
+IMAGE_BASE="$(container_image_base)"
+IMAGE_NAME="${IMAGE_BASE}${IMAGE_SUFFIX}"
+TAG="${1:-latest}"
 
 # Caller's env takes precedence; fall back to .env.
 if [ -z "${INSTALL_CJK_FONTS:-}" ] && [ -f "../.env" ]; then
@@ -32,10 +64,11 @@ if [ "${INSTALL_CJK_FONTS:-false}" = "true" ]; then
     BUILD_ARGS+=(--build-arg INSTALL_CJK_FONTS=true)
 fi
 
-echo "Building ClawBridge agent container image..."
+echo "Building ClawBridge agent container image (provider: ${PROVIDER})..."
+echo "Dockerfile: ${DOCKERFILE}"
 echo "Image: ${IMAGE_NAME}:${TAG}"
 
-${CONTAINER_RUNTIME} build "${BUILD_ARGS[@]}" -t "${IMAGE_NAME}:${TAG}" .
+${CONTAINER_RUNTIME} build "${BUILD_ARGS[@]}" -f "${DOCKERFILE}" -t "${IMAGE_NAME}:${TAG}" .
 
 echo ""
 echo "Build complete!"

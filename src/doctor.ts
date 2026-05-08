@@ -154,7 +154,7 @@ function checkContainerImage(): void {
     // Derive the image tag from the installed service registration (source of truth
     // for this install's slug), not from process.cwd() which gives the wrong slug
     // when doctor is run from any directory other than the package root.
-    let imageTag: string | undefined;
+    let slug: string | undefined;
 
     // macOS: read slug from ~/Library/LaunchAgents/com.clawbridge-v2-<slug>.plist
     if (process.platform === 'darwin') {
@@ -164,8 +164,7 @@ function checkContainerImage(): void {
           .readdirSync(launchAgentsDir)
           .find((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
         if (plist) {
-          const slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
-          imageTag = `clawbridge-agent-v2-${slug}:latest`;
+          slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
         }
       } catch {
         /* fall through */
@@ -173,14 +172,13 @@ function checkContainerImage(): void {
     }
 
     // Linux/VPS: read slug from systemd user unit clawbridge-v2-<slug>.service
-    if (!imageTag && process.platform === 'linux') {
+    if (!slug && process.platform === 'linux') {
       const unitDirs = [path.join(os.homedir(), '.config', 'systemd', 'user'), '/etc/systemd/system'];
       for (const dir of unitDirs) {
         try {
           const unit = fs.readdirSync(dir).find((f) => f.startsWith('clawbridge-v2-') && f.endsWith('.service'));
           if (unit) {
-            const slug = unit.replace(/^clawbridge-v2-/, '').replace(/\.service$/, '');
-            imageTag = `clawbridge-agent-v2-${slug}:latest`;
+            slug = unit.replace(/^clawbridge-v2-/, '').replace(/\.service$/, '');
             break;
           }
         } catch {
@@ -189,7 +187,15 @@ function checkContainerImage(): void {
       }
     }
 
-    if (!imageTag) imageTag = getDefaultContainerImage();
+    // Build the expected image tag for the active provider.
+    // For Codex installs the image carries a -codex suffix; for Claude it has none.
+    let imageTag: string;
+    if (AGENT_PROVIDER === 'codex') {
+      imageTag = slug ? `clawbridge-agent-v2-${slug}-codex:latest` : 'clawbridge-agent-v2-codex:latest';
+    } else {
+      imageTag = slug ? `clawbridge-agent-v2-${slug}:latest` : getDefaultContainerImage();
+    }
+
     const r = spawnSync('docker', ['image', 'inspect', imageTag], {
       encoding: 'utf-8',
       timeout: 8000,
@@ -198,7 +204,8 @@ function checkContainerImage(): void {
     if (r.status === 0) {
       pass('Agent image', imageTag);
     } else {
-      fail('Agent image', `"${imageTag}" not found`, 'run: clawbridge build-image');
+      const buildCmd = AGENT_PROVIDER === 'codex' ? 'clawbridge build-image --codex' : 'clawbridge build-image';
+      fail('Agent image', `"${imageTag}" not found`, `run: ${buildCmd}`);
     }
   } catch {
     fail('Agent image', 'docker unavailable', 'start Docker Desktop');
@@ -679,9 +686,17 @@ function checkProvider(env: Map<string, string>): void {
     const expectedLlmProvider = AGENT_PROVIDER === 'codex' ? 'openai-codex' : 'claude-code';
     const actualLlmProvider = env.get('HINDSIGHT_API_LLM_PROVIDER');
     if (!actualLlmProvider) {
-      fail('HINDSIGHT_API_LLM_PROVIDER', 'not set (Hindsight LLM will use default)', `set to ${expectedLlmProvider} in ~/.clawbridge/.env`);
+      fail(
+        'HINDSIGHT_API_LLM_PROVIDER',
+        'not set (Hindsight LLM will use default)',
+        `set to ${expectedLlmProvider} in ~/.clawbridge/.env`,
+      );
     } else if (actualLlmProvider !== expectedLlmProvider) {
-      fail('HINDSIGHT_API_LLM_PROVIDER', `${actualLlmProvider} (expected ${expectedLlmProvider})`, `update to ${expectedLlmProvider} in ~/.clawbridge/.env`);
+      fail(
+        'HINDSIGHT_API_LLM_PROVIDER',
+        `${actualLlmProvider} (expected ${expectedLlmProvider})`,
+        `update to ${expectedLlmProvider} in ~/.clawbridge/.env`,
+      );
     } else {
       pass('HINDSIGHT_API_LLM_PROVIDER', dim(actualLlmProvider));
     }

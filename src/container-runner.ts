@@ -464,15 +464,19 @@ async function buildContainerArgs(
   }
 
   // Inject credentials directly from ~/.clawbridge/.env (OneCLI removed in v2.0.33).
-  const creds = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
-  if (creds['CLAUDE_CODE_OAUTH_TOKEN']) {
-    args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${creds['CLAUDE_CODE_OAUTH_TOKEN']}`);
-    log.info('Injecting CLAUDE_CODE_OAUTH_TOKEN from .env', { containerName });
-  } else if (creds['ANTHROPIC_API_KEY']) {
-    args.push('-e', `ANTHROPIC_API_KEY=${creds['ANTHROPIC_API_KEY']}`);
-    log.info('Injecting ANTHROPIC_API_KEY from .env', { containerName });
-  } else {
-    log.warn('No credentials found in ~/.clawbridge/.env — container will have no credentials', { containerName });
+  // Skip for Codex — its auth comes from the ~/.codex bind-mount (see src/providers/codex.ts).
+  // Forwarding Claude tokens into a Codex container would be a credentials cross-contamination.
+  if (provider !== 'codex') {
+    const creds = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+    if (creds['CLAUDE_CODE_OAUTH_TOKEN']) {
+      args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${creds['CLAUDE_CODE_OAUTH_TOKEN']}`);
+      log.info('Injecting CLAUDE_CODE_OAUTH_TOKEN from .env', { containerName });
+    } else if (creds['ANTHROPIC_API_KEY']) {
+      args.push('-e', `ANTHROPIC_API_KEY=${creds['ANTHROPIC_API_KEY']}`);
+      log.info('Injecting ANTHROPIC_API_KEY from .env', { containerName });
+    } else {
+      log.warn('No credentials found in ~/.clawbridge/.env — container will have no credentials', { containerName });
+    }
   }
 
   // HINDSIGHT_* vars are intentionally NOT passed to containers.
