@@ -174,7 +174,7 @@ Skills we'd like to see:
 
 ## Requirements
 
-- macOS or Linux (Windows via WSL2)
+- macOS or Linux VPS (Ubuntu, Debian, CentOS — any distro with Docker)
 - Node.js 20+ and pnpm 10+ (the installer will install both if missing)
 - [Docker Desktop](https://docker.com/products/docker-desktop) (macOS/Windows) or Docker Engine (Linux)
 - [Claude Code](https://claude.ai/download) for `/customize`, `/debug`, error recovery during setup, and all `/add-<channel>` skills
@@ -203,7 +203,7 @@ Docker provides cross-platform support (macOS, Linux and Windows via WSL2) and a
 
 **Can I run this on Linux or Windows?**
 
-Yes. Docker is the default runtime and works on macOS, Linux, and Windows (via WSL2). Just run `bash clawbridge.sh`.
+Yes. ClawBridge runs on macOS (local machine) and Linux VPS (Ubuntu, Debian, CentOS, etc.). Just run `bash clawbridge.sh` on either. Windows via WSL2 also works.
 
 **Is this secure?**
 
