@@ -43,23 +43,56 @@ To migrate from an existing install:
 npx clawbridge-agent setup --migrate
 ```
 
+---
+
+## 🏢 Need a Managed Setup?
+
+Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency** handles everything for you — VPS provisioning, full installation, channel setup, custom AI persona, and ongoing support.
+
+| | Self-Host | Managed by Clawbridge Agency |
+|---|---|---|
+| Setup | You do it | We handle everything |
+| Updates | `clawbridge upgrade` | Done for you |
+| Channel config | DIY | Included |
+| Custom persona & memory | DIY | Included |
+| Support | Community / GitHub | Direct email |
+
+📩 **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
+
+---
+
 ## Features
 
-- 🤖 Multi-channel AI agents (Telegram, WhatsApp, Discord, Slack, iMessage, 15+ more)
-- 🔌 Connect your tools — Google, HubSpot, Slack, and more
-- 📊 Client portal with analytics & ROI dashboard
-- 📞 Voice agents via Retell AI
-- 👁 Vision & document analysis via Claude
-- 🔒 Container-isolated, self-hosted — your data stays yours
-- 🚀 Migrate from OpenClaw or NanoClaw in minutes
+- 🤖 **Multi-channel AI agents** — Telegram, WhatsApp, Discord, Slack, iMessage, 15+ more
+- 🔀 **Two AI backends** — Claude (Anthropic OAuth) or OpenAI Codex (ChatGPT Plus/Pro OAuth) — no per-message API billing, uses your existing subscription
+- 🧠 **Persistent memory** — Hindsight memory system with retain, recall, and reflect — agents remember context across sessions
+- 🔌 **Connect your tools** — Google, HubSpot, Slack, and more via MCP
+- 📊 **Client portal** — analytics & ROI dashboard
+- 📞 **Voice agents** via Retell AI
+- 👁 **Vision & document analysis** via Claude
+- 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
+- ⚡ **Skills system** — browser automation, web search, scheduling, self-customization, and more
+- 🚀 **Migrate from OpenClaw or NanoClaw** in minutes
 
 ## Architecture
 
 ```
-messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent SDK) → outbound.db → host process (delivery) → messaging apps
+messaging apps → host process (router) → inbound.db → container (Bun, Claude/Codex Agent) → outbound.db → host process (delivery) → messaging apps
 ```
 
 A single Node host orchestrates per-session agent containers. Agents run in Docker with explicit filesystem mounts. Credentials are injected directly from `~/.clawbridge/.env` into container environment variables at spawn time. See [docs/architecture.md](docs/architecture.md) for the full writeup.
+
+## AI Provider Choice
+
+ClawBridge supports two AI backends. You choose during setup — no switching required after install.
+
+### Claude (Anthropic OAuth)
+Uses your existing **Claude Pro/Max subscription** — no API billing. Authenticate once with `claude setup-token`. Hindsight memory uses Claude Haiku for retain/recall and Sonnet for reflect.
+
+### OpenAI Codex (ChatGPT OAuth)
+Uses your existing **ChatGPT Plus or Pro subscription** — no API billing. Authenticate once with `codex login --device-auth`. Hindsight memory uses `gpt-4.1-mini` for all operations.
+
+Both providers are fully isolated — choosing one won't interfere with the other.
 
 ## Philosophy
 
@@ -75,24 +108,24 @@ A single Node host orchestrates per-session agent containers. Agents run in Dock
 
 **Skills over features.** Trunk ships the registry and infrastructure, not specific channel adapters or alternative agent providers. Channels (Discord, Slack, Telegram, WhatsApp, …) live on a long-lived `channels` branch; alternative providers (OpenCode, Ollama) live on `providers`. You run `/add-telegram`, `/add-opencode`, etc. and the skill copies exactly the module(s) you need into your fork. No feature you didn't ask for.
 
-**Best harness, best model.** ClawBridge natively uses Claude Code via Anthropic's official Claude Agent SDK, so you get the latest Claude models and Claude Code's full toolset, including the ability to modify and expand your own ClawBridge fork. Other providers are drop-in options: `/add-codex` for OpenAI's Codex (ChatGPT subscription or API key), `/add-opencode` for OpenRouter, Google, DeepSeek and more via OpenCode, and `/add-ollama-provider` for local open-weight models. Provider is configurable per agent group.
+**Best harness, best model.** ClawBridge natively uses Claude Code via Anthropic's official Claude Agent SDK, so you get the latest Claude models and Claude Code's full toolset, including the ability to modify and expand your own ClawBridge fork. Other providers are drop-in options: OpenAI Codex (ChatGPT Plus/Pro subscription), `/add-opencode` for OpenRouter, Google, DeepSeek and more via OpenCode, and `/add-ollama-provider` for local open-weight models. Provider is configurable per install.
 
 ## What It Supports
 
 - **Multi-channel messaging** — WhatsApp, Telegram, Discord, Slack, Microsoft Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email via Resend. Installed on demand with `/add-<channel>` skills. Run one or many at the same time.
 - **Flexible isolation** — connect each channel to its own agent for full privacy, share one agent across many channels for unified memory with separate conversations, or fold multiple channels into a single shared session so one conversation spans many surfaces. Pick per channel via `/manage-channels`. See [docs/isolation-model.md](docs/isolation-model.md).
-- **Per-agent workspace** — each agent group has its own `CLAUDE.local.md` persona, its own memory, its own container, and only the mounts you allow. Nothing crosses the boundary unless you wire it to.
-- **Scheduled tasks** — recurring jobs that run Claude and can message you back
+- **Per-agent workspace** — each agent group has its own persona, its own memory, its own container, and only the mounts you allow. Nothing crosses the boundary unless you wire it to.
+- **Scheduled tasks** — recurring jobs that run Claude or Codex and can message you back
 - **Web access** — search and fetch content from the web
 - **Container isolation** — agents are sandboxed in Docker (macOS/Linux/WSL2), with optional [Docker Sandboxes](docs/docker-sandboxes.md) micro-VM isolation or Apple Container as a macOS-native opt-in
-- **Credential security** — agents never hold raw API keys. Outbound requests route through [OneCLI's Agent Vault](https://github.com/onecli/onecli), which injects credentials at request time and enforces per-agent policies and rate limits.
+- **Credential security** — agents never hold raw API keys. Outbound requests route through OneCLI's Agent Vault, which injects credentials at request time and enforces per-agent policies and rate limits.
 
 ## Usage
 
 Talk to your assistant with the trigger word (default: `@Andy`):
 
 ```
-@Andy send an overview of the sales pipeline every weekday morning at 9am (has access to my Obsidian vault folder)
+@Andy send an overview of the sales pipeline every weekday morning at 9am
 @Andy review the git history for the past week each Friday and update the README if there's drift
 @Andy every Monday at 8am, compile news on AI developments from Hacker News and TechCrunch and message me a briefing
 ```
@@ -106,17 +139,12 @@ From a channel you own or administer, you can manage groups and tasks:
 
 ## Customizing your agent
 
-Edit `~/.clawbridge/groups/main/CLAUDE.local.md` to customize your agent's persona.
-This is the only file you need to touch — the system configuration is managed automatically.
+Edit `~/.clawbridge/groups/main/CLAUDE.local.md` (Claude) or `AGENTS.local.md` (Codex) to customize your agent's persona. This is the only file you need to touch — the system configuration is managed automatically.
 
 The file is created with a default template on first run. Open it and change anything:
 - Agent name and personality
 - Background knowledge about you or your team
 - Behavioral preferences and response style
-
-The system-managed `_composed.md` (underscore prefix = internal, do not edit) is regenerated
-on every container spawn from shared base instructions and skill fragments. Your edits in
-`CLAUDE.local.md` are merged alongside it automatically.
 
 ## Customizing
 
@@ -128,8 +156,6 @@ ClawBridge doesn't use configuration files. To make changes, just tell Claude Co
 - "Store conversation summaries weekly"
 
 Or run `/customize` for guided changes.
-
-The codebase is small enough that Claude can safely modify it.
 
 ## Contributing
 
@@ -153,36 +179,27 @@ Skills we'd like to see:
 - [Docker Desktop](https://docker.com/products/docker-desktop) (macOS/Windows) or Docker Engine (Linux)
 - [Claude Code](https://claude.ai/download) for `/customize`, `/debug`, error recovery during setup, and all `/add-<channel>` skills
 
-## Architecture
+## Key Files
 
-```
-messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent SDK) → outbound.db → host process (delivery) → messaging apps
-```
-
-A single Node host orchestrates per-session agent containers. When a message arrives, the host routes it via the entity model (user → messaging group → agent group → session), writes it to the session's `inbound.db`, and wakes the container. The agent-runner inside the container polls `inbound.db`, runs Claude, and writes responses to `outbound.db`. The host polls `outbound.db` and delivers back through the channel adapter.
-
-Two SQLite files per session, each with exactly one writer — no cross-mount contention, no IPC, no stdin piping. Channels and alternative providers self-register at startup; trunk ships the registry and the Chat SDK bridge, while the adapters themselves are skill-installed per fork.
-
-For the full architecture writeup see [docs/architecture.md](docs/architecture.md); for the three-level isolation model see [docs/isolation-model.md](docs/isolation-model.md).
-
-Key files:
 - `src/index.ts` — entry point: DB init, channel adapters, delivery polls, sweep
 - `src/router.ts` — inbound routing: messaging group → agent group → session → `inbound.db`
 - `src/delivery.ts` — polls `outbound.db`, delivers via adapter, handles system actions
 - `src/host-sweep.ts` — 60s sweep: stale detection, due-message wake, recurrence
 - `src/session-manager.ts` — resolves sessions, opens `inbound.db` / `outbound.db`
-- `src/container-runner.ts` — spawns per-agent-group containers, OneCLI credential injection
+- `src/container-runner.ts` — spawns per-agent-group containers, credential injection
+- `src/providers/` — host-side provider config (`claude` and `codex` built in)
 - `src/db/` — central DB (users, roles, agent groups, messaging groups, wiring, migrations)
 - `src/channels/` — channel adapter infra (adapters installed via `/add-<channel>` skills)
-- `src/providers/` — host-side provider config (`claude` baked in; others via skills)
 - `container/agent-runner/` — Bun agent-runner: poll loop, MCP tools, provider abstraction
-- `groups/<folder>/` — per-agent-group filesystem (`CLAUDE.local.md` persona, `_composed.md` system entry point, skills, container config)
+- `container/Dockerfile` — Claude container image
+- `container/Dockerfile.codex` — Codex container image
+- `groups/<folder>/` — per-agent-group filesystem (persona, memory, skills, container config)
 
 ## FAQ
 
 **Why Docker?**
 
-Docker provides cross-platform support (macOS, Linux and Windows via WSL2) and a mature ecosystem. On macOS, you can optionally switch to Apple Container via `/convert-to-apple-container` for a lighter-weight native runtime. For additional isolation, [Docker Sandboxes](docs/docker-sandboxes.md) run each container inside a micro VM.
+Docker provides cross-platform support (macOS, Linux and Windows via WSL2) and a mature ecosystem. On macOS, you can optionally switch to Apple Container via `/convert-to-apple-container` for a lighter-weight native runtime.
 
 **Can I run this on Linux or Windows?**
 
@@ -190,22 +207,15 @@ Yes. Docker is the default runtime and works on macOS, Linux, and Windows (via W
 
 **Is this secure?**
 
-Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. Credentials never enter the container — outbound API requests route through [OneCLI's Agent Vault](https://github.com/onecli/onecli), which injects authentication at the proxy level and supports rate limits and access policies. You should still review what you're running, but the codebase is small enough that you actually can. See the [security documentation](https://docs.clawbridge.dev/concepts/security) for the full security model.
+Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. Credentials never enter the container raw — they're injected at spawn time and never written to disk inside the container.
 
-**Why no configuration files?**
+**Do I need to pay per message?**
 
-We don't want configuration sprawl. Every user should customize ClawBridge so that the code does exactly what they want, rather than configuring a generic system. If you prefer having config files, you can tell Claude to add them.
+No. ClawBridge uses OAuth subscriptions, not API billing. Claude backend uses your Claude Pro/Max subscription. Codex backend uses your ChatGPT Plus/Pro subscription. You pay a flat monthly rate to Anthropic or OpenAI — not per token.
 
 **Can I use third-party or open-source models?**
 
-Yes. The supported path is `/add-opencode` (OpenRouter, OpenAI, Google, DeepSeek, and more via OpenCode config) or `/add-ollama-provider` (local open-weight models via Ollama). Both are configurable per agent group, so different agents can run on different backends in the same install.
-
-For one-off experiments, any Claude API-compatible endpoint also works via `.env`:
-
-```bash
-ANTHROPIC_BASE_URL=https://your-api-endpoint.com
-ANTHROPIC_AUTH_TOKEN=your-token-here
-```
+Yes. The supported path is `/add-opencode` (OpenRouter, OpenAI, Google, DeepSeek, and more via OpenCode config) or `/add-ollama-provider` (local open-weight models via Ollama).
 
 **How do I debug issues?**
 
@@ -213,19 +223,17 @@ Ask Claude Code. "Why isn't the scheduler running?" "What's in the recent logs?"
 
 **Why isn't the setup working for me?**
 
-If a step fails, `clawbridge.sh` hands off to Claude Code to diagnose and resume. If that doesn't resolve it, run `claude`, then `/debug`. If Claude identifies an issue likely to affect other users, open a PR against the relevant setup step or skill.
+If a step fails, `clawbridge.sh` hands off to Claude Code to diagnose and resume. If that doesn't resolve it, run `claude`, then `/debug`.
 
 **What changes will be accepted into the codebase?**
 
-Only security fixes, bug fixes, and clear improvements will be accepted to the base configuration. That's all.
-
-Everything else (new capabilities, OS compatibility, hardware support, enhancements) should be contributed as skills on the `channels` or `providers` branch.
-
-This keeps the base system minimal and lets every user customize their installation without inheriting features they don't want.
+Only security fixes, bug fixes, and clear improvements will be accepted to the base configuration. Everything else (new capabilities, OS compatibility, enhancements) should be contributed as skills on the `channels` or `providers` branch.
 
 ## Community
 
 Questions? Ideas? [Join the Discord](https://discord.gg/VDdww8qS42).
+
+Need a managed setup? Email **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
 
 ## Changelog
 
@@ -234,4 +242,3 @@ See [CHANGELOG.md](CHANGELOG.md) for breaking changes, or the [full release hist
 ## License
 
 MIT
-
