@@ -139,7 +139,7 @@ write_header
 
 # ClawBridge wordmark + subtitle — setup:auto will see CLAWBRIDGE_BOOTSTRAPPED=1
 # and skip printing these again, so the flow stays visually continuous.
-printf '\n  %s%s\n' "$(bold 'Nano')" "$(brand_bold 'Claw')"
+printf '\n  %s%s\n' "$(bold 'Claw')" "$(brand_bold 'Bridge')"
 printf '  %s\n\n' "$(dim 'Setting up your personal AI assistant')"
 
 # ─── pre-flight: Homebrew on macOS ─────────────────────────────────────

@@ -958,7 +958,7 @@ function maybeReexecUnderSg(): void {
 
 function printIntro(): void {
   const isReexec = process.env.CLAWBRIDGE_REEXEC_SG === '1';
-  const wordmark = `${k.bold('Nano')}${brandBold('Claw')}`;
+  const wordmark = `${k.bold('Claw')}${brandBold('Bridge')}`;
 
   if (isReexec) {
     p.intro(
