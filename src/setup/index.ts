@@ -487,6 +487,54 @@ function checkNodePrerequisites(): void {
   // Skip the check to avoid blocking fresh installs that don't have pnpm.
 }
 
+
+// ─── Codex auth ───────────────────────────────────────────────────────────────
+
+async function setupCodexAuth(): Promise<void> {
+  // 1. Check / install codex CLI
+  const codexCheck = spawnSync('which', ['codex'], { encoding: 'utf8' });
+  if (codexCheck.status !== 0) {
+    p.log.info('Codex CLI is not installed. Installing now...');
+    const s = p.spinner();
+    s.start('Installing @openai/codex@0.129.0 (npm install -g @openai/codex@0.129.0)…');
+    const installResult = spawnSync('npm', ['install', '-g', '@openai/codex@0.129.0'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+    if (installResult.status !== 0) {
+      s.stop(k.red('Failed to install Codex CLI.'));
+      p.log.error('Please install manually: npm install -g @openai/codex@0.129.0');
+      process.exit(1);
+    }
+    s.stop(k.green('@openai/codex installed ✓'));
+  } else {
+    p.log.success('Codex CLI detected ✓');
+  }
+
+  // 2. Check if already authenticated
+  const codexCredsPath = path.join(os.homedir(), '.codex', 'auth.json');
+  if (fs.existsSync(codexCredsPath)) {
+    try {
+      const creds = JSON.parse(fs.readFileSync(codexCredsPath, 'utf8'));
+      if (creds?.accessToken || creds?.token) {
+        p.log.success('Codex authentication found ✓');
+        return;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // 3. Run codex login --device-auth interactively
+  p.log.message(dim('  Your browser will open to authenticate with OpenAI (ChatGPT Plus/Pro).'));
+  p.log.message(dim('  Complete the login, then return here.'));
+  p.log.message(dim('  Running: codex login --device-auth'));
+  const loginResult = spawnSync('codex', ['login', '--device-auth'], { stdio: 'inherit', encoding: 'utf8' });
+  if (loginResult.status === 0) {
+    p.log.success('Codex authenticated successfully ✓');
+  } else {
+    p.log.warn('Codex login may have failed. You can re-run it later with: codex login --device-auth');
+  }
+}
+
 // ─── Fresh install flow ───────────────────────────────────────────────────────
 
 async function runFreshInstall(): Promise<void> {
@@ -494,8 +542,25 @@ async function runFreshInstall(): Promise<void> {
   checkNodePrerequisites();
   p.log.step('Starting fresh install…');
 
-  // Step 1 — Claude OAuth token
-  const oauthToken = await setupClaudeAuth();
+  // Step 0 — Backend provider selection
+  const providerChoice = ensure(
+    await p.select({
+      message: 'Which AI backend would you like to use?',
+      options: [
+        { value: 'claude', label: 'Claude (Anthropic)', hint: 'requires Claude Pro/Max subscription' },
+        { value: 'codex', label: 'Codex (OpenAI)', hint: 'requires ChatGPT Plus/Pro subscription' },
+      ],
+      initialValue: 'claude',
+    }),
+  ) as string;
+
+  // Step 1 — Auth for chosen backend
+  let oauthToken = '';
+  if (providerChoice === 'codex') {
+    await setupCodexAuth();
+  } else {
+    oauthToken = await setupClaudeAuth();
+  }
 
   // Step 2 — Channels
   type ChannelOption = { value: string; label: string; hint?: string };

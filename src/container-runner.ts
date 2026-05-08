@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 
 import {
+  CODEX_CONTAINER_IMAGE,
   CONTAINER_IMAGE,
   CONTAINER_IMAGE_BASE,
   CONTAINER_INSTALL_LABEL,
@@ -503,7 +504,8 @@ async function buildContainerArgs(
   args.push('--entrypoint', 'bash');
 
   // Use per-agent-group image if one has been built, otherwise base image
-  const imageTag = containerConfig.imageTag || CONTAINER_IMAGE;
+  const defaultImage = provider === 'codex' ? CODEX_CONTAINER_IMAGE : CONTAINER_IMAGE;
+  const imageTag = containerConfig.imageTag || defaultImage;
   args.push(imageTag);
 
   args.push('-c', 'exec bun run /app/src/index.ts');
