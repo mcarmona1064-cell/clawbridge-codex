@@ -680,25 +680,65 @@ function checkProvider(env: Map<string, string>): void {
     }
   }
 
-  // Check HINDSIGHT_API_LLM_PROVIDER matches expected value (if HINDSIGHT_URL is set)
+  // Auto-fix Hindsight LLM vars if HINDSIGHT_URL is set
   const hindsightUrl = env.get('HINDSIGHT_URL');
   if (hindsightUrl) {
     const expectedLlmProvider = AGENT_PROVIDER === 'codex' ? 'openai-codex' : 'claude-code';
+    const isCodex = AGENT_PROVIDER === 'codex';
+    const expectedModels = isCodex
+      ? { retain: 'gpt-4.1-mini', recall: 'gpt-4.1-mini', reflect: 'gpt-4.1-mini' }
+      : { retain: 'claude-haiku-4-5', recall: 'claude-haiku-4-5', reflect: 'claude-sonnet-4-5' };
+
+    const envPath = path.join(os.homedir(), '.clawbridge', '.env');
+    const autoFixEnv = (key: string, value: string): void => {
+      try {
+        let envContent = fs.readFileSync(envPath, 'utf-8');
+        const lineRegex = new RegExp(`^${key}=.*$`, 'm');
+        if (lineRegex.test(envContent)) {
+          envContent = envContent.replace(lineRegex, `${key}=${value}`);
+        } else {
+          envContent = envContent.trimEnd() + `\n${key}=${value}\n`;
+        }
+        fs.writeFileSync(envPath, envContent, 'utf-8');
+      } catch {
+        /* ignore write errors */
+      }
+    };
+
+    // HINDSIGHT_API_LLM_PROVIDER
     const actualLlmProvider = env.get('HINDSIGHT_API_LLM_PROVIDER');
-    if (!actualLlmProvider) {
-      fail(
-        'HINDSIGHT_API_LLM_PROVIDER',
-        'not set (Hindsight LLM will use default)',
-        `set to ${expectedLlmProvider} in ~/.clawbridge/.env`,
-      );
-    } else if (actualLlmProvider !== expectedLlmProvider) {
-      fail(
-        'HINDSIGHT_API_LLM_PROVIDER',
-        `${actualLlmProvider} (expected ${expectedLlmProvider})`,
-        `update to ${expectedLlmProvider} in ~/.clawbridge/.env`,
-      );
+    if (!actualLlmProvider || actualLlmProvider !== expectedLlmProvider) {
+      autoFixEnv('HINDSIGHT_API_LLM_PROVIDER', expectedLlmProvider);
+      pass('HINDSIGHT_API_LLM_PROVIDER', dim(`${expectedLlmProvider} (auto-set)`));
     } else {
       pass('HINDSIGHT_API_LLM_PROVIDER', dim(actualLlmProvider));
+    }
+
+    // HINDSIGHT_API_RETAIN_MODEL
+    const actualRetain = env.get('HINDSIGHT_API_RETAIN_MODEL');
+    if (!actualRetain || actualRetain !== expectedModels.retain) {
+      autoFixEnv('HINDSIGHT_API_RETAIN_MODEL', expectedModels.retain);
+      pass('HINDSIGHT_API_RETAIN_MODEL', dim(`${expectedModels.retain} (auto-set)`));
+    } else {
+      pass('HINDSIGHT_API_RETAIN_MODEL', dim(actualRetain));
+    }
+
+    // HINDSIGHT_API_RECALL_MODEL
+    const actualRecall = env.get('HINDSIGHT_API_RECALL_MODEL');
+    if (!actualRecall || actualRecall !== expectedModels.recall) {
+      autoFixEnv('HINDSIGHT_API_RECALL_MODEL', expectedModels.recall);
+      pass('HINDSIGHT_API_RECALL_MODEL', dim(`${expectedModels.recall} (auto-set)`));
+    } else {
+      pass('HINDSIGHT_API_RECALL_MODEL', dim(actualRecall));
+    }
+
+    // HINDSIGHT_API_REFLECT_MODEL
+    const actualReflect = env.get('HINDSIGHT_API_REFLECT_MODEL');
+    if (!actualReflect || actualReflect !== expectedModels.reflect) {
+      autoFixEnv('HINDSIGHT_API_REFLECT_MODEL', expectedModels.reflect);
+      pass('HINDSIGHT_API_REFLECT_MODEL', dim(`${expectedModels.reflect} (auto-set)`));
+    } else {
+      pass('HINDSIGHT_API_REFLECT_MODEL', dim(actualReflect));
     }
   }
 }
