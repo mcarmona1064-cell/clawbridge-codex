@@ -90,7 +90,9 @@ function rebuildContainerImage(): boolean {
       const envContent = fs.readFileSync(envPath, 'utf-8');
       const match = envContent.match(/^AGENT_PROVIDER=(.+)$/m);
       if (match?.[1]?.trim() === 'codex') provider = 'codex';
-    } catch { /* default to claude */ }
+    } catch {
+      /* default to claude */
+    }
 
     const buildArgs = provider === 'codex' ? ['--codex'] : [];
     console.log(`  Building ${provider} container image\u2026`);

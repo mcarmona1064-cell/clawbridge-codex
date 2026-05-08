@@ -1335,7 +1335,9 @@ async function buildContainerImage(): Promise<boolean> {
       const envContent = fs.readFileSync(envPath, 'utf8');
       const match = envContent.match(/^AGENT_PROVIDER=(.+)$/m);
       if (match?.[1]?.trim() === 'codex') provider = 'codex';
-    } catch { /* default to claude */ }
+    } catch {
+      /* default to claude */
+    }
 
     const buildArgs = provider === 'codex' ? ['--codex'] : [];
 
