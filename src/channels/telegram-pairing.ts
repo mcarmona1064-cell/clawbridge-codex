@@ -4,11 +4,14 @@
  *
  * Flow:
  *   1. setup/pair-telegram calls createPairing() → writes DATA_DIR/pairing.json
- *      with a random code and waits.
- *   2. The running Telegram adapter (telegram.ts) intercepts any message whose
- *      text matches the code, writes the result back to pairing.json, and
- *      swallows the message (does not route it to the agent).
+ *      with state=pending and waits.
+ *   2. The running Telegram adapter (telegram.ts) intercepts the FIRST message
+ *      received while pairing is pending, writes the result back to pairing.json,
+ *      and swallows the message (does not route it to the agent).
  *   3. waitForPairing() polls pairing.json until consumed or timeout.
+ *
+ * No code entry required — the operator just sends /start (or any message)
+ * to the bot from the chat they want to register.
  */
 
 import fs from 'fs';
@@ -25,7 +28,6 @@ export type PairingIntent =
   | { kind: 'new-agent'; folder: string };
 
 interface PairingRecord {
-  code: string;
   intent: PairingIntent;
   state: 'pending' | 'consumed' | 'failed';
   createdAt: string;
@@ -35,13 +37,6 @@ interface PairingRecord {
     adminUserId?: string;
   };
   error?: string;
-}
-
-function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'CB-';
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
 }
 
 function readPairing(): PairingRecord | null {
@@ -67,8 +62,11 @@ export function clearPairing(): void {
 
 /**
  * Called by the Telegram adapter in handleMessage to check if an incoming
- * message is a pairing code submission. Returns true if the message was
- * consumed as a pairing attempt (caller should not route it to the agent).
+ * message should be consumed as a pairing attempt.
+ *
+ * When pairing is pending, the FIRST message from any chat is accepted —
+ * the operator just sends /start (or any text) to their bot.
+ * Returns true if the message was consumed (caller should not route it).
  */
 export function interceptPairingMessage(
   text: string,
@@ -79,48 +77,25 @@ export function interceptPairingMessage(
   const record = readPairing();
   if (!record || record.state !== 'pending') return false;
 
-  const normalized = text.trim().toUpperCase();
-
-  // Notify about the attempt regardless of match
-  if (normalized.length > 0) {
-    // Update with attempt info (non-destructive, state stays pending unless match)
-    // We don't write attempts to the file — setup/pair-telegram handles display
-    // via the onAttempt callback through polling.
-  }
-
-  if (normalized === record.code) {
-    writePairing({
-      ...record,
-      state: 'consumed',
-      result: { platformId, isGroup, adminUserId },
-    });
-    return true;
-  }
-
-  // Wrong code — still consume the message silently if it looks like a pairing attempt
-  // (starts with "CB-" prefix) to avoid confusing the agent.
-  if (normalized.startsWith('CB-')) {
-    return true;
-  }
-
-  return false;
+  // Accept the first message received — no code required.
+  // The operator is the one sending /start during setup.
+  writePairing({
+    ...record,
+    state: 'consumed',
+    result: { platformId, isGroup, adminUserId },
+  });
+  return true;
 }
 
-export async function createPairing(intent: PairingIntent): Promise<{ code: string }> {
-  const code = generateCode();
+export async function createPairing(intent: PairingIntent): Promise<void> {
   writePairing({
-    code,
     intent,
     state: 'pending',
     createdAt: new Date().toISOString(),
   });
-  return { code };
 }
 
-export async function waitForPairing(
-  code: string,
-  options: { onAttempt?: (a: { candidate: string }) => void } = {},
-): Promise<{
+export async function waitForPairing(): Promise<{
   intent: PairingIntent;
   consumed: { platformId: string; isGroup: boolean; adminUserId?: string } | null;
 }> {
@@ -136,9 +111,9 @@ export async function waitForPairing(
       }
 
       const record = readPairing();
-      if (!record || record.code !== code) {
+      if (!record) {
         clearInterval(poll);
-        reject(new Error('Pairing record missing or code mismatch'));
+        reject(new Error('Pairing record missing'));
         return;
       }
 

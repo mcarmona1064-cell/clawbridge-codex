@@ -49,7 +49,7 @@ export async function runTelegramChannel(displayName: string): Promise<void> {
   const botUrl = `https://t.me/${botUsername}`;
   p.note(
     [
-      `Opening @${botUsername} in Telegram so it's ready when the pairing code shows up.`,
+      `Opening @${botUsername} in Telegram so it's ready to receive messages.`,
       '',
       k.dim(botUrl),
     ].join('\n'),
@@ -78,7 +78,7 @@ export async function runTelegramChannel(displayName: string): Promise<void> {
     );
   }
 
-  const pair = await runPairTelegram();
+  const pair = await runPairTelegram(botUsername);
   if (!pair.ok) {
     await fail(
       'pair-telegram',
@@ -213,13 +213,24 @@ async function validateTelegramToken(token: string): Promise<string> {
   }
 }
 
-async function runPairTelegram(): Promise<
-  StepResult & { rawLog: string; durationMs: number }
-> {
+async function runPairTelegram(
+  botUsername: string,
+): Promise<StepResult & { rawLog: string; durationMs: number }> {
   const rawLog = setupLog.stepRawLog('pair-telegram');
   const start = Date.now();
   const s = p.spinner();
-  s.start('Generating a secret code for your bot…');
+
+  // Show the user where to go and what to do
+  p.note(
+    [
+      `Open @${botUsername} in Telegram and send /start (or any message).`,
+      '',
+      k.dim(`https://t.me/${botUsername}`),
+    ].join('\n'),
+    'Pair Telegram',
+  );
+
+  s.start('Waiting for you to message the bot from Telegram…');
   let spinnerActive = true;
 
   const stopSpinner = (msg: string, code?: number) => {
@@ -233,20 +244,9 @@ async function runPairTelegram(): Promise<
     'pair-telegram',
     ['--intent', 'main'],
     (block: Block) => {
-      if (block.type === 'PAIR_TELEGRAM_CODE') {
-        const reason = block.fields.REASON ?? 'initial';
-        if (reason === 'initial') {
-          stopSpinner('Your secret code is ready.');
-        } else {
-          stopSpinner("Old code expired. Here's a fresh one.");
-        }
-        p.note(formatCodeCard(block.fields.CODE ?? '????'), 'Secret code');
-        s.start('Waiting for you to send the code from Telegram…');
-        spinnerActive = true;
-      } else if (block.type === 'PAIR_TELEGRAM_ATTEMPT') {
-        stopSpinner(`Got "${block.fields.CANDIDATE ?? '?'}", not a match.`);
-        s.start('Waiting for the correct code…');
-        spinnerActive = true;
+      if (block.type === 'PAIR_TELEGRAM_READY') {
+        // pairing.json written — service will intercept the next message
+        // nothing extra to display, spinner already running
       } else if (block.type === 'PAIR_TELEGRAM') {
         if (block.fields.STATUS === 'success') {
           stopSpinner('Telegram paired.');
@@ -273,15 +273,7 @@ async function runPairTelegram(): Promise<
   return { ...result, rawLog, durationMs };
 }
 
-function formatCodeCard(code: string): string {
-  const spaced = code.split('').join('   ');
-  return [
-    '',
-    `   ${brandBold(spaced)}`,
-    '',
-    k.dim('   Send this code to your bot from Telegram.'),
-  ].join('\n');
-}
+
 
 async function resolveAgentName(): Promise<string> {
   const preset = process.env.CLAWBRIDGE_AGENT_NAME?.trim();

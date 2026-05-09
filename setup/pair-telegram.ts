@@ -1,22 +1,18 @@
 /**
- * Step: pair-telegram — issue a one-time pairing code and wait for the
- * operator to send the code from the chat they want to register.
+ * Step: pair-telegram — wait for the operator to send /start (or any message)
+ * to the bot from the chat they want to register.
+ *
+ * No code entry required. The running Telegram adapter intercepts the first
+ * incoming message while pairing.json is pending and records the chat ID.
  *
  * Emits machine-readable status blocks only. The parent driver
- * (`setup:auto`) renders the code / attempt / success UI with clack. Running
- * this step directly will look sparse — that's intentional.
+ * (`setup:auto`) renders the UI with clack.
  *
  * Blocks emitted:
- *   PAIR_TELEGRAM_CODE       { CODE, REASON=initial|regenerated }
- *   PAIR_TELEGRAM_ATTEMPT    { CANDIDATE }
- *   PAIR_TELEGRAM (final)    { STATUS=success, CODE, INTENT, PLATFORM_ID,
- *                              IS_GROUP, PAIRED_USER_ID }
- *                         or { STATUS=failed, CODE, ERROR }
- *
- * Depends on src/channels/telegram-pairing.js, which setup/add-telegram.sh
- * copies in from the `channels` branch before this step runs. setup/ is
- * excluded from the host tsconfig, so this file's import resolves only at
- * runtime — tsc won't complain on branches that haven't run add-telegram yet.
+ *   PAIR_TELEGRAM_READY (signals operator should now send /start)
+ *   PAIR_TELEGRAM (final)  { STATUS=success, INTENT, PLATFORM_ID,
+ *                            IS_GROUP, PAIRED_USER_ID }
+ *                       or { STATUS=failed, ERROR }
  */
 import path from 'path';
 
@@ -58,59 +54,33 @@ function intentToString(intent: PairingIntent): string {
 export async function run(args: string[]): Promise<void> {
   const intent = parseArgs(args);
 
-  // Pairing stores state under DATA_DIR; the DB isn't strictly needed for the
-  // pairing primitive itself, but the inbound interceptor running inside the
-  // live service needs migrations applied. Touch it here so a fresh install
-  // doesn't fail on the first code match.
+  // Touch the DB so migrations are applied before the interceptor fires.
   const db = initDb(path.join(DATA_DIR, 'v2.db'));
   runMigrations(db);
 
-  const MAX_REGENERATIONS = 5;
-  let record = await createPairing(intent);
-  emitStatus('PAIR_TELEGRAM_CODE', {
-    CODE: record.code,
-    REASON: 'initial',
-  });
+  await createPairing(intent);
 
-  for (let regen = 0; regen <= MAX_REGENERATIONS; regen++) {
-    try {
-      const consumed = await waitForPairing(record.code, {
-        onAttempt: (a) => {
-          emitStatus('PAIR_TELEGRAM_ATTEMPT', {
-            CANDIDATE: a.candidate,
-          });
-        },
-      });
+  // Signal the UI that pairing is ready — operator should now send /start
+  emitStatus('PAIR_TELEGRAM_READY', {});
 
-      emitStatus('PAIR_TELEGRAM', {
-        STATUS: 'success',
-        CODE: record.code,
-        INTENT: intentToString(consumed.intent),
-        PLATFORM_ID: consumed.consumed!.platformId,
-        IS_GROUP: consumed.consumed!.isGroup,
-        PAIRED_USER_ID: consumed.consumed!.adminUserId
-          ? `telegram:${consumed.consumed!.adminUserId}`
-          : '',
-      });
-      return;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const invalidated = /invalidated by wrong code/.test(message);
-      if (invalidated && regen < MAX_REGENERATIONS) {
-        record = await createPairing(intent);
-        emitStatus('PAIR_TELEGRAM_CODE', {
-          CODE: record.code,
-          REASON: 'regenerated',
-        });
-        continue;
-      }
-      const reason = invalidated ? 'max-regenerations-exceeded' : message;
-      emitStatus('PAIR_TELEGRAM', {
-        STATUS: 'failed',
-        CODE: record.code,
-        ERROR: reason,
-      });
-      process.exit(2);
-    }
+  try {
+    const consumed = await waitForPairing();
+
+    emitStatus('PAIR_TELEGRAM', {
+      STATUS: 'success',
+      INTENT: intentToString(consumed.intent),
+      PLATFORM_ID: consumed.consumed!.platformId,
+      IS_GROUP: consumed.consumed!.isGroup,
+      PAIRED_USER_ID: consumed.consumed!.adminUserId
+        ? `telegram:${consumed.consumed!.adminUserId}`
+        : '',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    emitStatus('PAIR_TELEGRAM', {
+      STATUS: 'failed',
+      ERROR: message,
+    });
+    process.exit(2);
   }
 }
