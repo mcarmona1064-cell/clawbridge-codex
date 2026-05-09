@@ -142,6 +142,26 @@ async function spawnContainer(session: Session): Promise<void> {
   const containerName = `clawbridge-v2-${agentGroup.folder}-${Date.now()}`;
   const args = await buildContainerArgs(mounts, containerName, agentGroup, containerConfig, provider, contribution);
 
+  // Stop any stale containers for this group before spawning a new one.
+  // This catches both named containers from previous runs (clawbridge-v2-<folder>-*)
+  // and unlabelled containers (docker auto-names like "kind_wu") that share the
+  // same group mount and would race on the outbound message queue.
+  try {
+    const psOutput = execSync(
+      `${CONTAINER_RUNTIME_BIN} ps --format '{{.Names}}\t{{.Mounts}}' 2>/dev/null || true`,
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+    ).trim();
+    for (const line of psOutput.split('\n')) {
+      if (!line) continue;
+      const [name, mounts = ''] = line.split('\t');
+      if (!name || name === containerName) continue;
+      if (mounts.includes(agentGroup.folder) || name.startsWith(`clawbridge-v2-${agentGroup.folder}-`)) {
+        log.warn('Stopping stale container for group', { stale: name, group: agentGroup.folder });
+        try { execSync(`${CONTAINER_RUNTIME_BIN} stop -t 1 ${name}`, { stdio: 'pipe' }); } catch { /* ignore */ }
+      }
+    }
+  } catch { /* docker ps failure — non-fatal */ }
+
   log.info('Spawning container', { sessionId: session.id, agentGroup: agentGroup.name, containerName });
 
   // Clear any orphan heartbeat from a previous container instance — the

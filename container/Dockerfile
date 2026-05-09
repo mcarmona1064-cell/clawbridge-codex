@@ -101,8 +101,18 @@ RUN --mount=type=cache,target=/root/.cache/pnpm \
 RUN --mount=type=cache,target=/root/.cache/pnpm \
     pnpm install -g "agent-browser@${AGENT_BROWSER_VERSION}"
 
-RUN --mount=type=cache,target=/root/.cache/pnpm \
-    pnpm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+RUN --mount=type=cache,target=/root/.cache/pnpm     pnpm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && \
+    if ! claude --version >/dev/null 2>&1; then \
+      echo "claude binary is a stub — locating native binary" && \
+      NATIVE=$(find /pnpm -name 'claude' -not -name '*.js' -type f -perm /111 2>/dev/null | head -1) && \
+      if [ -n "$NATIVE" ]; then \
+        echo "Found native binary at $NATIVE" && \
+        ln -sf "$NATIVE" /pnpm/bin/claude; \
+      else \
+        CLAUDE_PKG=$(find /pnpm -path "*/@anthropic-ai/claude-code" -maxdepth 8 -type d 2>/dev/null | head -1) && \
+        [ -n "$CLAUDE_PKG" ] && cd "$CLAUDE_PKG" && node scripts/postinstall.js 2>&1 || true; \
+      fi; \
+    fi
 
 # ---- Entrypoint --------------------------------------------------------------
 COPY entrypoint.sh /app/entrypoint.sh
