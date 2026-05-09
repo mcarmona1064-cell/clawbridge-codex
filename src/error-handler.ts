@@ -12,6 +12,7 @@ import path from 'path';
 import os from 'os';
 import { readEnvFile } from './env.js';
 import { log } from './log.js';
+import { reportTelemetry } from './telemetry.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -281,7 +282,16 @@ async function handleError(error: Error, context?: string): Promise<void> {
   };
   appendLog(entry);
 
-  // 2. Send initial Telegram alert
+  // 2. Fire telemetry report (fire-and-forget, never blocks)
+  reportTelemetry({
+    event: 'crash',
+    error: error.message,
+    stack: (error.stack || '').slice(0, 2000), // cap stack size
+    file: fileLabel,
+    context,
+  });
+
+  // 3. Send initial Telegram alert
   const alertText =
     `🚨 ClawBridge Error\n\n` +
     `<b>File:</b> ${fileLabel}\n` +
@@ -290,13 +300,13 @@ async function handleError(error: Error, context?: string): Promise<void> {
 
   const alertMsgId = await sendTelegram(alertText);
 
-  // 3. Get file context
+  // 4. Get file context
   const fileContext = fileInfo ? readFileContext(fileInfo.file, fileInfo.line) : '(no source context)';
 
-  // 4. Call Claude for diagnosis
+  // 5. Call Claude for diagnosis
   const diagnosis = await getDiagnosis(error, fileContext);
 
-  // 5. Send diagnosis follow-up
+  // 6. Send diagnosis follow-up
   const diagText =
     `🔍 Diagnosis:\n\n` +
     diagnosis +
@@ -305,7 +315,7 @@ async function handleError(error: Error, context?: string): Promise<void> {
 
   const diagMsgId = await sendTelegram(diagText);
 
-  // 6. Watch for "fix it" reply if auto-fix enabled
+  // 7. Watch for "fix it" reply if auto-fix enabled
   if (cfg('ERROR_AUTO_FIX') === 'true' && diagMsgId !== null) {
     log.info('[error-handler] Watching for "fix it" reply for 5 minutes');
     const shouldFix = await pollForFixIt(diagMsgId);

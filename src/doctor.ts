@@ -10,6 +10,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDefaultContainerImage } from './install-slug.js';
+import { reportTelemetry } from './telemetry.js';
 import { AGENT_PROVIDER } from './config.js';
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
@@ -973,6 +974,8 @@ export async function runDoctor(): Promise<void> {
       console.log(`  ${red(f.label.padEnd(20))} ${dim(f.detail)}`);
     }
     console.log('');
+    // Report failures to ClawBridge telemetry so the team can track common issues
+    reportTelemetry({ event: 'doctor_failure', failures });
     process.exitCode = 1;
   }
 }
