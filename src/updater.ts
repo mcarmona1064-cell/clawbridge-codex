@@ -126,6 +126,21 @@ function detectLaunchdLabel(): string | null {
   }
 }
 
+function restartSystemdService(unit: string, scope: string[]): void {
+  try {
+    const result = spawnSync('systemctl', [...scope, 'start', unit], { encoding: 'utf-8', timeout: 15000 });
+    if (result.status === 0) {
+      console.log(`  ✓ Service restarted: ${unit}`);
+    } else {
+      const scopeStr = scope.length > 0 ? scope.join(' ') + ' ' : '';
+      console.log(`  ⚠  systemctl start failed: ${result.stderr?.trim()}`);
+      console.log(`     Try manually: systemctl ${scopeStr}start ${unit}`);
+    }
+  } catch (err) {
+    console.log(`  ⚠  Could not restart service: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 function restartLaunchdService(label: string): void {
   try {
     const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
@@ -185,6 +200,8 @@ export async function runUpgrade(): Promise<void> {
   // (npm can't rename the package dir while the process has open file handles)
   const serviceLabel = detectLaunchdLabel();
   let serviceStopped = false;
+  let systemdUnit: string | null = null;
+  let systemdScope: string[] = [];
 
   if (process.platform === 'darwin' && serviceLabel) {
     console.log('\nStopping ClawBridge service before upgrade…');
@@ -208,6 +225,8 @@ export async function runUpgrade(): Promise<void> {
           const scope = dir.includes(os.homedir()) ? ['--user'] : [];
           spawnSync('systemctl', [...scope, 'stop', unit], { encoding: 'utf-8', timeout: 10000 });
           serviceStopped = true;
+          systemdUnit = unit;
+          systemdScope = scope;
           console.log(`  ✓ Service stopped: ${unit}`);
           break;
         }
@@ -245,6 +264,10 @@ export async function runUpgrade(): Promise<void> {
     }
   }
 
+  // Clean npm cache to avoid stale tarballs (helps with ENOTEMPTY on both platforms)
+  console.log('\nCleaning npm cache…');
+  spawnSync('npm', ['cache', 'clean', '--force'], { stdio: 'inherit', encoding: 'utf-8' });
+
   // Install
   console.log('\nInstalling…');
   const installResult = spawnSync('npm', ['install', '-g', 'clawbridge-agent@latest'], {
@@ -254,12 +277,16 @@ export async function runUpgrade(): Promise<void> {
 
   if (installResult.status !== 0) {
     // If stopped, try to restart before exiting
-    if (serviceStopped && serviceLabel && process.platform === 'darwin') {
-      try {
-        const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
-        spawnSync('launchctl', ['kickstart', `gui/${uid}/${serviceLabel}`], { encoding: 'utf-8', timeout: 10000 });
-      } catch {
-        /* best effort */
+    if (serviceStopped) {
+      if (serviceLabel && process.platform === 'darwin') {
+        try {
+          const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+          spawnSync('launchctl', ['kickstart', `gui/${uid}/${serviceLabel}`], { encoding: 'utf-8', timeout: 10000 });
+        } catch {
+          /* best effort */
+        }
+      } else if (systemdUnit && process.platform === 'linux') {
+        restartSystemdService(systemdUnit, systemdScope);
       }
     }
     console.error('\n✗ Upgrade failed. Try manually: npm install -g clawbridge-agent@latest');
@@ -277,13 +304,21 @@ export async function runUpgrade(): Promise<void> {
     console.log('  ✓ Container image rebuilt successfully');
   }
 
-  // Restart launchd service
-  const label = detectLaunchdLabel();
-  if (label) {
-    console.log('\nRestarting ClawBridge service…');
-    restartLaunchdService(label);
-  } else {
-    console.log('\n⚠  No launchd service found — restart manually if needed.');
+  // Restart service
+  console.log('\nRestarting ClawBridge service…');
+  if (process.platform === 'darwin') {
+    const label = detectLaunchdLabel();
+    if (label) {
+      restartLaunchdService(label);
+    } else {
+      console.log('  ⚠  No launchd service found — restart manually if needed.');
+    }
+  } else if (process.platform === 'linux') {
+    if (systemdUnit) {
+      restartSystemdService(systemdUnit, systemdScope);
+    } else {
+      console.log('  ⚠  No systemd service found — restart manually if needed.');
+    }
   }
 
   // Health check

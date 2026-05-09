@@ -66,23 +66,37 @@ export function ensureContainerRuntimeRunning(): void {
  */
 export function cleanupOrphans(): void {
   try {
+    // Use -a to catch both running AND stopped/exited containers.
+    // After a Docker daemon restart, --rm containers in Exited state are not
+    // automatically cleaned up and block subsequent docker run --name reuse.
     const output = execSync(
-      `${CONTAINER_RUNTIME_BIN} ps --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}'`,
+      `${CONTAINER_RUNTIME_BIN} ps -a --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}	{{.State}}'`,
       {
         stdio: ['pipe', 'pipe', 'pipe'],
         encoding: 'utf-8',
       },
     );
-    const orphans = output.trim().split('\n').filter(Boolean);
-    for (const name of orphans) {
-      try {
-        stopContainer(name);
-      } catch {
-        /* already stopped */
-      }
+    const lines = output.trim().split('\n').filter(Boolean);
+    const running: string[] = [];
+    const stopped: string[] = [];
+    for (const line of lines) {
+      const [name, state] = line.split('\t');
+      if (!name) continue;
+      if (state === 'running') running.push(name);
+      else stopped.push(name); // exited, created, paused, dead, etc.
     }
-    if (orphans.length > 0) {
-      log.info('Stopped orphaned containers', { count: orphans.length, names: orphans });
+    // Stop running containers first, then force-remove all (running + stopped).
+    for (const name of running) {
+      try { stopContainer(name); } catch { /* already stopped */ }
+    }
+    const all = [...running, ...stopped];
+    for (const name of all) {
+      try {
+        execSync(`${CONTAINER_RUNTIME_BIN} rm -f ${name}`, { stdio: 'pipe' });
+      } catch { /* already removed */ }
+    }
+    if (all.length > 0) {
+      log.info('Cleaned up orphaned containers', { running: running.length, stopped: stopped.length, names: all });
     }
   } catch (err) {
     log.warn('Failed to clean up orphaned containers', { err });

@@ -116,13 +116,27 @@ function setupLaunchd(
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>PathState</key>
+        <dict>
+            <key>/var/run/docker.sock</key>
+            <true/>
+        </dict>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>ProcessType</key>
+    <string>Background</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:${homeDir}/.local/bin</string>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${homeDir}/.local/bin</string>
         <key>HOME</key>
         <string>${homeDir}</string>
+        <key>DOCKER_HOST</key>
+        <string>unix://${homeDir}/.docker/run/docker.sock</string>
     </dict>
     <key>StandardOutPath</key>
     <string>${projectRoot}/logs/clawbridge.log</string>
@@ -282,9 +296,15 @@ ExecStart=${nodePath} ${projectRoot}/dist/index.js
 WorkingDirectory=${projectRoot}
 Restart=always
 RestartSec=5
+RestartPreventExitCodes=78
+StartLimitBurst=3
+StartLimitIntervalSec=120
 KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=30
 Environment=HOME=${homeDir}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:${homeDir}/.local/bin
+EnvironmentFile=-${homeDir}/.clawbridge/.env
 StandardOutput=append:${projectRoot}/logs/clawbridge.log
 StandardError=append:${projectRoot}/logs/clawbridge.error.log
 

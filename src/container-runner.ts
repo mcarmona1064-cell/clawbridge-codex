@@ -162,6 +162,13 @@ async function spawnContainer(session: Session): Promise<void> {
         } catch {
           /* ignore */
         }
+        // Force-remove so the stopped container doesn't linger after daemon restarts
+        // (--rm only auto-cleans on normal exits, not after daemon restart mid-run).
+        try {
+          execSync(`${CONTAINER_RUNTIME_BIN} rm -f ${name}`, { stdio: 'pipe' });
+        } catch {
+          /* already removed */
+        }
       }
     }
   } catch {
