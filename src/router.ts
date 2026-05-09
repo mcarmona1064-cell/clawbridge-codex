@@ -17,7 +17,10 @@
  * drops (no agent wired, no trigger match); the access gate writes rows
  * for policy refusals.
  */
+import fs from 'fs';
+import path from 'path';
 import { getChannelAdapter } from './channels/channel-registry.js';
+import { GROUPS_DIR } from './config.js';
 import { gateCommand } from './command-gate.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { recordDroppedMessage } from './db/dropped-messages.js';
@@ -423,6 +426,32 @@ async function deliverToAgent(
     }
   }
 
+  // Write inbound file attachments to the group's attachments folder so the
+  // container can access them. Filenames are prefixed with the message id to
+  // avoid collisions. The content object is mutated to include the paths so
+  // the agent sees them in the prompt.
+  let messageContent = event.message.content;
+  if (event.message.files && event.message.files.length > 0) {
+    try {
+      const attachDir = path.join(GROUPS_DIR, agentGroup.folder, 'attachments');
+      fs.mkdirSync(attachDir, { recursive: true });
+      const writtenPaths: string[] = [];
+      for (const file of event.message.files) {
+        const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const dest = path.join(attachDir, `${event.message.id}-${safeName}`);
+        fs.writeFileSync(dest, file.data);
+        // Container sees attachments at /workspace/group/attachments/<name>
+        writtenPaths.push(`/workspace/group/attachments/${event.message.id}-${safeName}`);
+      }
+      // Merge attachment paths into the content object
+      const parsed = typeof messageContent === 'string' ? JSON.parse(messageContent) : { ...(messageContent as object) };
+      parsed.attachments = writtenPaths;
+      messageContent = parsed;
+    } catch (err) {
+      log.warn('Failed to write inbound file attachment', { err, agentGroup: agentGroup.folder });
+    }
+  }
+
   writeSessionMessage(session.agent_group_id, session.id, {
     id: messageIdForAgent(event.message.id, agent.agent_group_id),
     kind: event.message.kind,
@@ -430,7 +459,7 @@ async function deliverToAgent(
     platformId: deliveryAddr.platformId,
     channelType: deliveryAddr.channelType,
     threadId: deliveryAddr.threadId,
-    content: event.message.content,
+    content: messageContent,
     trigger: wake ? 1 : 0,
   });
 

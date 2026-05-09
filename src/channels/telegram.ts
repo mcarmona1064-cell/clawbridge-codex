@@ -15,7 +15,7 @@
  */
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
-import type { ChannelAdapter, ChannelSetup, InboundMessage, OutboundFile, OutboundMessage } from './adapter.js';
+import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundFile, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 import { interceptPairingMessage } from './telegram-pairing.js';
 
@@ -67,6 +67,37 @@ interface TgVideoNote {
   file_size?: number;
 }
 
+interface TgDocument {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
+interface TgPhotoSize {
+  file_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+}
+
+interface TgVideo {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  duration: number;
+  file_size?: number;
+}
+
+interface TgSticker {
+  file_id: string;
+  width: number;
+  height: number;
+  is_animated: boolean;
+  is_video: boolean;
+  emoji?: string;
+}
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
@@ -79,6 +110,11 @@ interface TgMessage {
   voice?: TgVoice;
   audio?: TgAudio;
   video_note?: TgVideoNote;
+  document?: TgDocument;
+  photo?: TgPhotoSize[];      // array of sizes — largest is last
+  video?: TgVideo;
+  animation?: TgDocument;    // Telegram sends GIFs as MP4 animations (same shape as document)
+  sticker?: TgSticker;
 }
 
 interface TgFile {
@@ -272,7 +308,7 @@ function createAdapter(): ChannelAdapter | null {
         const updates = await tgGet<TgUpdate[]>(token, 'getUpdates', {
           offset: lastUpdateId + 1,
           timeout: LONG_POLL_TIMEOUT_S,
-          allowed_updates: '["message"]',
+          allowed_updates: '["message","edited_message"]',
         });
         for (const upd of updates) {
           lastUpdateId = Math.max(lastUpdateId, upd.update_id);
@@ -332,7 +368,34 @@ function createAdapter(): ChannelAdapter | null {
       const transcript = await transcribeVoice(msg);
       if (transcript) text = `[voice] ${transcript}`;
     }
-    if (!text) return; // photo/sticker/etc without text — ignore for v1
+
+    // Collect file attachments: document, photo (largest size), video, animation, sticker
+    const files: InboundFile[] = [];
+    if (msg.document) {
+      const f = await tgDownloadFile(token, msg.document.file_id);
+      if (f) files.push({ filename: msg.document.file_name ?? f.filename, mimeType: msg.document.mime_type, data: f.data });
+    }
+    if (msg.photo?.length) {
+      const largest = msg.photo[msg.photo.length - 1];
+      const f = await tgDownloadFile(token, largest.file_id);
+      if (f) files.push({ filename: f.filename || 'photo.jpg', mimeType: 'image/jpeg', data: f.data });
+    }
+    if (msg.video) {
+      const f = await tgDownloadFile(token, msg.video.file_id);
+      if (f) files.push({ filename: (msg.video.file_name ?? f.filename) || 'video.mp4', mimeType: msg.video.mime_type ?? 'video/mp4', data: f.data });
+    }
+    if (msg.animation) {
+      const f = await tgDownloadFile(token, msg.animation.file_id);
+      if (f) files.push({ filename: (msg.animation.file_name ?? f.filename) || 'animation.mp4', mimeType: msg.animation.mime_type ?? 'video/mp4', data: f.data });
+    }
+    if (msg.sticker) {
+      const f = await tgDownloadFile(token, msg.sticker.file_id);
+      if (f) files.push({ filename: f.filename || 'sticker.webp', mimeType: 'image/webp', data: f.data });
+    }
+
+    // Drop messages with no text and no files (e.g. unsupported sticker types)
+    if (!text && files.length === 0) return;
+
     const platformId = platformIdFor(msg.chat.id);
     const isGroup = msg.chat.type !== 'private';
     // Intercept pairing codes during setup — swallow the message if consumed.
@@ -351,6 +414,7 @@ function createAdapter(): ChannelAdapter | null {
         sender: senderName(msg.from),
         senderId: msg.from ? `telegram:${msg.from.id}` : `telegram:${msg.chat.id}`,
       },
+      ...(files.length > 0 ? { files } : {}),
     };
 
     // Best-effort: surface the chat name so the host can fill in

@@ -290,7 +290,7 @@ export class ClaudeProvider implements AgentProvider {
         cwd: input.cwd,
         additionalDirectories: this.additionalDirectories,
         resume: input.continuation,
-        pathToClaudeCodeExecutable: '/pnpm/claude',
+        // pathToClaudeCodeExecutable: SDK resolves claude via $PATH (PNPM_HOME/bin on PATH in image)
         systemPrompt: instructions ? { type: 'preset' as const, preset: 'claude_code' as const, append: instructions } : undefined,
         allowedTools: TOOL_ALLOWLIST,
         disallowedTools: SDK_DISALLOWED_TOOLS,

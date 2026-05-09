@@ -58,8 +58,17 @@ export interface InboundEvent {
     isMention?: boolean;
     /** True when the source is a group/channel thread, false for DMs. */
     isGroup?: boolean;
+    /** File attachments from the user, written to the group's attachments folder by the router. */
+    files?: InboundFile[];
   };
   replyTo?: DeliveryAddress;
+}
+
+/** An inbound file attachment (photo, document, video, etc.) from the user. */
+export interface InboundFile {
+  filename: string;
+  mimeType?: string;
+  data: Buffer;
 }
 
 /** Inbound message from adapter to host. */
@@ -85,6 +94,8 @@ export interface InboundMessage {
   isMention?: boolean;
   /** True when the source is a group/channel thread, false for DMs. */
   isGroup?: boolean;
+  /** File attachments from the user (photos, documents, video, etc.). */
+  files?: InboundFile[];
 }
 
 /** A file attachment to deliver alongside a message. */

@@ -21,5 +21,3 @@ export { requestApproval, registerApprovalHandler, notifyAgent } from './primiti
 export type { ApprovalHandler, ApprovalHandlerContext, RequestApprovalOptions } from './primitive.js';
 
 registerResponseHandler(handleApprovalsResponse);
-
-

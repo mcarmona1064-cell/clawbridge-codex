@@ -22,10 +22,7 @@ const PAIRING_FILE = path.join(DATA_DIR, 'pairing.json');
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-export type PairingIntent =
-  | 'main'
-  | { kind: 'wire-to'; folder: string }
-  | { kind: 'new-agent'; folder: string };
+export type PairingIntent = 'main' | { kind: 'wire-to'; folder: string } | { kind: 'new-agent'; folder: string };
 
 interface PairingRecord {
   intent: PairingIntent;
