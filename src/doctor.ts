@@ -109,7 +109,7 @@ interface ContainerInfo {
   status: string;
 }
 
-function checkContainers(): void {
+function checkContainers(autoFix: boolean): void {
   const required = ['hindsight-api', 'hindsight-db'];
 
   let containers: ContainerInfo[] = [];
@@ -141,15 +141,35 @@ function checkContainers(): void {
       if (isUp) {
         pass(name, found.status);
       } else {
-        fail(name, found.status, `run: clawbridge upgrade`);
+        if (autoFix) {
+          try {
+            const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
+            execSync('docker compose up -d', { cwd: clawbridgeDir, stdio: 'pipe' });
+            pass(name, 'started');
+          } catch (e) {
+            fail(name, found.status, 'run: cd ~/.clawbridge && docker compose up -d');
+          }
+        } else {
+          fail(name, found.status, 'run: cd ~/.clawbridge && docker compose up -d');
+        }
       }
     } else {
-      fail(name, 'container not found', 'run: clawbridge upgrade');
+      if (autoFix) {
+        try {
+          const clawbridgeDir = path.join(os.homedir(), '.clawbridge');
+          execSync('docker compose up -d', { cwd: clawbridgeDir, stdio: 'pipe' });
+          pass(name, 'started');
+        } catch (e) {
+          fail(name, 'container not found', 'run: cd ~/.clawbridge && docker compose up -d');
+        }
+      } else {
+        fail(name, 'container not found', 'run: cd ~/.clawbridge && docker compose up -d');
+      }
     }
   }
 }
 
-function checkContainerImage(): void {
+function checkContainerImage(autoFix: boolean): void {
   try {
     // Derive the image tag from the installed service registration (source of truth
     // for this install's slug), not from process.cwd() which gives the wrong slug
@@ -205,7 +225,18 @@ function checkContainerImage(): void {
       pass('Agent image', imageTag);
     } else {
       const buildCmd = AGENT_PROVIDER === 'codex' ? 'clawbridge build-image --codex' : 'clawbridge build-image';
-      fail('Agent image', `"${imageTag}" not found`, `run: ${buildCmd}`);
+      if (autoFix) {
+        try {
+          const pkgDir = path.dirname(fileURLToPath(import.meta.url));
+          const projectRoot = path.resolve(pkgDir, '../..');
+          execSync('bash container/build.sh', { cwd: projectRoot, stdio: 'inherit' });
+          pass('Agent image', 'built');
+        } catch {
+          fail('Agent image', `"${imageTag}" not found`, `run: ${buildCmd}`);
+        }
+      } else {
+        fail('Agent image', `"${imageTag}" not found`, `run: ${buildCmd}`);
+      }
     }
   } catch {
     fail('Agent image', 'docker unavailable', 'start Docker Desktop');
@@ -243,6 +274,7 @@ async function checkHindsightHealth(env: Map<string, string>): Promise<void> {
 }
 
 function checkLaunchd(): void {
+  if (process.platform !== 'darwin') return; // Linux handled by checkSystemd
   try {
     const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
     const plists = fs
@@ -288,6 +320,60 @@ function checkLaunchd(): void {
   }
 }
 
+
+async function checkSystemd(autoFix: boolean): Promise<void> {
+  try {
+    const homeDir = os.homedir();
+    const userUnitDir = path.join(homeDir, '.config', 'systemd', 'user');
+
+    // Find any clawbridge service unit
+    let unitName: string | null = null;
+    try {
+      const files = fs.readdirSync(userUnitDir);
+      const unit = files.find(f => f.startsWith('clawbridge') && f.endsWith('.service'));
+      if (unit) unitName = unit.replace('.service', '');
+    } catch {
+      // dir doesn't exist
+    }
+
+    // Also check system-level
+    if (!unitName) {
+      try {
+        const sysFiles = fs.readdirSync('/etc/systemd/system/');
+        const unit = sysFiles.find(f => f.startsWith('clawbridge') && f.endsWith('.service'));
+        if (unit) unitName = unit.replace('.service', '');
+      } catch { /* ignore */ }
+    }
+
+    if (!unitName) {
+      return fail('Systemd service', 'No ClawBridge systemd unit found', 'run: clawbridge setup to register the service');
+    }
+
+    // Check if active
+    try {
+      const isRoot = process.getuid?.() === 0;
+      const prefix = isRoot ? 'systemctl' : 'systemctl --user';
+      execSync(`${prefix} is-active ${unitName}`, { stdio: 'pipe' });
+      pass('Systemd service', unitName);
+    } catch {
+      if (autoFix) {
+        try {
+          const isRoot = process.getuid?.() === 0;
+          const prefix = isRoot ? 'systemctl' : 'systemctl --user';
+          execSync(`${prefix} restart ${unitName}`, { stdio: 'pipe' });
+          pass('Systemd service', `${unitName} (restarted)`);
+        } catch (e) {
+          fail('Systemd service', `${unitName} not active, restart failed`, `run: systemctl --user restart ${unitName}`);
+        }
+      } else {
+        fail('Systemd service', `${unitName} not active`, `run: systemctl --user restart ${unitName}`);
+      }
+    }
+  } catch (err) {
+    fail('Systemd service', String(err));
+  }
+}
+
 function checkDatabase(): void {
   const dbPath = path.join(os.homedir(), '.clawbridge', 'data', 'v2.db');
   try {
@@ -303,7 +389,7 @@ function checkDatabase(): void {
   }
 }
 
-function checkDockerComposeSymlink(): void {
+function checkDockerComposeSymlink(autoFix: boolean): void {
   const destPath = path.join(os.homedir(), '.clawbridge', 'docker-compose.yml');
   try {
     const stat = fs.lstatSync(destPath);
@@ -314,7 +400,20 @@ function checkDockerComposeSymlink(): void {
       fail('docker-compose', 'exists but is NOT a symlink — compose drift risk', 'run: clawbridge upgrade to re-link');
     }
   } catch {
-    fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge setup');
+    if (autoFix) {
+      try {
+        const pkgDir = path.dirname(fileURLToPath(import.meta.url));
+        const composeSrc = path.resolve(pkgDir, '../../integrations/docker-compose.yml');
+        const composeDest = path.join(os.homedir(), '.clawbridge', 'docker-compose.yml');
+        fs.mkdirSync(path.dirname(composeDest), { recursive: true });
+        fs.symlinkSync(composeSrc, composeDest);
+        pass('docker-compose.yml symlink', 'created');
+      } catch (e) {
+        fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge setup');
+      }
+    } else {
+      fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge setup');
+    }
   }
 }
 
@@ -327,7 +426,7 @@ function checkConfigFile(env: Map<string, string>): void {
   }
   pass('Config file', `~/.clawbridge/.env`);
 
-  const requiredKeys = ['CLAUDE_CODE_OAUTH_TOKEN', 'ASSISTANT_NAME', 'HINDSIGHT_URL', 'HINDSIGHT_API_KEY'];
+  const requiredKeys = ['CLAUDE_CODE_OAUTH_TOKEN', 'ASSISTANT_NAME'];
   for (const key of requiredKeys) {
     if (env.get(key)) {
       pass(key, dim('set'));
@@ -335,6 +434,16 @@ function checkConfigFile(env: Map<string, string>): void {
       fail(key, `missing from ~/.clawbridge/.env`);
     }
   }
+
+  // Hindsight is optional — only flag if partially configured
+  const hindsightUrl = env.get('HINDSIGHT_URL');
+  const hindsightKey = env.get('HINDSIGHT_API_KEY');
+  if (hindsightUrl && !hindsightKey) {
+    fail('HINDSIGHT_API_KEY', 'HINDSIGHT_URL is set but HINDSIGHT_API_KEY is missing');
+  } else if (hindsightUrl && hindsightKey) {
+    pass('Hindsight', 'configured');
+  }
+  // If neither is set, Hindsight is just not enabled — that's fine, don't flag it
 }
 
 // ─── Channel checks ───────────────────────────────────────────────────────────
@@ -344,17 +453,33 @@ async function fixAndVerifyChannel(channelName: string, verify: () => Promise<bo
 
   // Restart service
   try {
-    const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
-    const plists = fs
-      .readdirSync(launchAgentsDir)
-      .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
-    if (plists.length > 0) {
-      const label = plists[0].replace(/\.plist$/, '');
-      const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
-      spawnSync('launchctl', ['kickstart', '-k', `gui/${uid}/${label}`], {
-        encoding: 'utf-8',
-        timeout: 15000,
-      });
+    if (process.platform === 'darwin') {
+      const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
+      const plists = fs
+        .readdirSync(launchAgentsDir)
+        .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+      if (plists.length > 0) {
+        const label = plists[0].replace(/\.plist$/, '');
+        const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+        spawnSync('launchctl', ['kickstart', '-k', `gui/${uid}/${label}`], {
+          encoding: 'utf-8',
+          timeout: 15000,
+        });
+      }
+    } else {
+      // Linux: find and restart the systemd unit
+      try {
+        const homeDir = os.homedir();
+        const userUnitDir = path.join(homeDir, '.config', 'systemd', 'user');
+        const files = fs.readdirSync(userUnitDir);
+        const unit = files.find(f => f.startsWith('clawbridge') && f.endsWith('.service'));
+        if (unit) {
+          const unitName = unit.replace('.service', '');
+          const isRoot = process.getuid?.() === 0;
+          const prefix = isRoot ? 'systemctl' : 'systemctl --user';
+          execSync(`${prefix} restart ${unitName}`, { stdio: 'pipe' });
+        }
+      } catch { /* ignore */ }
     }
   } catch {
     /* ignore restart errors — we'll verify below */
@@ -422,7 +547,7 @@ async function checkTelegram(env: Map<string, string>, autoFix: boolean): Promis
   }
 }
 
-async function checkWhatsApp(env: Map<string, string>): Promise<void> {
+async function checkWhatsApp(env: Map<string, string>, autoFix: boolean): Promise<void> {
   const phoneNumberId = env.get('WHATSAPP_PHONE_NUMBER_ID');
   const accessToken = env.get('WHATSAPP_ACCESS_TOKEN');
 
@@ -457,10 +582,32 @@ async function checkWhatsApp(env: Map<string, string>): Promise<void> {
     } else {
       const errMsg = data.error?.message ?? `HTTP ${res.status}`;
       fail('WhatsApp', `API error: ${errMsg}`, 'check WHATSAPP_ACCESS_TOKEN in ~/.clawbridge/.env');
+      if (autoFix) {
+        await fixAndVerifyChannel('WhatsApp', async () => {
+          try {
+            const r = await fetch(
+              `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number`,
+              { headers: { Authorization: `Bearer ${accessToken}` } },
+            );
+            return r.ok;
+          } catch { return false; }
+        });
+      }
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     fail('WhatsApp', `unreachable (${msg})`, 'check internet connection or WHATSAPP_ACCESS_TOKEN');
+    if (autoFix) {
+      await fixAndVerifyChannel('WhatsApp', async () => {
+        try {
+          const r = await fetch(
+            `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+          return r.ok;
+        } catch { return false; }
+      });
+    }
   }
 }
 
@@ -567,7 +714,7 @@ async function checkChannels(env: Map<string, string>, autoFix: boolean): Promis
   }
 
   await checkTelegram(env, autoFix);
-  await checkWhatsApp(env);
+  await checkWhatsApp(env, autoFix);
   await checkDiscord(env, autoFix);
   await checkSlack(env, autoFix);
 }
@@ -764,7 +911,11 @@ export async function runDoctor(): Promise<void> {
   console.log('');
   console.log(bold('System'));
   checkDocker();
-  checkLaunchd();
+  if (process.platform === 'darwin') {
+    checkLaunchd();
+  } else {
+    await checkSystemd(autoFix);
+  }
 
   // ── Config ───────────────────────────────────────────────────────────────
   console.log('');
@@ -779,8 +930,8 @@ export async function runDoctor(): Promise<void> {
   // ── Services ─────────────────────────────────────────────────────────────
   console.log('');
   console.log(bold('Services'));
-  checkContainers();
-  checkContainerImage();
+  checkContainers(autoFix);
+  checkContainerImage(autoFix);
   checkCodex(env);
   await checkHindsightHealth(env);
 
@@ -793,7 +944,7 @@ export async function runDoctor(): Promise<void> {
   console.log('');
   console.log(bold('Storage'));
   checkDatabase();
-  checkDockerComposeSymlink();
+  checkDockerComposeSymlink(autoFix);
 
   // ── Summary ──────────────────────────────────────────────────────────────
   console.log('');
