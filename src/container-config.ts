@@ -54,6 +54,14 @@ export interface ContainerConfig {
    * The MCP tool is a no-op error response when this is false.
    */
   allowHostExec?: boolean;
+  /**
+   * Extra environment variables to inject into the container. Values may
+   * reference `~/.clawbridge/.env` entries with `${VAR}` or `${VAR:-default}`
+   * syntax. These are injected after credential vars and can be overridden by
+   * providerContribution.env. Trust boundary: container.json is host-side and
+   * agent edits go through the self-mod approval flow.
+   */
+  env?: Record<string, string>;
 }
 
 function emptyConfig(): ContainerConfig {
@@ -95,6 +103,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
       allowHostExec: raw.allowHostExec ?? false,
+      env: raw.env,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

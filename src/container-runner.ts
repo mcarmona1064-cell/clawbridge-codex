@@ -505,6 +505,19 @@ async function buildContainerArgs(
     }
   }
 
+  // Per-group env vars from container.json — injected after credential vars.
+  // Values may contain ${VAR} or ${VAR:-default} references to ~/.clawbridge/.env.
+  if (containerConfig.env && Object.keys(containerConfig.env).length > 0) {
+    const varNames = Object.values(containerConfig.env).flatMap((v) =>
+      [...v.matchAll(/\${([^}:-]+)/g)].map((m) => m[1]),
+    );
+    const dotenv = varNames.length > 0 ? readEnvFile(varNames) : {};
+    for (const [key, tmpl] of Object.entries(containerConfig.env)) {
+      const value = tmpl.replace(/\${([^}:-]+)(?::-([^}]*))?}/g, (_, k, def) => dotenv[k] ?? def ?? '');
+      args.push('-e', `${key}=${value}`);
+    }
+  }
+
   // HINDSIGHT_* vars are intentionally NOT passed to containers.
   // Hindsight (semantic memory) runs as a host-side service and is accessed
   // only by the host process (src/memory/hindsight.ts). Containers have no

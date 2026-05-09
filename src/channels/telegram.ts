@@ -15,12 +15,20 @@
  */
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
-import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundFile, OutboundMessage } from './adapter.js';
+import type {
+  ChannelAdapter,
+  ChannelSetup,
+  InboundFile,
+  InboundMessage,
+  OutboundFile,
+  OutboundMessage,
+} from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 import { interceptPairingMessage } from './telegram-pairing.js';
 
 const API_BASE = 'https://api.telegram.org';
 const LONG_POLL_TIMEOUT_S = 25;
+const INBOUND_FILE_SIZE_CAP = 50 * 1024 * 1024; // 50 MB
 
 interface TgUser {
   id: number;
@@ -111,9 +119,9 @@ interface TgMessage {
   audio?: TgAudio;
   video_note?: TgVideoNote;
   document?: TgDocument;
-  photo?: TgPhotoSize[];      // array of sizes — largest is last
+  photo?: TgPhotoSize[]; // array of sizes — largest is last
   video?: TgVideo;
-  animation?: TgDocument;    // Telegram sends GIFs as MP4 animations (same shape as document)
+  animation?: TgDocument; // Telegram sends GIFs as MP4 animations (same shape as document)
   sticker?: TgSticker;
 }
 
@@ -369,28 +377,76 @@ function createAdapter(): ChannelAdapter | null {
       if (transcript) text = `[voice] ${transcript}`;
     }
 
-    // Collect file attachments: document, photo (largest size), video, animation, sticker
+    // Collect file attachments: document, photo (largest size), video, animation, sticker.
+    // For every file: append a synthetic text hint for backward compat with containers that
+    // don't yet parse the `files` field, and to give the agent a one-line preview.
+    // Files exceeding INBOUND_FILE_SIZE_CAP are hinted but not downloaded.
     const files: InboundFile[] = [];
+
+    async function tgCollectFile(opts: {
+      fileId: string;
+      fileSize?: number;
+      filename: string;
+      mimeType?: string;
+      hintType?: string;
+    }): Promise<void> {
+      const { fileId, fileSize, filename, mimeType, hintType = 'document' } = opts;
+      if (fileSize && fileSize > INBOUND_FILE_SIZE_CAP) {
+        const mb = Math.round(fileSize / 1024 / 1024);
+        text = (text ? text + '\n' : '') + `[${hintType}] ${filename} (${mb}MB — exceeds 50MB inbound limit, not downloaded)`;
+        return;
+      }
+      const f = await tgDownloadFile(token, fileId);
+      if (!f) return;
+      const sizeStr = fileSize ? ` size=${fileSize}` : '';
+      const mimeStr = mimeType ? ` mime=${mimeType}` : '';
+      text = (text ? text + '\n' : '') + `[${hintType}] ${filename}${mimeStr}${sizeStr}`;
+      files.push({ filename, mimeType, data: f.data });
+    }
+
     if (msg.document) {
-      const f = await tgDownloadFile(token, msg.document.file_id);
-      if (f) files.push({ filename: msg.document.file_name ?? f.filename, mimeType: msg.document.mime_type, data: f.data });
+      await tgCollectFile({
+        fileId: msg.document.file_id,
+        fileSize: msg.document.file_size,
+        filename: msg.document.file_name ?? 'file.bin',
+        mimeType: msg.document.mime_type,
+      });
     }
     if (msg.photo?.length) {
       const largest = msg.photo[msg.photo.length - 1];
-      const f = await tgDownloadFile(token, largest.file_id);
-      if (f) files.push({ filename: f.filename || 'photo.jpg', mimeType: 'image/jpeg', data: f.data });
+      await tgCollectFile({
+        fileId: largest.file_id,
+        fileSize: largest.file_size,
+        filename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        hintType: 'photo',
+      });
     }
     if (msg.video) {
-      const f = await tgDownloadFile(token, msg.video.file_id);
-      if (f) files.push({ filename: (msg.video.file_name ?? f.filename) || 'video.mp4', mimeType: msg.video.mime_type ?? 'video/mp4', data: f.data });
+      await tgCollectFile({
+        fileId: msg.video.file_id,
+        fileSize: msg.video.file_size,
+        filename: msg.video.file_name ?? 'video.mp4',
+        mimeType: msg.video.mime_type ?? 'video/mp4',
+        hintType: 'video',
+      });
     }
     if (msg.animation) {
-      const f = await tgDownloadFile(token, msg.animation.file_id);
-      if (f) files.push({ filename: (msg.animation.file_name ?? f.filename) || 'animation.mp4', mimeType: msg.animation.mime_type ?? 'video/mp4', data: f.data });
+      await tgCollectFile({
+        fileId: msg.animation.file_id,
+        fileSize: msg.animation.file_size,
+        filename: msg.animation.file_name ?? 'animation.mp4',
+        mimeType: msg.animation.mime_type ?? 'video/mp4',
+        hintType: 'animation',
+      });
     }
     if (msg.sticker) {
       const f = await tgDownloadFile(token, msg.sticker.file_id);
-      if (f) files.push({ filename: f.filename || 'sticker.webp', mimeType: 'image/webp', data: f.data });
+      if (f) {
+        const filename = f.filename || 'sticker.webp';
+        text = (text ? text + '\n' : '') + `[sticker] ${filename} mime=image/webp`;
+        files.push({ filename, mimeType: 'image/webp', data: f.data });
+      }
     }
 
     // Drop messages with no text and no files (e.g. unsupported sticker types)

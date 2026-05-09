@@ -426,26 +426,34 @@ async function deliverToAgent(
     }
   }
 
-  // Write inbound file attachments to the group's attachments folder so the
-  // container can access them. Filenames are prefixed with the message id to
-  // avoid collisions. The content object is mutated to include the paths so
-  // the agent sees them in the prompt.
+  // Materialize inbound file attachments into the session workspace so the
+  // container can access them at /workspace/inbound/<msgId>/<filename>.
+  // Buffers are written to disk here and stripped from the DB row —
+  // SQLite is the wrong place for blobs, and the workspace path is already
+  // mounted into the container at /workspace.
   let messageContent = event.message.content;
   if (event.message.files && event.message.files.length > 0) {
     try {
-      const attachDir = path.join(GROUPS_DIR, agentGroup.folder, 'attachments');
-      fs.mkdirSync(attachDir, { recursive: true });
-      const writtenPaths: string[] = [];
+      const msgId = messageIdForAgent(event.message.id, agent.agent_group_id);
+      const inboundDir = path.join(sessionDir(session.agent_group_id, session.id), 'inbound', msgId);
+      fs.mkdirSync(inboundDir, { recursive: true });
+      const attachmentMeta: { filename: string; mimeType?: string; localPath: string; type: string }[] = [];
       for (const file of event.message.files) {
         const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const dest = path.join(attachDir, `${event.message.id}-${safeName}`);
+        const dest = path.join(inboundDir, safeName);
         fs.writeFileSync(dest, file.data);
-        // Container sees attachments at /workspace/group/attachments/<name>
-        writtenPaths.push(`/workspace/group/attachments/${event.message.id}-${safeName}`);
+        // localPath is relative to /workspace (the session mount point in the container).
+        // The formatter prepends /workspace/ when building the prompt.
+        attachmentMeta.push({
+          filename: file.filename,
+          mimeType: file.mimeType,
+          localPath: `inbound/${msgId}/${safeName}`,
+          type: file.mimeType?.startsWith('image/') ? 'image' : 'file',
+        });
       }
-      // Merge attachment paths into the content object
-      const parsed = typeof messageContent === 'string' ? JSON.parse(messageContent) : { ...(messageContent as object) };
-      parsed.attachments = writtenPaths;
+      const parsed =
+        typeof messageContent === 'string' ? JSON.parse(messageContent) : { ...(messageContent as object) };
+      parsed.attachments = attachmentMeta;
       messageContent = parsed;
     } catch (err) {
       log.warn('Failed to write inbound file attachment', { err, agentGroup: agentGroup.folder });
