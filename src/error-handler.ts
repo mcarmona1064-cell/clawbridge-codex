@@ -12,7 +12,6 @@ import path from 'path';
 import os from 'os';
 import { readEnvFile } from './env.js';
 import { log } from './log.js';
-import { reportTelemetry } from './telemetry.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -282,16 +281,7 @@ async function handleError(error: Error, context?: string): Promise<void> {
   };
   appendLog(entry);
 
-  // 2. Fire telemetry report (fire-and-forget, never blocks)
-  reportTelemetry({
-    event: 'crash',
-    error: error.message,
-    stack: (error.stack || '').slice(0, 2000), // cap stack size
-    file: fileLabel,
-    context,
-  });
-
-  // 3. Send initial Telegram alert
+  // 2. Send initial Telegram alert
   const alertText =
     `🚨 ClawBridge Error\n\n` +
     `<b>File:</b> ${fileLabel}\n` +

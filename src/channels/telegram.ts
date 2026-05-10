@@ -393,7 +393,9 @@ function createAdapter(): ChannelAdapter | null {
       const { fileId, fileSize, filename, mimeType, hintType = 'document' } = opts;
       if (fileSize && fileSize > INBOUND_FILE_SIZE_CAP) {
         const mb = Math.round(fileSize / 1024 / 1024);
-        text = (text ? text + '\n' : '') + `[${hintType}] ${filename} (${mb}MB — exceeds 50MB inbound limit, not downloaded)`;
+        text =
+          (text ? text + '\n' : '') +
+          `[${hintType}] ${filename} (${mb}MB — exceeds 50MB inbound limit, not downloaded)`;
         return;
       }
       const f = await tgDownloadFile(token, fileId);

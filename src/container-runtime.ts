@@ -87,13 +87,19 @@ export function cleanupOrphans(): void {
     }
     // Stop running containers first, then force-remove all (running + stopped).
     for (const name of running) {
-      try { stopContainer(name); } catch { /* already stopped */ }
+      try {
+        stopContainer(name);
+      } catch {
+        /* already stopped */
+      }
     }
     const all = [...running, ...stopped];
     for (const name of all) {
       try {
         execSync(`${CONTAINER_RUNTIME_BIN} rm -f ${name}`, { stdio: 'pipe' });
-      } catch { /* already removed */ }
+      } catch {
+        /* already removed */
+      }
     }
     if (all.length > 0) {
       log.info('Cleaned up orphaned containers', { running: running.length, stopped: stopped.length, names: all });

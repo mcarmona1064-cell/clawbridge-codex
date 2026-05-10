@@ -363,9 +363,6 @@ async function main(): Promise<void> {
 
   setupLog.complete(Date.now() - RUN_START);
   phEmit('setup_completed', { duration_ms: Date.now() - RUN_START });
-  // Report successful install to ClawBridge telemetry
-  reportTelemetry({ event: 'install', success: true, channel: channelChoice });
-
   const dmTarget = channelDmLabel(channelChoice);
   if (dmTarget) {
     // Bright framed banner (not dim) — the whole point of the feedback was
@@ -864,11 +861,6 @@ function printIntro(): void {
   // the visible top of the clack session once the bash output scrolls away.
   p.intro(`${wordmark}  ${k.dim("Let's get you set up.")}`);
 
-  // Telemetry consent notice — shown once at the start of setup
-  p.note(
-    k.dim('ClawBridge sends anonymous crash and install reports to help improve stability.\nNo message content or credentials are included.\nDisable anytime: add CLAWBRIDGE_NO_TELEMETRY=true to ~/.clawbridge/.env'),
-    'Telemetry',
-  );
 }
 
 /**
@@ -907,11 +899,5 @@ function initProgressionLog(): void {
 main().catch((err) => {
   p.log.error(err instanceof Error ? err.message : String(err));
   p.cancel('Setup aborted.');
-  // Report failed install to ClawBridge telemetry
-  reportTelemetry({
-    event: 'install',
-    success: false,
-    errorMessage: err instanceof Error ? err.message : String(err),
-  });
   process.exit(1);
 });

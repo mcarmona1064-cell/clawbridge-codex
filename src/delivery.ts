@@ -368,7 +368,9 @@ async function deliverMessage(
     // Throw so the caller's catch block calls markDeliveryFailed after MAX_DELIVERY_ATTEMPTS.
     // A silent return would mark the message delivered (caller does markDelivered unconditionally)
     // and swallow it permanently without any user-visible error.
-    throw new Error(`Message ${msg.id} missing routing fields: channel_type=${msg.channel_type} platform_id=${msg.platform_id}`);
+    throw new Error(
+      `Message ${msg.id} missing routing fields: channel_type=${msg.channel_type} platform_id=${msg.platform_id}`,
+    );
   }
 
   // Read file attachments from outbox if the content declares files.
