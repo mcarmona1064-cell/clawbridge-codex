@@ -1,6 +1,6 @@
 {
   "name": "clawbridge-agent",
-  "version": "2.5.19",
+  "version": "2.5.20",
   "description": "AI agent platform for ClawBridge Agency. Self-hosted, secure, customizable.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",

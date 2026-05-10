@@ -105,14 +105,36 @@ RUN --mount=type=cache,target=/root/.cache/pnpm \
 RUN --mount=type=cache,target=/root/.cache/pnpm     pnpm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && \
     if ! claude --version >/dev/null 2>&1; then \
       echo "claude binary is a stub — locating native binary" && \
-      NATIVE=$(find /pnpm -name 'claude' -not -name '*.js' -type f -perm /111 2>/dev/null | head -1) && \
-      if [ -n "$NATIVE" ]; then \
+      NATIVE=$(find /pnpm -path '*/@anthropic-ai/claude-code-linux-*/claude' -type f -perm /111 2>/dev/null | head -1) && \
+      if [ -n "$NATIVE" ] && [ "$NATIVE" != "/pnpm/bin/claude" ]; then \
         echo "Found native binary at $NATIVE" && \
-        ln -sf "$NATIVE" /pnpm/bin/claude; \
+        ln -sfn "$NATIVE" /pnpm/bin/claude; \
       else \
         CLAUDE_PKG=$(find /pnpm -path "*/@anthropic-ai/claude-code" -maxdepth 8 -type d 2>/dev/null | head -1) && \
         [ -n "$CLAUDE_PKG" ] && cd "$CLAUDE_PKG" && node scripts/postinstall.js 2>&1 || true; \
       fi; \
+    fi
+
+# ---- Fix Bun-installed agent-SDK native binary ------------------------------
+# `bun install` resolves @anthropic-ai/claude-agent-sdk's optional native deps
+# to the *musl* variant (claude-agent-sdk-linux-arm64-musl) even on this
+# glibc-based node:22-slim image. The musl-linked binary then fails to exec
+# because the musl dynamic linker (ld-musl-aarch64.so.1) isn't installed,
+# and the SDK reports "Claude Code native binary not found at ...".
+#
+# Fix: replace whatever Bun put there with a symlink to the working native
+# binary that pnpm fetched in the previous step (same version, glibc-correct).
+# Done after both bun install and the pnpm global install so both layers exist.
+RUN set -e; \
+    REAL=$(find /pnpm -path '*/@anthropic-ai/claude-code-linux-*/claude' -type f 2>/dev/null | head -1); \
+    if [ -z "$REAL" ]; then \
+      echo "WARN: native claude binary not found under /pnpm — skipping SDK symlink fix"; \
+    else \
+      for d in /app/node_modules/@anthropic-ai/claude-agent-sdk-linux-*; do \
+        [ -d "$d" ] || continue; \
+        ln -sfn "$REAL" "$d/claude"; \
+        echo "Linked $d/claude -> $REAL"; \
+      done; \
     fi
 
 # ---- Entrypoint --------------------------------------------------------------
