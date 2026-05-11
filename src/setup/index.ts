@@ -169,7 +169,7 @@ req.end();
     );
     return result.status === 0;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -540,8 +540,12 @@ async function runFreshInstall(): Promise<void> {
     } catch {
       /* not present */
     }
-    fs.symlinkSync(srcCompose, destCompose);
-    p.log.success('docker-compose.yml linked to package source');
+    try {
+      fs.symlinkSync(srcCompose, destCompose);
+      p.log.success('docker-compose.yml linked to package source');
+    } catch (e) {
+      p.log.warn('docker-compose.yml symlink failed — setup can continue but upgrades may not auto-update compose');
+    }
   }
 
   const confirmWrite = ensure(
@@ -990,7 +994,11 @@ async function runMigrationFlow(): Promise<void> {
     } catch {
       /* not present */
     }
-    fs.symlinkSync(srcCompose, destCompose);
+    try {
+      fs.symlinkSync(srcCompose, destCompose);
+    } catch {
+      p.log.warn('docker-compose.yml symlink failed — run: clawbridge doctor --fix');
+    }
   }
 
   // Step A — Claude OAuth token

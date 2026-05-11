@@ -266,7 +266,7 @@ async function checkHindsightHealth(env: Map<string, string>): Promise<void> {
   }
 }
 
-function checkLaunchd(): void {
+function checkLaunchd(autoFix: boolean): void {
   if (process.platform !== 'darwin') return; // Linux handled by checkSystemd
   try {
     const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
@@ -280,11 +280,18 @@ function checkLaunchd(): void {
     const label = plists[0].replace(/\.plist$/, '');
     const r = spawnSync('launchctl', ['list', label], { encoding: 'utf-8', timeout: 5000 });
     if (r.status !== 0 || r.stdout.includes('Could not find service')) {
-      fail(
-        'LaunchD service',
-        `${label} not loaded`,
-        `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`,
-      );
+      if (autoFix) {
+        try {
+          const uid = execSync('id -u', { encoding: 'utf-8' }).trim();
+          const plistPath = path.join(os.homedir(), 'Library', 'LaunchAgents', plists[0]);
+          execSync(`launchctl bootstrap gui/${uid} ${plistPath}`, { encoding: 'utf-8' });
+          pass('LaunchD service', `${label} (bootstrapped)`);
+        } catch (e) {
+          fail('LaunchD service', `${label} not loaded, bootstrap failed`, `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`);
+        }
+      } else {
+        fail('LaunchD service', `${label} not loaded`, `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`);
+      }
       return;
     }
     // Parse PID from launchctl list output
@@ -299,11 +306,17 @@ function checkLaunchd(): void {
       if (lastExit === '0') {
         pass('LaunchD service', `loaded, last exit 0  ${dim(label)}`);
       } else {
-        fail(
-          'LaunchD service',
-          `loaded but not running (LastExitStatus=${lastExit})`,
-          `check: tail -f ~/.clawbridge/logs/agent.log`,
-        );
+        if (autoFix) {
+          try {
+            const uid2 = execSync('id -u', { encoding: 'utf-8' }).trim();
+            execSync(`launchctl kickstart -k gui/${uid2}/${label}`, { encoding: 'utf-8' });
+            pass('LaunchD service', `${label} (restarted)`);
+          } catch {
+            fail('LaunchD service', `loaded but not running (LastExitStatus=${lastExit})`, `check: tail -f ~/.clawbridge/logs/agent.log`);
+          }
+        } else {
+          fail('LaunchD service', `loaded but not running (LastExitStatus=${lastExit})`, `check: tail -f ~/.clawbridge/logs/agent.log`);
+        }
       }
     }
   } catch (err: unknown) {
@@ -824,7 +837,7 @@ export async function runDoctor(): Promise<void> {
   console.log(bold('System'));
   checkDocker();
   if (process.platform === 'darwin') {
-    checkLaunchd();
+    checkLaunchd(autoFix);
   } else {
     await checkSystemd(autoFix);
   }

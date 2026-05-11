@@ -759,6 +759,8 @@ export async function runMigration(
           const match = srcEnvContent.match(new RegExp(`^${key}=(.*)$`, 'm'));
           if (match && !existingEnv.includes(`${key}=`)) {
             linesToAdd.push(`${key}=${match[1]}`);
+          } else if (match && existingEnv.includes(`${key}=`)) {
+            emit('credentials', `  Skipping ${key} — already present in .env`);
           }
         }
         if (linesToAdd.length > 0) {
