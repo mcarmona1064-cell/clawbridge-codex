@@ -1,0 +1,17 @@
+[Unit]
+Description=ClawBridge Agent ({{SLUG}})
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{NODE_PATH}} {{PROJECT_ROOT}}/dist/index.js
+WorkingDirectory={{HOME}}/.clawbridge
+Restart=always
+RestartSec=5
+StandardOutput=append:{{HOME}}/.clawbridge/logs/out.log
+StandardError=append:{{HOME}}/.clawbridge/logs/err.log
+Environment="HOME={{HOME}}"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin"
+
+[Install]
+WantedBy=default.target

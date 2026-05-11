@@ -19,6 +19,7 @@
     "integrations/auth-portal",
     "integrations/start.sh",
     "launchd",
+    "systemd",
     "setup",
     "README.md",
     "LICENSE",

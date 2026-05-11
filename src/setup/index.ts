@@ -36,7 +36,7 @@ import {
 } from './migrate.js';
 
 import { checkForUpdate, runUpgrade } from '../updater.js';
-import { getLaunchdLabel } from '../install-slug.js';
+import { getLaunchdLabel, getSystemdUnit } from '../install-slug.js';
 
 // Handle "clawbridge doctor" command
 if (process.argv[2] === 'doctor') {
@@ -634,7 +634,7 @@ async function runFreshInstall(): Promise<void> {
   }
 
   await buildContainerImageWithRetry();
-  await registerLaunchd(cfg.agentName);
+  await registerService(cfg.agentName);
 
   // Telegram channel verification (after everything is running)
   let botUsername: string | undefined;
@@ -678,13 +678,24 @@ async function runFreshInstall(): Promise<void> {
     }
     checks.push({ label: 'Hindsight memory', ok: hindsightOk, fix: 'run: docker compose up -d' });
 
-    // Launchd service
-    const launchCheck = spawnSync('launchctl', ['list', cfg.agentName.toLowerCase()], {
-      stdio: 'pipe',
-      encoding: 'utf-8',
-      timeout: 3000,
-    });
-    checks.push({ label: 'Launchd service', ok: launchCheck.status === 0, fix: 'run: clawbridge doctor' });
+    // Service registration
+    const packageRootForCheck = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+    if (process.platform === 'darwin') {
+      const launchCheck = spawnSync('launchctl', ['list', cfg.agentName.toLowerCase()], {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+        timeout: 3000,
+      });
+      checks.push({ label: 'Launchd service', ok: launchCheck.status === 0, fix: 'run: clawbridge doctor' });
+    } else {
+      const unit = getSystemdUnit(packageRootForCheck);
+      const svcCheck = spawnSync('systemctl', ['--user', 'is-active', unit], {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+        timeout: 3000,
+      });
+      checks.push({ label: 'Systemd service', ok: svcCheck.status === 0, fix: 'run: clawbridge doctor' });
+    }
 
     hs.stop('Setup verification:');
     for (const c of checks) {
@@ -1095,7 +1106,7 @@ async function runMigrationFlow(): Promise<void> {
   }
 
   await buildContainerImageWithRetry();
-  await registerLaunchd(migratedCfg.agentName);
+  await registerService(migratedCfg.agentName);
 
   p.outro(k.green('✅ Migration done!') + `  ClawBridge data is at ${k.bold(os.homedir() + '/.clawbridge')}`);
 }
@@ -1227,6 +1238,61 @@ async function registerLaunchd(assistantName: string): Promise<void> {
     }
   } catch (err) {
     p.log.warn(`launchd registration failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+// ─── systemd registration ────────────────────────────────────────────────────
+
+async function registerSystemd(assistantName: string): Promise<void> {
+  try {
+    const home = os.homedir();
+    const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+    const tmplPath = path.join(packageRoot, 'systemd', 'clawbridge.service.tmpl');
+    if (!fs.existsSync(tmplPath)) {
+      p.log.warn('systemd template not found — skipping service registration.');
+      return;
+    }
+    const unit = getSystemdUnit(packageRoot);
+    let nodePath = process.execPath;
+    try {
+      const which = spawnSync('which', ['node'], { encoding: 'utf-8' });
+      if (which.status === 0 && which.stdout.trim()) nodePath = which.stdout.trim();
+    } catch {
+      /* use process.execPath */
+    }
+
+    const tmpl = fs.readFileSync(tmplPath, 'utf-8');
+    const serviceContent = tmpl
+      .replace(/\{\{SLUG\}\}/g, unit)
+      .replace(/\{\{HOME\}\}/g, home)
+      .replace(/\{\{NODE_PATH\}\}/g, nodePath)
+      .replace(/\{\{PROJECT_ROOT\}\}/g, packageRoot);
+
+    const systemdUserDir = path.join(home, '.config', 'systemd', 'user');
+    fs.mkdirSync(systemdUserDir, { recursive: true });
+    fs.mkdirSync(path.join(home, '.clawbridge', 'logs'), { recursive: true });
+    const unitPath = path.join(systemdUserDir, `${unit}.service`);
+    fs.writeFileSync(unitPath, serviceContent);
+    p.log.success(`systemd unit written to ~/.config/systemd/user/${unit}.service`);
+
+    try {
+      execSync('systemctl --user daemon-reload', { encoding: 'utf-8' });
+      execSync(`systemctl --user enable --now ${unit}`, { encoding: 'utf-8' });
+      p.log.success('ClawBridge agent registered with systemd and will start automatically.');
+    } catch (err) {
+      p.log.warn(`systemctl failed: ${err instanceof Error ? err.message : String(err)}`);
+      p.log.info(`To register manually: systemctl --user enable --now ${unit}`);
+    }
+  } catch (err) {
+    p.log.warn(`systemd registration failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function registerService(assistantName: string): Promise<void> {
+  if (process.platform === 'darwin') {
+    await registerLaunchd(assistantName);
+  } else {
+    await registerSystemd(assistantName);
   }
 }
 
