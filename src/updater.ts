@@ -152,7 +152,13 @@ export async function runUpgrade(): Promise<void> {
   console.log('🔄 Upgrading ClawBridge Agent…\n');
 
   // Check current version
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
+  let pkg: { version: string };
+  try {
+    pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
+  } catch {
+    console.log('Could not read package.json. Installation may be corrupted.');
+    process.exit(1);
+  }
   const currentVersion = pkg.version;
   console.log(`Current version: ${currentVersion}`);
 

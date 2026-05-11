@@ -530,6 +530,7 @@ async function handleForwardedEvent(
   try {
     event = JSON.parse(body);
   } catch {
+    log.warn('chat-sdk-bridge: malformed JSON in forwarded event, dropping', { bodyLength: body.length });
     return;
   }
 

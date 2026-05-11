@@ -84,7 +84,12 @@ export function forwardAttachedFiles(
   }
 
   const targetInboxDir = path.join(sessionDir(target.agentGroupId, target.sessionId), 'inbox', target.messageId);
-  fs.mkdirSync(targetInboxDir, { recursive: true });
+  try {
+    fs.mkdirSync(targetInboxDir, { recursive: true });
+  } catch (err) {
+    log.warn('agent-route: failed to create target inbox dir, no files forwarded', { targetInboxDir, err });
+    return [];
+  }
 
   const attachments: ForwardedAttachment[] = [];
   for (const filename of source.filenames) {
