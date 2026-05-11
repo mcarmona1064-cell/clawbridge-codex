@@ -139,16 +139,18 @@ async function sweep(): Promise<void> {
     log.error('Host sweep error', { err });
   }
 
-  // Nightly memory decay — runs once at/after 2am each calendar day
-  await runNightlyMemoryDecay();
+  try {
+    // Nightly memory decay — runs once at/after 2am each calendar day
+    await runNightlyMemoryDecay();
+    // Evening reflect — runs once between 19:00 and 20:00 each day
+    await runEveningReflect();
+    // Weekly cross-client report — runs Sunday midnight
+    await runWeeklyCrossClientReport();
+  } catch (err) {
+    log.error('Host sweep nightly task error', { err });
+  }
 
-  // Evening reflect — runs once between 19:00 and 20:00 each day
-  await runEveningReflect();
-
-  // Weekly cross-client report — runs Sunday midnight
-  await runWeeklyCrossClientReport();
-
-  setTimeout(sweep, SWEEP_INTERVAL_MS);
+  if (running) setTimeout(sweep, SWEEP_INTERVAL_MS);
 }
 
 async function runNightlyMemoryDecay(): Promise<void> {

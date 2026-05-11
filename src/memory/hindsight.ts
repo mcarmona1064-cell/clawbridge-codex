@@ -80,15 +80,22 @@ export function buildTags(opts: {
 // ── Availability check ────────────────────────────────────────────────────────
 
 let _hindsightAvailable: boolean | null = null;
+let _hindsightCheckedAt = 0;
+// Re-check more aggressively when down (5 min) vs when healthy (30 min)
+const AVAILABILITY_TTL_MS_UP = 30 * 60 * 1000;
+const AVAILABILITY_TTL_MS_DOWN = 5 * 60 * 1000;
 
 export async function isHindsightAvailable(): Promise<boolean> {
-  if (_hindsightAvailable !== null) return _hindsightAvailable;
+  const now = Date.now();
+  const ttl = _hindsightAvailable === false ? AVAILABILITY_TTL_MS_DOWN : AVAILABILITY_TTL_MS_UP;
+  if (_hindsightAvailable !== null && now - _hindsightCheckedAt < ttl) return _hindsightAvailable;
   try {
     const res = await fetch(`${getHindsightUrl()}/health`, { signal: AbortSignal.timeout(2000) });
     _hindsightAvailable = res.ok;
   } catch {
     _hindsightAvailable = false;
   }
+  _hindsightCheckedAt = now;
   log.info('[hindsight] Availability check', { available: _hindsightAvailable, url: getHindsightUrl() });
   return _hindsightAvailable;
 }
@@ -96,6 +103,7 @@ export async function isHindsightAvailable(): Promise<boolean> {
 // Reset availability cache (called on error to retry next time)
 function resetAvailability() {
   _hindsightAvailable = null;
+  _hindsightCheckedAt = 0;
 }
 
 // ── Core operations ───────────────────────────────────────────────────────────
