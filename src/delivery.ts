@@ -282,7 +282,6 @@ async function deliverMessage(
     throw new Error(`Invalid JSON in outbound message ${msg.id}`);
   }
 
-
   // System actions — handle internally (schedule_task, cancel_task, etc.)
   if (msg.kind === 'system') {
     await handleSystemAction(content, session, inDb);

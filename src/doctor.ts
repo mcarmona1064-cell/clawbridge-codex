@@ -287,10 +287,18 @@ function checkLaunchd(autoFix: boolean): void {
           execSync(`launchctl bootstrap gui/${uid} ${plistPath}`, { encoding: 'utf-8' });
           pass('LaunchD service', `${label} (bootstrapped)`);
         } catch (e) {
-          fail('LaunchD service', `${label} not loaded, bootstrap failed`, `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`);
+          fail(
+            'LaunchD service',
+            `${label} not loaded, bootstrap failed`,
+            `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`,
+          );
         }
       } else {
-        fail('LaunchD service', `${label} not loaded`, `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`);
+        fail(
+          'LaunchD service',
+          `${label} not loaded`,
+          `run: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/${plists[0]}`,
+        );
       }
       return;
     }
@@ -312,10 +320,18 @@ function checkLaunchd(autoFix: boolean): void {
             execSync(`launchctl kickstart -k gui/${uid2}/${label}`, { encoding: 'utf-8' });
             pass('LaunchD service', `${label} (restarted)`);
           } catch {
-            fail('LaunchD service', `loaded but not running (LastExitStatus=${lastExit})`, `check: tail -f ~/.clawbridge/logs/agent.log`);
+            fail(
+              'LaunchD service',
+              `loaded but not running (LastExitStatus=${lastExit})`,
+              `check: tail -f ~/.clawbridge/logs/agent.log`,
+            );
           }
         } else {
-          fail('LaunchD service', `loaded but not running (LastExitStatus=${lastExit})`, `check: tail -f ~/.clawbridge/logs/agent.log`);
+          fail(
+            'LaunchD service',
+            `loaded but not running (LastExitStatus=${lastExit})`,
+            `check: tail -f ~/.clawbridge/logs/agent.log`,
+          );
         }
       }
     }

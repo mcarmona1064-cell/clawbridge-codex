@@ -110,9 +110,7 @@ function createAdapter(): ChannelAdapter | null {
     isConnected: () => connected,
 
     async deliver(platformId: string, _threadId: string | null, message: OutboundMessage) {
-      const to = platformId.startsWith(`${CHANNEL_TYPE}:`)
-        ? platformId.slice(`${CHANNEL_TYPE}:`.length)
-        : platformId;
+      const to = platformId.startsWith(`${CHANNEL_TYPE}:`) ? platformId.slice(`${CHANNEL_TYPE}:`.length) : platformId;
 
       const content = message.content as { text?: string };
       const text = content?.text ?? '';

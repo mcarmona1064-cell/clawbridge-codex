@@ -209,7 +209,13 @@ function buildEnvFile(cfg: FreshConfig, existingEnv?: Map<string, string>): stri
     lines.push('# Slack', 'SLACK_BOT_TOKEN=', 'SLACK_SIGNING_SECRET=', '');
   }
   if (cfg.channels.includes('whatsapp')) {
-    lines.push('# WhatsApp', 'WHATSAPP_PHONE_NUMBER_ID=', 'WHATSAPP_ACCESS_TOKEN=', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN=', '');
+    lines.push(
+      '# WhatsApp',
+      'WHATSAPP_PHONE_NUMBER_ID=',
+      'WHATSAPP_ACCESS_TOKEN=',
+      'WHATSAPP_WEBHOOK_VERIFY_TOKEN=',
+      '',
+    );
   }
   if (cfg.channels.includes('gmail')) {
     lines.push('# Gmail', 'GMAIL_CLIENT_ID=', 'GMAIL_CLIENT_SECRET=', '');
