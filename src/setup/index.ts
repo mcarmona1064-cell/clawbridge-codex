@@ -350,28 +350,6 @@ async function promptAgentName(existingValue?: string): Promise<string> {
   return raw.trim() || 'ClawBridge';
 }
 
-async function promptAdminCreds(existing?: {
-  email?: string;
-  password?: string;
-}): Promise<{ email: string; password: string }> {
-  if (existing?.email && existing?.password) {
-    return { email: existing.email, password: existing.password };
-  }
-  const email = ensure(
-    await p.text({
-      message: 'Admin email (for portal login)',
-      placeholder: 'admin@example.com',
-      validate: validateEmail,
-    }),
-  ) as string;
-  const password = ensure(
-    await p.password({
-      message: 'Admin password',
-      validate: validatePassword,
-    }),
-  ) as string;
-  return { email: email.trim(), password };
-}
 
 async function promptHindsight(existingUrl?: string): Promise<{ dbPassword?: string; apiKey?: string; url?: string }> {
   if (existingUrl) {
@@ -736,38 +714,6 @@ AGENT_PROVIDER=${providerChoice}
       s2.stop(k.yellow('docker compose returned an error — check output below.'));
       if (result.stderr) console.error(result.stderr);
     }
-  }
-
-  // Start portal if portal/docker-compose.yml exists in package dir
-  // Run from the package's portal/ dir so ./api and ./app volume paths resolve correctly.
-  // Pass --env-file so vars from ~/.clawbridge/.env are available.
-  try {
-    const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
-    const portalDir = path.join(packageRoot, 'portal');
-    const portalComposeFile = path.join(portalDir, 'docker-compose.yml');
-    if (fs.existsSync(portalComposeFile)) {
-      const ps = p.spinner();
-      ps.start('Starting portal…');
-      const portalResult = spawnSync('docker', ['compose', '--env-file', envPath, 'up', '-d'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        encoding: 'utf-8',
-        cwd: portalDir,
-      });
-      if (portalResult.status === 0) {
-        ps.stop(k.green('Portal started.'));
-      } else {
-        ps.stop(k.yellow('Portal start failed (non-critical) — check logs in portal/'));
-        if (portalResult.stderr) console.error(portalResult.stderr);
-        p.log.info(
-          dim(
-            'If the portal fails to start, run:\n' +
-              '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d',
-          ),
-        );
-      }
-    }
-  } catch {
-    // portal is optional — don't fail setup
   }
 
   await buildContainerImageWithRetry();
@@ -1216,38 +1162,6 @@ async function runMigrationFlow(): Promise<void> {
       ds.stop(k.yellow('docker compose returned an error — check output below.'));
       if (dockerResult.stderr) console.error(dockerResult.stderr);
     }
-  }
-
-  // Start portal if portal/docker-compose.yml exists in package dir
-  // Run from the package's portal/ dir so ./api and ./app volume paths resolve correctly.
-  // Pass --env-file so vars from ~/.clawbridge/.env are available.
-  try {
-    const packageRoot2 = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
-    const portalDir2 = path.join(packageRoot2, 'portal');
-    const portalComposeFile2 = path.join(portalDir2, 'docker-compose.yml');
-    if (fs.existsSync(portalComposeFile2)) {
-      const ps2 = p.spinner();
-      ps2.start('Starting portal…');
-      const portalResult2 = spawnSync('docker', ['compose', '--env-file', envPath, 'up', '-d'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        encoding: 'utf-8',
-        cwd: portalDir2,
-      });
-      if (portalResult2.status === 0) {
-        ps2.stop(k.green('Portal started.'));
-      } else {
-        ps2.stop(k.yellow('Portal start failed (non-critical) — check logs in portal/'));
-        if (portalResult2.stderr) console.error(portalResult2.stderr);
-        p.log.info(
-          dim(
-            'If the portal fails to start, run:\n' +
-              '  docker volume rm portal_portal-db 2>/dev/null; docker compose -f ~/.clawbridge/portal-docker-compose.yml up -d',
-          ),
-        );
-      }
-    }
-  } catch {
-    // portal is optional — don't fail setup
   }
 
   // 6. Optionally deactivate source

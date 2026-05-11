@@ -67,7 +67,6 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 - 🔀 **Two AI backends** — Claude (Anthropic OAuth) or OpenAI Codex (ChatGPT Plus/Pro OAuth) — no per-message API billing, uses your existing subscription
 - 🧠 **Persistent memory** — Hindsight memory system with retain, recall, and reflect — agents remember context across sessions
 - 🔌 **Connect your tools** — Google, HubSpot, Slack, and more via MCP
-- 📊 **Client portal** — analytics & ROI dashboard
 - 📞 **Voice agents** via Retell AI
 - 👁 **Vision & document analysis** via Claude
 - 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
