@@ -8,7 +8,7 @@ The agent-runner has two layers:
 
 1. **Agent-runner core** — owns the poll loop, message formatting, DB reads/writes, MCP tool implementations, routing, status management, media handling. This is ClawBridge-specific and shared across all providers.
 
-2. **Agent provider** — owns the SDK interaction. Takes formatted prompts, pushes them to the SDK, yields events back. Trunk ships the `claude` provider; additional providers (OpenCode, Codex, etc.) are installed by `/add-<provider>` skills from the `providers` branch.
+2. **Agent provider** — owns the SDK interaction. Takes formatted prompts, pushes them to the SDK, yields events back. Trunk ships the `claude` provider; additional providers install via `/add-<provider>` skills from the `providers` branch.
 
 The boundary: the agent-runner decides **what** to send and **what to do** with results. The provider decides **how** to talk to the SDK.
 
@@ -78,8 +78,8 @@ type ProviderEvent =
 
 - **Message formatting** — the agent-runner formats messages before passing to the provider. The provider receives a ready-to-send prompt string.
 - **Hooks** — Claude-specific. The Claude provider registers hooks internally (PreCompact, PreToolUse, etc.). Other providers don't need them.
-- **Tool allowlists** — Claude uses `allowedTools`. Codex uses `approvalPolicy`. OpenCode uses `permission`. Each provider configures this internally based on the same intent: "allow everything, no prompting."
-- **Session persistence** — Claude persists sessions to disk automatically. Codex and OpenCode manage their own session state. The agent-runner doesn't control this — it just passes `sessionId` and `resumeAt`.
+- **Tool allowlists** — Claude uses `allowedTools`, configured internally to allow everything without prompting.
+- **Session persistence** — Claude persists sessions to disk automatically. The agent-runner passes `sessionId` and `resumeAt`.
 - **Sandbox configuration** — provider-specific. Each provider configures its own sandbox internally.
 
 ### Provider event semantics
@@ -90,8 +90,6 @@ type ProviderEvent =
 - **`progress`** — optional, for logging. The agent-runner logs these but doesn't act on them.
 
 ## Provider Implementations
-
-Only the `claude` provider ships in trunk. The Codex and OpenCode sections below document the provider interface for reference and for skills that install additional providers — they are not baked into the core image.
 
 ### Claude Provider
 
@@ -151,161 +149,6 @@ class ClaudeProvider implements AgentProvider {
 - Full tool allowlist
 - `additionalDirectories` for multi-directory access
 
-### Codex Provider
-
-Wraps `@openai/codex-sdk`.
-
-```typescript
-class CodexProvider implements AgentProvider {
-  query(input: QueryInput): AgentQuery {
-    const codex = new Codex(this.buildOptions(input));
-    const thread = input.sessionId
-      ? codex.resumeThread(input.sessionId, this.threadOptions(input))
-      : codex.startThread(this.threadOptions(input));
-
-    const abortController = new AbortController();
-    let pendingFollowUp: string | null = null;
-
-    return {
-      push: (msg) => {
-        // Codex doesn't support streaming input.
-        // Store the follow-up and abort the current turn.
-        pendingFollowUp = msg;
-        abortController.abort();
-      },
-      end: () => { /* no-op — Codex turns end naturally */ },
-      abort: () => abortController.abort(),
-      events: this.run(thread, input.prompt, abortController, () => pendingFollowUp),
-    };
-  }
-
-  private async *run(thread, prompt, abortController, getPendingFollowUp): AsyncIterable<ProviderEvent> {
-    let currentPrompt = prompt;
-
-    while (true) {
-      try {
-        const streamed = await thread.runStreamed(currentPrompt, {
-          signal: abortController.signal,
-        });
-
-        let sessionId: string | undefined;
-        let resultText = '';
-
-        for await (const event of streamed.events) {
-          if (event.type === 'thread.started') {
-            sessionId = event.thread_id;
-            yield { type: 'init', sessionId };
-          }
-          if (event.type === 'item.completed' && event.item.type === 'agent_message') {
-            resultText = event.item.text || resultText;
-          }
-          if (event.type === 'turn.failed') {
-            yield { type: 'error', message: event.error.message, retryable: false };
-            return;
-          }
-        }
-
-        yield { type: 'result', text: resultText || null };
-
-        // Check if a follow-up was queued during this turn
-        const followUp = getPendingFollowUp();
-        if (followUp) {
-          currentPrompt = followUp;
-          // Reset for next iteration
-          continue;
-        }
-
-        return;
-      } catch (err) {
-        if (abortController.signal.aborted && getPendingFollowUp()) {
-          // Aborted because of follow-up — restart with new prompt
-          currentPrompt = getPendingFollowUp();
-          abortController = new AbortController();
-          continue;
-        }
-        throw err;
-      }
-    }
-  }
-}
-```
-
-**Codex-specific behavior inside the provider:**
-- `developer_instructions` for system prompt (loaded from CLAUDE.md)
-- `git init` in workspace (Codex requires a git repo)
-- Abort+restart pattern for follow-up messages
-- `sandboxMode`, `approvalPolicy`, `networkAccessEnabled` from env vars
-- Conversation archiving (Codex doesn't have PreCompact)
-
-### OpenCode Provider
-
-Wraps `@opencode-ai/sdk`.
-
-```typescript
-class OpenCodeProvider implements AgentProvider {
-  query(input: QueryInput): AgentQuery {
-    // OpenCode runs a local server — create it once, reuse across queries
-    const { client, server } = await createOpencode({ config: this.buildConfig(input) });
-    const { stream } = await client.event.subscribe();
-
-    let aborted = false;
-    let pendingFollowUp: string | null = null;
-
-    return {
-      push: (msg) => {
-        pendingFollowUp = msg;
-        server.close();  // interrupt current query
-      },
-      end: () => { /* no-op */ },
-      abort: () => { aborted = true; server.close(); },
-      events: this.run(client, server, stream, input, () => pendingFollowUp),
-    };
-  }
-
-  private async *run(client, server, stream, input, getPendingFollowUp): AsyncIterable<ProviderEvent> {
-    const session = await client.session.create();
-    yield { type: 'init', sessionId: session.data.id };
-
-    await client.session.promptAsync({
-      path: { id: session.data.id },
-      body: { parts: [{ type: 'text', text: input.prompt }] },
-    });
-
-    for await (const event of stream) {
-      if (event.type === 'session.idle') {
-        // Collect result text from accumulated message parts
-        const resultText = this.extractResult(event);
-        yield { type: 'result', text: resultText };
-
-        const followUp = getPendingFollowUp();
-        if (followUp) {
-          await client.session.promptAsync({
-            path: { id: session.data.id },
-            body: { parts: [{ type: 'text', text: followUp }] },
-          });
-          continue;
-        }
-
-        return;
-      }
-
-      if (event.type === 'session.error') {
-        yield { type: 'error', message: event.properties?.error?.data?.message, retryable: false };
-        return;
-      }
-    }
-  }
-}
-```
-
-**OpenCode-specific behavior inside the provider:**
-- Local gRPC/HTTP server lifecycle (`server.close()`)
-- SSE event stream for output
-- Provider/model selection via config (`OPENCODE_PROVIDER`, `OPENCODE_MODEL`)
-- MCP config format translation (`type: 'local'`, `command: [cmd, ...args]`, `environment`)
-- System prompt injected via `<system>` prefix in prompt text
-- No resume support (sessions are always new or reused by ID)
-
 ## Agent-Runner Core
 
 Everything below is handled by the agent-runner, not the provider.
@@ -340,7 +183,7 @@ Everything below is handled by the agent-runner, not the provider.
 └─────────────────────────────────────────┘
 ```
 
-**Concurrent polling during active query:** While the provider is running a query, the agent-runner continues polling messages_in on a short interval (~500ms). New pending messages are formatted and pushed into the active query via `provider.push()`. This lets follow-up messages arrive while the agent is processing — Claude handles this natively, Codex/OpenCode handle it via abort+restart internally.
+**Concurrent polling during active query:** While the provider is running a query, the agent-runner continues polling messages_in on a short interval (~500ms). New pending messages are formatted and pushed into the active query via `provider.push()`. This lets follow-up messages arrive while the agent is processing.
 
 **Idle behavior:** When no messages are pending and no query is active, the agent-runner sleeps briefly (1s) and re-polls. The container stays warm until the host kills it (idle timeout).
 
@@ -655,7 +498,7 @@ The agent-runner inspects attachments in chat/chat-sdk messages and handles them
 
 **Provider-native content blocks:**
 
-| Type | Claude | Codex / OpenCode |
+| Type | Claude |
 |------|--------|------------------|
 | Images (JPEG, PNG, GIF, WebP) | Native image content block | Save to disk |
 | PDFs | Native document content block | Save to disk |
@@ -676,8 +519,6 @@ The agent can use tools (Read, Bash) to access saved files.
 For channels where direct download isn't possible (e.g., WhatsApp buffered streams), the channel adapter serves the media via a local URL. The agent-runner downloads from that URL.
 
 **Content block construction (Claude):** The agent-runner builds multi-part `MessageParam` content: `[{ type: 'image', source: { type: 'base64', media_type, data } }, { type: 'text', text: '...' }]`. The prompt passed to the provider is not a plain string in this case — the `QueryInput.prompt` field needs to support structured content for Claude. The provider's `query()` method handles the format-specific construction.
-
-**Content block construction (Codex/OpenCode):** Everything is text. File references are inlined in the prompt string. The provider receives a plain string prompt.
 
 #### Outbound (agent → messages_out)
 
@@ -712,7 +553,7 @@ These are ephemeral to the container's lifetime. When the container is killed an
 
 The agent-runner receives configuration via:
 
-- **Environment variables:** `AGENT_PROVIDER` (claude/codex/opencode), `CLAWBRIDGE_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
+- **Environment variables:** `AGENT_PROVIDER` (default: claude), `CLAWBRIDGE_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
 - **Fixed mount paths:** Session DB at `/workspace/session.db`. Agent group folder at `/workspace/agent/`. System prompt from `/workspace/agent/CLAUDE.md` and `/workspace/global/CLAUDE.md`.
 - **Optional startup config:** Some config may be passed as a JSON file at a fixed path (e.g., `/workspace/config.json`) for things like the session ID to resume, assistant name, and admin user ID. This avoids overloading environment variables.
 

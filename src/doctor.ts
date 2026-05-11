@@ -727,7 +727,6 @@ async function checkChannels(env: Map<string, string>, autoFix: boolean): Promis
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-
 function checkProvider(env: Map<string, string>): void {
   // Report current provider
   pass('AGENT_PROVIDER', AGENT_PROVIDER);

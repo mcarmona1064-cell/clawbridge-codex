@@ -464,7 +464,6 @@ function checkNodePrerequisites(): void {
   // Skip the check to avoid blocking fresh installs that don't have pnpm.
 }
 
-
 // ─── Fresh install flow ───────────────────────────────────────────────────────
 
 async function runFreshInstall(): Promise<void> {

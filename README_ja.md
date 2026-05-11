@@ -45,9 +45,9 @@ bash clawbridge.sh
 
 **AIネイティブ、設計としてハイブリッド。** インストールとオンボーディングは最適化されたスクリプトのパスで、速く決定的です。判断が必要なところ（インストール失敗、対話的な決定、カスタマイズ）では、制御はシームレスにClaude Codeへ渡されます。セットアップ以降も、監視ダッシュボードやデバッグUIは用意しません。問題をチャットで説明すれば、Claude Codeが処理します。
 
-**機能ではなくスキル。** トランクにはレジストリとインフラのみを同梱し、個別のチャネルアダプターや代替プロバイダーは含めません。チャネル（Discord、Slack、Telegram、WhatsAppなど）は長期運用される`channels`ブランチに、代替プロバイダー（OpenCode、Ollama）は`providers`ブランチに置かれます。`/add-telegram`や`/add-opencode`などを実行すると、スキルが必要なモジュールだけを正確にフォークへコピーします。要求していない機能は一切入りません。
+**機能ではなくスキル。** トランクにはレジストリとインフラのみを同梱し、個別のチャネルアダプターや代替プロバイダーは含めません。チャネル（Discord、Slack、Telegram、WhatsAppなど）は長期運用される`channels`ブランチに、Ollamaは`providers`ブランチに置かれます。`/add-telegram`などを実行すると、スキルが必要なモジュールだけを正確にフォークへコピーします。要求していない機能は一切入りません。
 
-**最高のハーネス、最高のモデル。** ClawBridgeはAnthropic公式のClaude Agent SDK経由でネイティブにClaude Codeを使用します。最新のClaudeモデルとClaude Codeの全ツールセット（自分のClawBridgeフォークを変更・拡張する能力を含む）が手に入ります。他プロバイダーはドロップイン・オプションです。OpenAIのCodex（ChatGPTサブスクリプションまたはAPIキー）向けには`/add-codex`、OpenCode経由のOpenRouter、Google、DeepSeekなどには`/add-opencode`、ローカルのオープンウェイトモデルには`/add-ollama-provider`。プロバイダーはエージェントグループごとに設定可能です。
+**最高のハーネス、最高のモデル。** ClawBridgeはAnthropic公式のClaude Agent SDK経由でネイティブにClaude Codeを使用します。最新のClaudeモデルとClaude Codeの全ツールセット（自分のClawBridgeフォークを変更・拡張する能力を含む）が手に入ります。ローカルのオープンウェイトモデルには`/add-ollama-provider`をご利用ください。
 
 ## サポート機能
 
@@ -156,7 +156,7 @@ Dockerはクロスプラットフォーム対応（macOS、Linux、WSL2経由の
 
 **サードパーティやオープンソースモデルを使えますか？**
 
-はい。推奨される方法は`/add-opencode`（OpenCode設定経由でOpenRouter、OpenAI、Google、DeepSeekなど）か`/add-ollama-provider`（Ollama経由でローカルのオープンウェイトモデル）です。どちらもエージェントグループごとに設定可能なので、同じインストール内で異なるエージェントが異なるバックエンドで動作できます。
+はい。`/add-ollama-provider`でOllama経由のローカルオープンウェイトモデルを使用できます。
 
 一時的な実験用には、Claude API互換のエンドポイントも`.env`で利用できます：
 
