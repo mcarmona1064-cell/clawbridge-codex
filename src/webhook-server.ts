@@ -20,7 +20,10 @@ interface WebhookEntry {
   adapterName: string;
 }
 
+type RawHandler = (req: Request) => Promise<Response>;
+
 const routes = new Map<string, WebhookEntry>();
+const rawRoutes = new Map<string, RawHandler>();
 let server: http.Server | null = null;
 
 /** Convert Node.js IncomingMessage to a Web API Request. */
@@ -67,6 +70,16 @@ async function fromWebResponse(webRes: Response, nodeRes: http.ServerResponse): 
 }
 
 /**
+ * Register a raw HTTP handler on the shared server (for channels that don't use the Chat SDK).
+ * Starts the server lazily on first call.
+ */
+export function registerRawWebhookHandler(name: string, handler: RawHandler): void {
+  rawRoutes.set(name, handler);
+  ensureServer();
+  log.info('Raw webhook handler registered', { name, path: `/webhook/${name}` });
+}
+
+/**
  * Register a webhook adapter on the shared server.
  * Starts the server lazily on first call.
  */
@@ -92,16 +105,27 @@ function ensureServer(): void {
       return;
     }
 
-    const adapterName = match[1];
-    const entry = routes.get(adapterName);
-    if (!entry) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end(`Unknown adapter: ${adapterName}`);
-      return;
-    }
+    const adapterName = match[1]!;
 
     try {
       const webReq = await toWebRequest(req);
+
+      // Raw handler (Slack, WhatsApp, etc.) takes priority
+      const rawHandler = rawRoutes.get(adapterName);
+      if (rawHandler) {
+        const webRes = await rawHandler(webReq);
+        await fromWebResponse(webRes, res);
+        return;
+      }
+
+      // Chat SDK adapter
+      const entry = routes.get(adapterName);
+      if (!entry) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end(`Unknown adapter: ${adapterName}`);
+        return;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const webhooks = entry.chat.webhooks as Record<string, (r: Request, opts?: any) => Promise<Response>>;
       const handler = webhooks[entry.adapterName];

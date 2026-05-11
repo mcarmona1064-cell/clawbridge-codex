@@ -63,11 +63,10 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 
 ## Features
 
-- 🤖 **Multi-channel AI agents** — Telegram, WhatsApp, Discord, Slack, iMessage, 15+ more
+- 🤖 **Multi-channel AI agents** — Telegram, WhatsApp, Discord, Slack, and more
 - 🤖 **Claude (Anthropic OAuth)** — no per-message API billing, uses your Claude Pro/Max subscription
 - 🧠 **Persistent memory** — Hindsight memory system with retain, recall, and reflect — agents remember context across sessions
 - 🔌 **Connect your tools** — Google, HubSpot, Slack, and more via MCP
-- 📞 **Voice agents** via Retell AI
 - 👁 **Vision & document analysis** via Claude
 - 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
 - 🛡️ **Prompt injection protection** — built-in skill guards against malicious message injection attacks
@@ -106,7 +105,7 @@ ClawBridge uses Claude via Anthropic's official Claude Agent SDK. Authenticate o
 
 ## What It Supports
 
-- **Multi-channel messaging** — WhatsApp, Telegram, Discord, Slack, Microsoft Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email via Resend. Installed on demand with `/add-<channel>` skills. Run one or many at the same time.
+- **Multi-channel messaging** — WhatsApp, Telegram, Discord, Slack, Microsoft Teams, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email via Resend. Installed on demand with `/add-<channel>` skills. Run one or many at the same time.
 - **Flexible isolation** — connect each channel to its own agent for full privacy, share one agent across many channels for unified memory with separate conversations, or fold multiple channels into a single shared session so one conversation spans many surfaces. Pick per channel via `/manage-channels`. See [docs/isolation-model.md](docs/isolation-model.md).
 - **Per-agent workspace** — each agent group has its own persona, its own memory, its own container, and only the mounts you allow. Nothing crosses the boundary unless you wire it to.
 - **Scheduled tasks** — recurring jobs that run Claude and can message you back
