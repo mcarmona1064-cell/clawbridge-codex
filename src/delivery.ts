@@ -273,7 +273,15 @@ async function deliverMessage(
     return;
   }
 
-  const content = JSON.parse(msg.content);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let content: any;
+  try {
+    content = JSON.parse(msg.content);
+  } catch {
+    log.error('Failed to parse outbound message content — marking as failed', { id: msg.id });
+    throw new Error(`Invalid JSON in outbound message ${msg.id}`);
+  }
+
 
   // System actions — handle internally (schedule_task, cancel_task, etc.)
   if (msg.kind === 'system') {
