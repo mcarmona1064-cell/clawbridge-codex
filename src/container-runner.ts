@@ -3,7 +3,7 @@
  * Spawns agent containers with session folder + agent group folder mounts.
  * The container runs the v2 agent-runner which polls the session DB.
  */
-import { ChildProcess, execSync, spawn } from 'child_process';
+import { ChildProcess, execFileSync, execSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -165,14 +165,14 @@ async function spawnContainer(session: Session): Promise<void> {
       if (mounts.includes(agentGroup.folder) || name.startsWith(`clawbridge-v2-${agentGroup.folder}-`)) {
         log.warn('Stopping stale container for group', { stale: name, group: agentGroup.folder });
         try {
-          execSync(`${CONTAINER_RUNTIME_BIN} stop -t 1 ${name}`, { stdio: 'pipe' });
+          stopContainer(name);
         } catch {
           /* ignore */
         }
         // Force-remove so the stopped container doesn't linger after daemon restarts
         // (--rm only auto-cleans on normal exits, not after daemon restart mid-run).
         try {
-          execSync(`${CONTAINER_RUNTIME_BIN} rm -f ${name}`, { stdio: 'pipe' });
+          execFileSync(CONTAINER_RUNTIME_BIN, ['rm', '-f', name], { stdio: 'pipe' });
         } catch {
           /* already removed */
         }

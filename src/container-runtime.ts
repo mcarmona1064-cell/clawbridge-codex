@@ -2,7 +2,7 @@
  * Container runtime abstraction for ClawBridge.
  * All runtime-specific logic lives here so swapping runtimes means changing one file.
  */
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import os from 'os';
 
 import { CONTAINER_INSTALL_LABEL } from './config.js';
@@ -96,7 +96,7 @@ export function cleanupOrphans(): void {
     const all = [...running, ...stopped];
     for (const name of all) {
       try {
-        execSync(`${CONTAINER_RUNTIME_BIN} rm -f ${name}`, { stdio: 'pipe' });
+        execFileSync(CONTAINER_RUNTIME_BIN, ['rm', '-f', name], { stdio: 'pipe' });
       } catch {
         /* already removed */
       }
