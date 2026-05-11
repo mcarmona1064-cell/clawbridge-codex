@@ -207,14 +207,7 @@ function checkContainerImage(autoFix: boolean): void {
       }
     }
 
-    // Build the expected image tag for the active provider.
-    // For Codex installs the image carries a -codex suffix; for Claude it has none.
-    let imageTag: string;
-    if (AGENT_PROVIDER === 'codex') {
-      imageTag = slug ? `clawbridge-agent-v2-${slug}-codex:latest` : 'clawbridge-agent-v2-codex:latest';
-    } else {
-      imageTag = slug ? `clawbridge-agent-v2-${slug}:latest` : getDefaultContainerImage();
-    }
+    const imageTag = slug ? `clawbridge-agent-v2-${slug}:latest` : getDefaultContainerImage();
 
     const r = spawnSync('docker', ['image', 'inspect', imageTag], {
       encoding: 'utf-8',
@@ -224,7 +217,7 @@ function checkContainerImage(autoFix: boolean): void {
     if (r.status === 0) {
       pass('Agent image', imageTag);
     } else {
-      const buildCmd = AGENT_PROVIDER === 'codex' ? 'clawbridge build-image --codex' : 'clawbridge build-image';
+      const buildCmd = 'clawbridge build-image';
       if (autoFix) {
         try {
           const pkgDir = path.dirname(fileURLToPath(import.meta.url));
@@ -734,120 +727,27 @@ async function checkChannels(env: Map<string, string>, autoFix: boolean): Promis
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-function checkCodex(env: Map<string, string>): void {
-  // Only check if any agent group uses codex provider
-  // We detect this by looking for codex CLI on PATH — if it's installed,
-  // run the auth and image checks.
-  const codexBin = spawnSync('which', ['codex'], { encoding: 'utf-8', timeout: 5000 });
-  if (codexBin.status !== 0) {
-    // Codex not installed — skip silently (it's optional)
-    return;
-  }
-
-  // Binary version
-  const versionResult = spawnSync('codex', ['--version'], { encoding: 'utf-8', timeout: 8000, stdio: 'pipe' });
-  if (versionResult.status === 0 && versionResult.stdout.trim()) {
-    pass('Codex CLI', versionResult.stdout.trim());
-  } else {
-    fail('Codex CLI', 'installed but --version failed', 'try: codex --version');
-  }
-
-  // Auth — check ~/.codex/auth.json exists and has a token
-  const codexCredsPath = path.join(os.homedir(), '.codex', 'auth.json');
-  try {
-    const creds = JSON.parse(fs.readFileSync(codexCredsPath, 'utf-8'));
-    if (creds?.accessToken || creds?.token) {
-      pass('Codex auth', dim('token found'));
-    } else {
-      fail('Codex auth', '~/.codex/auth.json has no token', 'run: codex login --device-auth');
-    }
-  } catch {
-    fail('Codex auth', '~/.codex/auth.json not found', 'run: codex login --device-auth');
-  }
-
-  // Container image
-  void env; // env available for future use (e.g. CODEX_CONTAINER_IMAGE override)
-  try {
-    // Derive codex image tag — mirrors CODEX_CONTAINER_IMAGE logic in config.ts
-    const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
-    let codexImageTag: string | undefined;
-    try {
-      const plist = fs
-        .readdirSync(launchAgentsDir)
-        .find((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
-      if (plist) {
-        const slug = plist.replace(/^com\.clawbridge-v2-/, '').replace(/\.plist$/, '');
-        codexImageTag = `clawbridge-agent-v2-${slug}-codex:latest`;
-      }
-    } catch {
-      /* non-macOS or no plist */
-    }
-
-    if (!codexImageTag) {
-      codexImageTag = 'clawbridge-agent-v2-codex:latest';
-    }
-
-    const r = spawnSync('docker', ['image', 'inspect', codexImageTag], {
-      encoding: 'utf-8',
-      timeout: 8000,
-      stdio: 'pipe',
-    });
-    if (r.status === 0) {
-      pass('Codex image', codexImageTag);
-    } else {
-      fail('Codex image', `"${codexImageTag}" not found`, 'run: clawbridge build-image --codex');
-    }
-  } catch {
-    fail('Codex image', 'docker unavailable', 'start Docker Desktop');
-  }
-}
 
 function checkProvider(env: Map<string, string>): void {
   // Report current provider
   pass('AGENT_PROVIDER', AGENT_PROVIDER);
 
-  if (AGENT_PROVIDER === 'codex') {
-    // Verify codex binary
-    const versionResult = spawnSync('codex', ['--version'], { encoding: 'utf-8', timeout: 8000, stdio: 'pipe' });
-    if (versionResult.status === 0 && versionResult.stdout.trim()) {
-      pass('Codex CLI', versionResult.stdout.trim());
-    } else {
-      fail('Codex CLI', 'installed but --version failed', 'try: npm install -g @openai/codex@latest');
-    }
-
-    // Verify ~/.codex/auth.json
-    const codexCredsPath = path.join(os.homedir(), '.codex', 'auth.json');
-    try {
-      const creds = JSON.parse(fs.readFileSync(codexCredsPath, 'utf-8'));
-      if (creds?.tokens?.access_token || creds?.api_key || creds?.accessToken || creds?.token) {
-        pass('Codex auth', dim('token found'));
-      } else {
-        fail('Codex auth', '~/.codex/auth.json has no token', 'run: codex login --device-auth');
-      }
-    } catch {
-      fail('Codex auth', '~/.codex/auth.json not found', 'run: codex login --device-auth');
-    }
+  // Check CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
+  const oauthToken = env.get('CLAUDE_CODE_OAUTH_TOKEN');
+  const apiKey = env.get('ANTHROPIC_API_KEY');
+  if (oauthToken) {
+    pass('Claude auth', dim('CLAUDE_CODE_OAUTH_TOKEN set'));
+  } else if (apiKey) {
+    pass('Claude auth', dim('ANTHROPIC_API_KEY set'));
   } else {
-    // Claude: check CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
-    const oauthToken = env.get('CLAUDE_CODE_OAUTH_TOKEN');
-    const apiKey = env.get('ANTHROPIC_API_KEY');
-    if (oauthToken) {
-      pass('Claude auth', dim('CLAUDE_CODE_OAUTH_TOKEN set'));
-    } else if (apiKey) {
-      pass('Claude auth', dim('ANTHROPIC_API_KEY set'));
-    } else {
-      fail('Claude auth', 'no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY', 'run: claude setup-token');
-    }
+    fail('Claude auth', 'no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY', 'run: claude setup-token');
   }
 
   // Auto-fix Hindsight LLM vars if HINDSIGHT_URL is set
   const hindsightUrl = env.get('HINDSIGHT_URL');
   if (hindsightUrl) {
-    const expectedLlmProvider = AGENT_PROVIDER === 'codex' ? 'openai-codex' : 'claude-code';
-    const isCodex = AGENT_PROVIDER === 'codex';
-    const expectedModels = isCodex
-      ? { retain: 'gpt-4.1-mini', recall: 'gpt-4.1-mini', reflect: 'gpt-4.1-mini' }
-      : { retain: 'claude-haiku-4-5', recall: 'claude-haiku-4-5', reflect: 'claude-sonnet-4-5' };
+    const expectedLlmProvider = 'claude-code';
+    const expectedModels = { retain: 'claude-haiku-4-5', recall: 'claude-haiku-4-5', reflect: 'claude-sonnet-4-5' };
 
     const envPath = path.join(os.homedir(), '.clawbridge', '.env');
     const autoFixEnv = (key: string, value: string): void => {
@@ -945,7 +845,6 @@ export async function runDoctor(): Promise<void> {
   console.log(bold('Services'));
   checkContainers(autoFix);
   checkContainerImage(autoFix);
-  checkCodex(env);
   await checkHindsightHealth(env);
 
   // ── Channels ─────────────────────────────────────────────────────────────

@@ -2,12 +2,10 @@
 # Build the ClawBridge agent container image.
 #
 # Usage:
-#   build.sh [--codex] [tag]
+#   build.sh [tag]
 #
 # Reads optional build flags from ../.env:
 #   INSTALL_CJK_FONTS=true   — add Chinese/Japanese/Korean fonts (~200MB)
-#   AGENT_PROVIDER=codex     — build the Codex image (same as --codex flag)
-# setup/container.ts reads the same file, so both build paths stay in sync.
 # Callers can also override by exporting these vars directly.
 
 set -e
@@ -23,34 +21,9 @@ cd "$SCRIPT_DIR"
 source "$PROJECT_ROOT/setup/lib/install-slug.sh"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 
-# ── Provider / Dockerfile selection ─────────────────────────────────────────
-# Detect provider: --codex flag takes highest priority, then AGENT_PROVIDER env
-# var (exported or from ../.env), defaulting to claude.
-PROVIDER="${AGENT_PROVIDER:-}"
-
-# Parse first positional arg for --codex flag
-if [ "${1:-}" = "--codex" ]; then
-    PROVIDER="codex"
-    shift
-fi
-
-# If AGENT_PROVIDER not set yet, fall back to ../.env
-if [ -z "$PROVIDER" ] && [ -f "../.env" ]; then
-    PROVIDER="$(grep '^AGENT_PROVIDER=' ../.env | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '[:space:]')"
-fi
-
-PROVIDER="${PROVIDER:-claude}"
-
-if [ "$PROVIDER" = "codex" ]; then
-    DOCKERFILE="Dockerfile.codex"
-    IMAGE_SUFFIX="-codex"
-else
-    DOCKERFILE="Dockerfile"
-    IMAGE_SUFFIX=""
-fi
-
+DOCKERFILE="Dockerfile"
 IMAGE_BASE="$(container_image_base)"
-IMAGE_NAME="${IMAGE_BASE}${IMAGE_SUFFIX}"
+IMAGE_NAME="${IMAGE_BASE}"
 TAG="${1:-latest}"
 
 # Caller's env takes precedence; fall back to .env.
@@ -64,8 +37,8 @@ if [ "${INSTALL_CJK_FONTS:-false}" = "true" ]; then
     BUILD_ARGS+=(--build-arg INSTALL_CJK_FONTS=true)
 fi
 
-echo "Building ClawBridge agent container image (provider: ${PROVIDER})..."
-echo "Dockerfile: ${DOCKERFILE}"
+echo "Building ClawBridge agent container image..."
+
 echo "Image: ${IMAGE_NAME}:${TAG}"
 
 ${CONTAINER_RUNTIME} build "${BUILD_ARGS[@]}" -f "${DOCKERFILE}" -t "${IMAGE_NAME}:${TAG}" .

@@ -350,7 +350,6 @@ async function promptAgentName(existingValue?: string): Promise<string> {
   return raw.trim() || 'ClawBridge';
 }
 
-
 async function promptHindsight(existingUrl?: string): Promise<{ dbPassword?: string; apiKey?: string; url?: string }> {
   if (existingUrl) {
     p.log.success('Hindsight already configured ✓');
@@ -465,54 +464,6 @@ function checkNodePrerequisites(): void {
   // Skip the check to avoid blocking fresh installs that don't have pnpm.
 }
 
-// ─── Codex auth ───────────────────────────────────────────────────────────────
-
-async function setupCodexAuth(): Promise<void> {
-  // 1. Check / install codex CLI
-  const codexCheck = spawnSync('which', ['codex'], { encoding: 'utf8' });
-  if (codexCheck.status !== 0) {
-    p.log.info('Codex CLI is not installed. Installing now...');
-    const s = p.spinner();
-    s.start('Installing @openai/codex@0.129.0 (npm install -g @openai/codex@0.129.0)…');
-    const installResult = spawnSync('npm', ['install', '-g', '@openai/codex@0.129.0'], {
-      encoding: 'utf8',
-      stdio: 'pipe',
-    });
-    if (installResult.status !== 0) {
-      s.stop(k.red('Failed to install Codex CLI.'));
-      p.log.error('Please install manually: npm install -g @openai/codex@0.129.0');
-      process.exit(1);
-    }
-    s.stop(k.green('@openai/codex installed ✓'));
-  } else {
-    p.log.success('Codex CLI detected ✓');
-  }
-
-  // 2. Check if already authenticated
-  const codexCredsPath = path.join(os.homedir(), '.codex', 'auth.json');
-  if (fs.existsSync(codexCredsPath)) {
-    try {
-      const creds = JSON.parse(fs.readFileSync(codexCredsPath, 'utf8'));
-      if (creds?.tokens?.access_token || creds?.api_key || creds?.accessToken || creds?.token) {
-        p.log.success('Codex authentication found ✓');
-        return;
-      }
-    } catch {
-      /* fall through */
-    }
-  }
-
-  // 3. Run codex login --device-auth interactively
-  p.log.message(dim('  Your browser will open to authenticate with OpenAI (ChatGPT Plus/Pro).'));
-  p.log.message(dim('  Complete the login, then return here.'));
-  p.log.message(dim('  Running: codex login --device-auth'));
-  const loginResult = spawnSync('codex', ['login', '--device-auth'], { stdio: 'inherit', encoding: 'utf8' });
-  if (loginResult.status === 0) {
-    p.log.success('Codex authenticated successfully ✓');
-  } else {
-    p.log.warn('Codex login may have failed. You can re-run it later with: codex login --device-auth');
-  }
-}
 
 // ─── Fresh install flow ───────────────────────────────────────────────────────
 
@@ -521,25 +472,8 @@ async function runFreshInstall(): Promise<void> {
   checkNodePrerequisites();
   p.log.step('Starting fresh install…');
 
-  // Step 0 — Backend provider selection
-  const providerChoice = ensure(
-    await p.select({
-      message: 'Which AI backend would you like to use?',
-      options: [
-        { value: 'claude', label: 'Claude (Anthropic)', hint: 'requires Claude Pro/Max subscription' },
-        { value: 'codex', label: 'Codex (OpenAI)', hint: 'requires ChatGPT Plus/Pro subscription' },
-      ],
-      initialValue: 'claude',
-    }),
-  ) as string;
-
-  // Step 1 — Auth for chosen backend
-  let oauthToken = '';
-  if (providerChoice === 'codex') {
-    await setupCodexAuth();
-  } else {
-    oauthToken = await setupClaudeAuth();
-  }
+  // Step 1 — Auth
+  const oauthToken = await setupClaudeAuth();
 
   // Step 2 — Channels
   type ChannelOption = { value: string; label: string; hint?: string };
@@ -624,33 +558,17 @@ async function runFreshInstall(): Promise<void> {
 
   fs.writeFileSync(envPath, envContent);
 
-  // Append AGENT_PROVIDER to .env
-  fs.appendFileSync(
-    envPath,
-    `
-AGENT_PROVIDER=${providerChoice}
-`,
-  );
-
   // Hindsight auto-config: write LLM provider settings if HINDSIGHT_URL is set
   // and these vars are not already present
   if (cfg.hindsightUrl) {
     const existingForHindsight = parseEnvFile(envPath);
     const hindsightLines: string[] = [''];
-    const hindsightProviderVars =
-      providerChoice === 'codex'
-        ? {
-            HINDSIGHT_API_LLM_PROVIDER: 'openai-codex',
-            HINDSIGHT_API_LLM_MODEL: 'gpt-5.4-mini',
-            HINDSIGHT_API_RETAIN_LLM_MODEL: 'gpt-5.4-mini',
-            HINDSIGHT_API_REFLECT_LLM_MODEL: 'gpt-5.4-mini',
-          }
-        : {
-            HINDSIGHT_API_LLM_PROVIDER: 'claude-code',
-            HINDSIGHT_API_LLM_MODEL: 'claude-haiku-4-20250514',
-            HINDSIGHT_API_RETAIN_LLM_MODEL: 'claude-haiku-4-20250514',
-            HINDSIGHT_API_REFLECT_LLM_MODEL: 'claude-sonnet-4-20250514',
-          };
+    const hindsightProviderVars = {
+      HINDSIGHT_API_LLM_PROVIDER: 'claude-code',
+      HINDSIGHT_API_LLM_MODEL: 'claude-haiku-4-20250514',
+      HINDSIGHT_API_RETAIN_LLM_MODEL: 'claude-haiku-4-20250514',
+      HINDSIGHT_API_REFLECT_LLM_MODEL: 'claude-sonnet-4-20250514',
+    };
     for (const [key, value] of Object.entries(hindsightProviderVars)) {
       if (!existingForHindsight.get(key)) {
         hindsightLines.push(`${key}=${value}`);
@@ -1241,22 +1159,10 @@ async function buildContainerImage(): Promise<boolean> {
       return false;
     }
 
-    // Detect provider from ~/.clawbridge/.env so we build the correct image.
-    // By this point the .env has already been written (fresh install or migration).
-    const envPath = path.join(os.homedir(), '.clawbridge', '.env');
-    let provider = 'claude';
-    try {
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      const match = envContent.match(/^AGENT_PROVIDER=(.+)$/m);
-      if (match?.[1]?.trim() === 'codex') provider = 'codex';
-    } catch {
-      /* default to claude */
-    }
-
-    const buildArgs = provider === 'codex' ? ['--codex'] : [];
+    const buildArgs: string[] = [];
 
     const s = p.spinner();
-    s.start(`Building ${provider} container image (this takes 1–2 min on first run)…`);
+    s.start(`Building container image (this takes 1–2 min on first run)…`);
     const result = spawnSync('bash', [buildScript, ...buildArgs], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',

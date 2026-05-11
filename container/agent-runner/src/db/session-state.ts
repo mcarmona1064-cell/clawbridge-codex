@@ -5,9 +5,7 @@
  * Primary use: remember each provider's opaque continuation id so the
  * agent's conversation resumes across container restarts. Keyed per
  * provider because continuations are provider-private — a Claude
- * conversation id means nothing to Codex and vice versa. Switching
- * providers is therefore lossless: each provider's last thread stays
- * on file and resumes cleanly if the user flips back.
+ * continuation id is private to the provider that created it.
  */
 import { getOutboundDb } from './connection.js';
 

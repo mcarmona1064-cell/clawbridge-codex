@@ -37,7 +37,7 @@ export interface ContainerConfig {
   additionalMounts: AdditionalMountConfig[];
   /** Which skills to enable — array of skill names or "all" (default). */
   skills: string[] | 'all';
-  /** Agent provider name (e.g. "claude", "opencode"). Default: "claude". */
+  /** Agent provider name. Default: "claude". */
   provider?: string;
   /** Agent group display name (used in transcript archiving). */
   groupName?: string;

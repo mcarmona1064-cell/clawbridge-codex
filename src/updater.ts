@@ -83,19 +83,8 @@ function rebuildContainerImage(): boolean {
       return false;
     }
 
-    // Detect provider from ~/.clawbridge/.env so we build the correct image.
-    const envPath = path.join(os.homedir(), '.clawbridge', '.env');
-    let provider = 'claude';
-    try {
-      const envContent = fs.readFileSync(envPath, 'utf-8');
-      const match = envContent.match(/^AGENT_PROVIDER=(.+)$/m);
-      if (match?.[1]?.trim() === 'codex') provider = 'codex';
-    } catch {
-      /* default to claude */
-    }
-
-    const buildArgs = provider === 'codex' ? ['--codex'] : [];
-    console.log(`  Building ${provider} container image\u2026`);
+    console.log(`  Building container image\u2026`);
+    const buildArgs: string[] = [];
 
     const result = spawnSync('bash', [buildScript, ...buildArgs], {
       stdio: 'inherit',

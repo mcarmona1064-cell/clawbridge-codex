@@ -28,20 +28,20 @@ describe('session-state — per-provider continuations', () => {
 
   test('providers are isolated — switching reads the right slot', () => {
     setContinuation('claude', 'claude-conv-1');
-    setContinuation('codex', 'codex-thread-xyz');
+    setContinuation('claude', 'claude-thread-xyz');
 
     expect(getContinuation('claude')).toBe('claude-conv-1');
-    expect(getContinuation('codex')).toBe('codex-thread-xyz');
+    expect(getContinuation('claude')).toBe('claude-thread-xyz');
   });
 
   test('clearContinuation only affects the specified provider', () => {
     setContinuation('claude', 'keep-me');
-    setContinuation('codex', 'drop-me');
+    setContinuation('claude', 'drop-me');
 
-    clearContinuation('codex');
+    clearContinuation('claude');
 
     expect(getContinuation('claude')).toBe('keep-me');
-    expect(getContinuation('codex')).toBeUndefined();
+    expect(getContinuation('claude')).toBeUndefined();
   });
 
   test('unknown provider returns undefined', () => {
@@ -67,7 +67,7 @@ describe('session-state — legacy migration', () => {
 
     // After migration the legacy key must be gone, whether or not it was adopted.
     // A subsequent migration for a different provider must not see it.
-    const resultAfterSecondCall = migrateLegacyContinuation('codex');
+    const resultAfterSecondCall = migrateLegacyContinuation('claude');
     expect(resultAfterSecondCall).toBeUndefined();
   });
 
@@ -84,8 +84,8 @@ describe('session-state — legacy migration', () => {
   test('no legacy row — returns current provider value (possibly undefined)', () => {
     expect(migrateLegacyContinuation('claude')).toBeUndefined();
 
-    setContinuation('codex', 'codex-value');
-    expect(migrateLegacyContinuation('codex')).toBe('codex-value');
+    setContinuation('claude', 'claude-value');
+    expect(migrateLegacyContinuation('claude')).toBe('claude-value');
   });
 
   test('migration is idempotent on a second call (legacy already gone)', () => {

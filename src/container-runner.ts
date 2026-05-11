@@ -9,7 +9,6 @@ import path from 'path';
 
 import {
   AGENT_PROVIDER,
-  CODEX_CONTAINER_IMAGE,
   CONTAINER_IMAGE,
   CONTAINER_IMAGE_BASE,
   CONTAINER_INSTALL_LABEL,
@@ -146,6 +145,13 @@ async function spawnContainer(session: Session): Promise<void> {
   // This catches both named containers from previous runs (clawbridge-v2-<folder>-*)
   // and unlabelled containers (docker auto-names like "kind_wu") that share the
   // same group mount and would race on the outbound message queue.
+  //
+  // BUT: don't kill containers that this daemon spawned for ANOTHER active
+  // session in the same group — those are legitimate in-flight siblings, not
+  // orphans. Killing them mid-reply produces SIGKILL (exit 137) before the
+  // agent can deliver. Multiple sessions per group is a valid state (e.g. two
+  // Telegram users both DM'ing the same agent).
+  const activeContainerNames = new Set([...activeContainers.values()].map((v) => v.containerName));
   try {
     const psOutput = execSync(`${CONTAINER_RUNTIME_BIN} ps --format '{{.Names}}\t{{.Mounts}}' 2>/dev/null || true`, {
       encoding: 'utf-8',
@@ -155,6 +161,7 @@ async function spawnContainer(session: Session): Promise<void> {
       if (!line) continue;
       const [name, mounts = ''] = line.split('\t');
       if (!name || name === containerName) continue;
+      if (activeContainerNames.has(name)) continue; // in-flight sibling — leave it alone
       if (mounts.includes(agentGroup.folder) || name.startsWith(`clawbridge-v2-${agentGroup.folder}-`)) {
         log.warn('Stopping stale container for group', { stale: name, group: agentGroup.folder });
         try {
@@ -377,7 +384,7 @@ function buildMounts(
     mounts.push(...validated);
   }
 
-  // Provider-contributed mounts (e.g. opencode-xdg)
+  // Provider-contributed mounts
   if (providerContribution.mounts) {
     mounts.push(...providerContribution.mounts);
   }
@@ -497,19 +504,15 @@ async function buildContainerArgs(
   }
 
   // Inject credentials directly from ~/.clawbridge/.env.
-  // Skip for Codex — its auth comes from the ~/.codex bind-mount (see src/providers/codex.ts).
-  // Forwarding Claude tokens into a Codex container would be a credentials cross-contamination.
-  if (provider !== 'codex') {
-    const creds = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
-    if (creds['CLAUDE_CODE_OAUTH_TOKEN']) {
-      args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${creds['CLAUDE_CODE_OAUTH_TOKEN']}`);
-      log.info('Injecting CLAUDE_CODE_OAUTH_TOKEN from .env', { containerName });
-    } else if (creds['ANTHROPIC_API_KEY']) {
-      args.push('-e', `ANTHROPIC_API_KEY=${creds['ANTHROPIC_API_KEY']}`);
-      log.info('Injecting ANTHROPIC_API_KEY from .env', { containerName });
-    } else {
-      log.warn('No credentials found in ~/.clawbridge/.env — container will have no credentials', { containerName });
-    }
+  const creds = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+  if (creds['CLAUDE_CODE_OAUTH_TOKEN']) {
+    args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${creds['CLAUDE_CODE_OAUTH_TOKEN']}`);
+    log.info('Injecting CLAUDE_CODE_OAUTH_TOKEN from .env', { containerName });
+  } else if (creds['ANTHROPIC_API_KEY']) {
+    args.push('-e', `ANTHROPIC_API_KEY=${creds['ANTHROPIC_API_KEY']}`);
+    log.info('Injecting ANTHROPIC_API_KEY from .env', { containerName });
+  } else {
+    log.warn('No credentials found in ~/.clawbridge/.env — container will have no credentials', { containerName });
   }
 
   // Per-group env vars from container.json — injected after credential vars.
@@ -555,7 +558,7 @@ async function buildContainerArgs(
   args.push('--entrypoint', 'bash');
 
   // Use per-agent-group image if one has been built, otherwise base image
-  const defaultImage = provider === 'codex' ? CODEX_CONTAINER_IMAGE : CONTAINER_IMAGE;
+  const defaultImage = CONTAINER_IMAGE;
   const imageTag = containerConfig.imageTag || defaultImage;
   args.push(imageTag);
 

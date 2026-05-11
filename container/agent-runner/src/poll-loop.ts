@@ -24,7 +24,7 @@ function generateId(): string {
 export interface PollLoopConfig {
   provider: AgentProvider;
   /**
-   * Name of the provider (e.g. "claude", "codex", "opencode"). Used to key
+   * Name of the provider (e.g. "claude"). Used to key
    * the stored continuation per-provider so flipping providers doesn't
    * resurrect a stale id from a different backend.
    */
@@ -50,7 +50,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
   // was persisted. The continuation is opaque to the poll-loop — the
   // provider decides how to use it (Claude resumes a .jsonl transcript,
   // other providers may reload a thread ID, etc.). Keyed per-provider so
-  // a Codex thread id never gets handed to Claude or vice versa.
+  // keyed by provider so continuations are not mixed across providers.
   let continuation: string | undefined = migrateLegacyContinuation(config.providerName);
 
   if (continuation) {
