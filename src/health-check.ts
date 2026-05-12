@@ -117,10 +117,12 @@ async function tryRestartClawBridgeService(): Promise<boolean> {
       const launchAgentsDir = path.join(os.homedir(), 'Library', 'LaunchAgents');
       let plists: string[] = [];
       try {
-        plists = fs.readdirSync(launchAgentsDir).filter(
-          (f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'),
-        );
-      } catch { /* ignore */ }
+        plists = fs
+          .readdirSync(launchAgentsDir)
+          .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
+      } catch {
+        /* ignore */
+      }
       if (plists.length === 0) return false;
       const label = plists[0].replace(/\.plist$/, '');
       const uid = execFileSync('id', ['-u'], { encoding: 'utf-8' }).trim();
@@ -140,14 +142,18 @@ async function tryRestartClawBridgeService(): Promise<boolean> {
         const files = fs.readdirSync(userUnitDir);
         const unit = files.find((f) => f.startsWith('clawbridge') && f.endsWith('.service'));
         if (unit) unitName = unit.replace('.service', '');
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       if (!unitName) {
         try {
           const sysFiles = fs.readdirSync('/etc/systemd/system/');
           const unit = sysFiles.find((f) => f.startsWith('clawbridge') && f.endsWith('.service'));
           if (unit) unitName = unit.replace('.service', '');
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
 
       if (!unitName) return false;

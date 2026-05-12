@@ -718,7 +718,7 @@ async function runFreshInstall(): Promise<void> {
   }
 
   if (composeSuccess) {
-    const outroLines = [k.green('✅ ClawBridge is running!'), '', `  • Portal:    ${k.bold('http://localhost:4000')}`];
+    const outroLines = [k.green('✅ ClawBridge is running!'), ''];
     if (botUsername) {
       outroLines.push(`  • Telegram:  ${k.bold('@' + botUsername)}  ← message me to start`);
     } else if (telegramToken) {

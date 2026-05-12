@@ -32,14 +32,13 @@ The wizard walks you through these steps:
 2. **Enable channels** — multi-select: Telegram, WhatsApp, Discord, Slack, Gmail
 3. **Telegram bot token** — paste the token from @BotFather (if Telegram selected)
 4. **Agent name** — what your assistant is called (default: `ClawBridge`)
-5. **Admin credentials** — email + password for the portal at `http://localhost:4000`
 7. **Retell AI key** (optional) — for voice agents
 8. **Generate `.env`** — writes all config to `.env` in your project root
 9. **docker compose up -d** — starts ClawBridge in the background
 
 Success output:
 ```
-✅ ClawBridge is running!  Portal: http://localhost:4000
+✅ ClawBridge is running!
 ```
 
 ---
@@ -134,8 +133,6 @@ This restores from `~/.clawbridge/migration-backup/` and removes the migrated fi
 |---|---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | ✅ | OAuth token from `claude setup-token` (Claude Pro/Max) |
 | `AGENT_NAME` | ✅ | Display name for your agent |
-| `ADMIN_EMAIL` | ✅ | Portal login email |
-| `ADMIN_PASSWORD` | ✅ | Portal login password |
 | `TELEGRAM_BOT_TOKEN` | Channel | From @BotFather |
 | `DISCORD_BOT_TOKEN` | Channel | Discord bot token |
 | `SLACK_BOT_TOKEN` | Channel | Slack bot token |
@@ -154,9 +151,6 @@ This restores from `~/.clawbridge/migration-backup/` and removes the migrated fi
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat…
 
 AGENT_NAME=ClawBridge
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=changeme
-
 TELEGRAM_BOT_TOKEN=123456789:ABCdef…
 ```
 
