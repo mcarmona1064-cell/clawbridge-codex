@@ -454,7 +454,15 @@ async function deliverToAgent(
       const parsed =
         typeof messageContent === 'string' ? JSON.parse(messageContent) : { ...(messageContent as object) };
       parsed.attachments = attachmentMeta;
-      messageContent = parsed;
+      // Re-stringify: writeSessionMessage → insertMessage binds content as a TEXT
+      // column, so SQLite needs a string. Without this, photo-bearing messages
+      // throw `TypeError: SQLite3 can only bind numbers, strings, bigints,
+      // buffers, and null` and the entire inbound row is dropped — the agent
+      // never sees the message, text or photo. Regression introduced when
+      // ba89b22 started forwarding `files` through onInbound (before that, this
+      // branch never ran because files never arrived here). See incident
+      // 2026-05-13 (Telegram photos silently vanished post-ba89b22).
+      messageContent = JSON.stringify(parsed);
     } catch (err) {
       log.warn('Failed to write inbound file attachment', { err, agentGroup: agentGroup.folder });
     }
