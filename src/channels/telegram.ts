@@ -25,6 +25,7 @@ import type {
 } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 import { interceptPairingMessage } from './telegram-pairing.js';
+import { transcribeAudio } from '../transcription.js';
 
 const API_BASE = 'https://api.telegram.org';
 const LONG_POLL_TIMEOUT_S = 25;
@@ -246,37 +247,6 @@ async function tgDownloadFile(token: string, fileId: string): Promise<{ data: Bu
   return { data: buf, filename };
 }
 
-const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
-const GROQ_MODEL = 'whisper-large-v3-turbo';
-
-async function transcribeWithGroq(
-  apiKey: string,
-  audio: { data: Buffer; filename: string },
-  mimeType: string,
-): Promise<string> {
-  const form = new FormData();
-  const blob = new Blob([new Uint8Array(audio.data)], { type: mimeType });
-  form.append('file', blob, audio.filename);
-  form.append('model', GROQ_MODEL);
-  form.append('response_format', 'text');
-
-  let res: Response;
-  try {
-    res = await fetch(GROQ_TRANSCRIBE_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-    });
-  } catch (err) {
-    throw new NetworkError(`Groq transcription network error: ${(err as Error).message}`);
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Groq transcription failed: ${res.status} ${body.slice(0, 200)}`);
-  }
-  return (await res.text()).trim();
-}
-
 async function tgPostMultipart<T>(
   token: string,
   method: string,
@@ -302,7 +272,7 @@ async function tgPostMultipart<T>(
 }
 
 function createAdapter(): ChannelAdapter | null {
-  const { TELEGRAM_BOT_TOKEN: token, GROQ_API_KEY: groqKey } = readEnvFile(['TELEGRAM_BOT_TOKEN', 'GROQ_API_KEY']);
+  const { TELEGRAM_BOT_TOKEN: token } = readEnvFile(['TELEGRAM_BOT_TOKEN']);
   if (!token) return null;
 
   let running = false;
@@ -349,21 +319,13 @@ function createAdapter(): ChannelAdapter | null {
   async function transcribeVoice(msg: TgMessage): Promise<string | null> {
     const media = msg.voice ?? msg.audio ?? msg.video_note;
     if (!media) return null;
-    if (!groqKey) {
-      log.warn('Telegram: voice/audio received but GROQ_API_KEY not set — dropping', {
-        chatId: msg.chat.id,
-        duration: media.duration,
-      });
-      return null;
-    }
     try {
       const file = await tgDownloadFile(token, media.file_id);
       if (!file) return null;
       const mime =
         ('mime_type' in media && media.mime_type) ||
         (msg.voice ? 'audio/ogg' : msg.video_note ? 'video/mp4' : 'audio/mpeg');
-      const transcript = await transcribeWithGroq(groqKey, file, mime);
-      return transcript;
+      return await transcribeAudio(file.data, file.filename, mime);
     } catch (err) {
       log.error('Telegram: voice transcription failed', { err: (err as Error).message });
       return null;

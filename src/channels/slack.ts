@@ -14,6 +14,7 @@ import { namespacedPlatformId } from '../platform-id.js';
 import { registerRawWebhookHandler } from '../webhook-server.js';
 import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
+import { isAudioLike, transcribeAudio } from '../transcription.js';
 
 const CHANNEL_TYPE = 'slack';
 const SLACK_API = 'https://slack.com/api';
@@ -151,6 +152,14 @@ function createAdapter(): ChannelAdapter | null {
                 continue;
               }
               const buf = Buffer.from(await res.arrayBuffer());
+              if (isAudioLike(mimeType)) {
+                const transcript = await transcribeAudio(buf, filename, mimeType);
+                if (transcript) {
+                  text = (text ? text + '\n' : '') + `[voice] ${transcript}`;
+                  files.push({ filename, mimeType, data: buf });
+                  continue;
+                }
+              }
               const sizeStr = ` size=${size || buf.length}`;
               const mimeStr = ` mime=${mimeType}`;
               text = (text ? text + '\n' : '') + `[file] ${filename}${mimeStr}${sizeStr}`;

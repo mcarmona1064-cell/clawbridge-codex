@@ -66,7 +66,7 @@
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "node -e \"try{require('better-sqlite3')}catch(e){console.error('\\n⚠ ClawBridge needs build tools for the database driver.\\nRun: apt install -y python3 make g++ (Ubuntu/Debian) or yum install -y python3 make gcc-c++ (CentOS)\\nThen: npm install -g clawbridge-agent\\n')}\""
+    "postinstall": "node -e \"try{require('better-sqlite3')}catch(e){console.error('\\n\u26a0 ClawBridge needs build tools for the database driver.\\nRun: apt install -y python3 make g++ (Ubuntu/Debian) or yum install -y python3 make gcc-c++ (CentOS)\\nThen: npm install -g clawbridge-agent\\n')}\""
   },
   "dependencies": {
     "@clack/core": "^1.2.0",
@@ -94,5 +94,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "optionalDependencies": {
+    "@xenova/transformers": "^2.17.2"
   }
 }

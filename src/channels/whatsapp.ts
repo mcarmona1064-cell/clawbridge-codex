@@ -18,6 +18,7 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { namespacedPlatformId } from '../platform-id.js';
 import { registerRawWebhookHandler } from '../webhook-server.js';
+import { isAudioLike, transcribeAudio } from '../transcription.js';
 import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 
@@ -177,14 +178,27 @@ function createAdapter(): ChannelAdapter | null {
                   const filename = fileNameFor(type, desc);
                   const downloaded = await waDownloadMedia(desc.id);
                   if (downloaded) {
-                    const sizeStr = ` size=${downloaded.size}`;
-                    const mimeStr = ` mime=${downloaded.mimeType}`;
-                    text = (text ? text + '\n' : '') + `[${type}] ${filename}${mimeStr}${sizeStr}`;
-                    files.push({
-                      filename,
-                      mimeType: downloaded.mimeType,
-                      data: downloaded.data,
-                    });
+                    if (isAudioLike(downloaded.mimeType)) {
+                      const transcript = await transcribeAudio(downloaded.data, filename, downloaded.mimeType);
+                      if (transcript) {
+                        text = (text ? text + '\n' : '') + `[voice] ${transcript}`;
+                        files.push({ filename, mimeType: downloaded.mimeType, data: downloaded.data });
+                      } else {
+                        const sizeStr = ` size=${downloaded.size}`;
+                        const mimeStr = ` mime=${downloaded.mimeType}`;
+                        text = (text ? text + '\n' : '') + `[${type}] ${filename}${mimeStr}${sizeStr}`;
+                        files.push({ filename, mimeType: downloaded.mimeType, data: downloaded.data });
+                      }
+                    } else {
+                      const sizeStr = ` size=${downloaded.size}`;
+                      const mimeStr = ` mime=${downloaded.mimeType}`;
+                      text = (text ? text + '\n' : '') + `[${type}] ${filename}${mimeStr}${sizeStr}`;
+                      files.push({
+                        filename,
+                        mimeType: downloaded.mimeType,
+                        data: downloaded.data,
+                      });
+                    }
                   } else {
                     // Hint without download — agent should still acknowledge.
                     const mimeStr = desc.mime_type ? ` mime=${desc.mime_type}` : '';

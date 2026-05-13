@@ -17,6 +17,7 @@ import { log } from '../log.js';
 import { namespacedPlatformId } from '../platform-id.js';
 import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
+import { isAudioLike, transcribeAudio } from '../transcription.js';
 
 const CHANNEL_TYPE = 'discord';
 const MAX_LEN = 2000;
@@ -100,6 +101,14 @@ function createAdapter(): ChannelAdapter | null {
             continue;
           }
           const buf = Buffer.from(await res.arrayBuffer());
+          if (isAudioLike(mimeType)) {
+            const transcript = await transcribeAudio(buf, filename, mimeType);
+            if (transcript) {
+              text = (text ? text + '\n' : '') + `[voice] ${transcript}`;
+              files.push({ filename, mimeType, data: buf });
+              continue;
+            }
+          }
           const sizeStr = ` size=${size || buf.length}`;
           const mimeStr = ` mime=${mimeType}`;
           text = (text ? text + '\n' : '') + `[file] ${filename}${mimeStr}${sizeStr}`;
