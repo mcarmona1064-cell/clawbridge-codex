@@ -50,8 +50,16 @@ This is significantly faster than sequential research and keeps each subagent's 
 
 ## Inbound file attachments
 
-When a message contains `[image: ... — saved to /workspace/...]` or `[photo: ... — saved to /workspace/...]`, use the **Read** tool on that exact path to view the image — Claude Code renders images natively so you will see it directly.
+Inbound messages may include one or more attachments labeled by type. Each hint has the form `[<type>: <filename> — saved to /workspace/<path>]`. The path is real — the file is already on disk inside your workspace.
 
-For other file types (`[file: ...]`, `[document: ...]`), the file is at the listed `/workspace/` path and can be accessed with Read or Bash.
+How to handle each type:
 
-Always read attachments before responding to messages that include them.
+- **`[image: ...]` / `[photo: ...]`** — call **Read** on the path. The Read tool renders images natively, so you will see the image content directly. Always do this before responding.
+- **`[pdf: ...]`** — call **Read** on the path. The Read tool extracts PDF text and renders pages natively. For PDFs over 10 pages you must pass the `pages` parameter (e.g. `pages: "1-5"`); max 20 pages per call. For longer documents, read in ranges and synthesize.
+- **`[video: ...]` / `[audio: ...]`** — the file is at the listed path. You cannot view video/audio content directly. Acknowledge that you received it, note the filename and mime type, and ask the user what they'd like done (e.g. transcribe, summarize, extract frames). If transcription is set up for the channel (e.g. Telegram voice → Whisper), the transcript will arrive as `[voice] <text>` text instead of a file.
+- **`[file: ...]` / `[document: ...]`** — generic attachment. Use **Read** (for text-like files) or **Bash** (for spreadsheets, archives, binaries — `unzip -l`, `file <path>`, etc.) to inspect.
+
+Rules:
+- Always read/inspect attachments before responding to messages that include them.
+- Never assume the file's contents from the filename alone.
+- If a Read fails (e.g. unsupported format), say so — don't fabricate the contents.

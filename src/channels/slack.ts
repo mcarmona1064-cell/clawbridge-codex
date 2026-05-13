@@ -12,11 +12,29 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { namespacedPlatformId } from '../platform-id.js';
 import { registerRawWebhookHandler } from '../webhook-server.js';
-import type { ChannelAdapter, ChannelSetup, InboundMessage, OutboundMessage } from './adapter.js';
+import type {
+  ChannelAdapter,
+  ChannelSetup,
+  InboundFile,
+  InboundMessage,
+  OutboundMessage,
+} from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 
 const CHANNEL_TYPE = 'slack';
 const SLACK_API = 'https://slack.com/api';
+const INBOUND_FILE_SIZE_CAP = 50 * 1024 * 1024; // 50 MB — matches Telegram / WhatsApp / Discord
+
+interface SlackFile {
+  id: string;
+  name?: string;
+  title?: string;
+  mimetype?: string;
+  filetype?: string;
+  size?: number;
+  url_private?: string;
+  url_private_download?: string;
+}
 
 function createAdapter(): ChannelAdapter | null {
   const env = readEnvFile(['SLACK_BOT_TOKEN', 'SLACK_SIGNING_SECRET']);
@@ -85,18 +103,72 @@ function createAdapter(): ChannelAdapter | null {
 
         if (payload['type'] === 'event_callback') {
           const event = payload['event'] as Record<string, unknown> | undefined;
-          if (!event || event['type'] !== 'message' || event['subtype']) {
+          // Slack delivers file uploads as `message` events with subtype
+          // `file_share` rather than a plain message. Allow that subtype
+          // through; reject all others (message_changed, message_deleted,
+          // channel_join, etc.).
+          if (!event || event['type'] !== 'message') {
+            return new Response('OK');
+          }
+          const subtype = event['subtype'] as string | undefined;
+          if (subtype && subtype !== 'file_share') {
             return new Response('OK');
           }
           // Ignore own messages and bot messages
           if (event['bot_id'] || event['user'] === botUserId) return new Response('OK');
 
           const channelId = event['channel'] as string;
-          const text = (event['text'] as string) ?? '';
+          let text = (event['text'] as string) ?? '';
           const ts = event['ts'] as string;
           const threadTs = (event['thread_ts'] as string | undefined) ?? null;
           const isGroup = (event['channel_type'] as string) !== 'im';
           const platformId = namespacedPlatformId(CHANNEL_TYPE, channelId);
+
+          // Slack file uploads arrive as `event.files: SlackFile[]`. Each file
+          // exposes a `url_private` / `url_private_download` URL that requires
+          // an Authorization: Bearer <bot-token> header to fetch. Mirrors the
+          // pattern used by Telegram / WhatsApp / Discord adapters: every
+          // successful download adds a one-line text hint AND a buffer to
+          // the `files` array; failures still emit a hint so the agent
+          // acknowledges the message rather than silently ignoring it.
+          const files: InboundFile[] = [];
+          const eventFiles = (event['files'] as SlackFile[] | undefined) ?? [];
+          for (const file of eventFiles) {
+            const filename = file.name || file.title || `file.${file.filetype ?? 'bin'}`;
+            const mimeType = file.mimetype ?? 'application/octet-stream';
+            const size = file.size ?? 0;
+            if (size > INBOUND_FILE_SIZE_CAP) {
+              const mb = Math.round(size / 1024 / 1024);
+              text = (text ? text + '\n' : '') + `[file] ${filename} (${mb}MB — exceeds inbound limit, not downloaded)`;
+              continue;
+            }
+            const downloadUrl = file.url_private_download ?? file.url_private;
+            if (!downloadUrl) {
+              text = (text ? text + '\n' : '') + `[file] ${filename} mime=${mimeType} (no url)`;
+              continue;
+            }
+            try {
+              const res = await fetch(downloadUrl, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!res.ok) {
+                log.warn('[slack] file fetch failed', { filename, status: res.status });
+                text = (text ? text + '\n' : '') + `[file] ${filename} mime=${mimeType} (download failed)`;
+                continue;
+              }
+              const buf = Buffer.from(await res.arrayBuffer());
+              const sizeStr = ` size=${size || buf.length}`;
+              const mimeStr = ` mime=${mimeType}`;
+              text = (text ? text + '\n' : '') + `[file] ${filename}${mimeStr}${sizeStr}`;
+              files.push({ filename, mimeType, data: buf });
+            } catch (err) {
+              log.warn('[slack] file download threw', { filename, err: (err as Error).message });
+              text = (text ? text + '\n' : '') + `[file] ${filename} mime=${mimeType} (download failed)`;
+            }
+          }
+
+          // Drop entirely empty messages (no text, no files).
+          if (!text && files.length === 0) return new Response('OK');
 
           const inbound: InboundMessage = {
             id: ts,
@@ -105,6 +177,7 @@ function createAdapter(): ChannelAdapter | null {
             timestamp: new Date(parseFloat(ts) * 1000).toISOString(),
             isMention: !isGroup || (botUserId ? text.includes(`<@${botUserId}>`) : false),
             isGroup,
+            ...(files.length > 0 ? { files } : {}),
           };
 
           if (cfg) {

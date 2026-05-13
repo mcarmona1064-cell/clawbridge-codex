@@ -444,11 +444,27 @@ async function deliverToAgent(
         fs.writeFileSync(dest, file.data);
         // localPath is relative to /workspace (the session mount point in the container).
         // The formatter prepends /workspace/ when building the prompt.
+        // The `type` label becomes the prompt-hint prefix the agent reads
+        // (e.g. `[image: photo.jpg ...]`). PDFs get their own label so the
+        // agent — and any per-type CLAUDE.md guidance — can branch on it.
+        // Everything not explicitly recognized falls through to `file`,
+        // which the agent handles generically with Read or Bash.
+        const mime = file.mimeType ?? '';
+        const labelType =
+          mime === 'application/pdf'
+            ? 'pdf'
+            : mime.startsWith('image/')
+              ? 'image'
+              : mime.startsWith('video/')
+                ? 'video'
+                : mime.startsWith('audio/')
+                  ? 'audio'
+                  : 'file';
         attachmentMeta.push({
           filename: file.filename,
           mimeType: file.mimeType,
           localPath: `inbound/${msgId}/${safeName}`,
-          type: file.mimeType?.startsWith('image/') ? 'image' : 'file',
+          type: labelType,
         });
       }
       const parsed =
