@@ -32,8 +32,8 @@ export interface MigrationAudit {
   skills: string[];
   channels: string[];
   configFiles: string[];
-  tools: string[];       // MCP server names detected across groups
-  apiKeys: string[];     // API key variable names found (not values)
+  tools: string[]; // MCP server names detected across groups
+  apiKeys: string[]; // API key variable names found (not values)
   hasClaudeOAuth: boolean; // CLAUDE_CODE_OAUTH_TOKEN present
 }
 
@@ -258,7 +258,9 @@ function detectTools(sourceDir: string): string[] {
       if (cfg['mcpServers'] && typeof cfg['mcpServers'] === 'object') {
         tools.push(...Object.keys(cfg['mcpServers'] as object));
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
   // Per-group container.json (deduplicate across groups)
   for (const rel of ['groups', 'data/groups', 'store/groups']) {
@@ -276,9 +278,13 @@ function detectTools(sourceDir: string): string[] {
               if (!tools.includes(name)) tools.push(name);
             }
           }
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
     break; // only need the first groups dir that exists
   }
   return tools;
@@ -322,7 +328,9 @@ function detectApiKeys(sourceDir: string): string[] {
           keys.push(key);
         }
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
   return keys;
 }
@@ -852,14 +860,19 @@ export async function runMigration(
           const destMcp = (dest['mcpServers'] ?? {}) as Record<string, unknown>;
           let merged = 0;
           for (const [name, cfg] of Object.entries(srcMcp)) {
-            if (!(name in destMcp)) { destMcp[name] = cfg; merged++; }
+            if (!(name in destMcp)) {
+              destMcp[name] = cfg;
+              merged++;
+            }
           }
           if (merged > 0) {
             dest['mcpServers'] = destMcp;
             fs.writeFileSync(destCj, JSON.stringify(dest, null, 2));
             emit('skills', `  Merged ${merged} MCP server(s) from source container.json`);
           }
-        } catch { /* skip merge on parse error */ }
+        } catch {
+          /* skip merge on parse error */
+        }
       }
       break;
     }
@@ -887,23 +900,26 @@ export async function runMigration(
         const m = line.match(/^([A-Za-z][A-Za-z0-9_]+)=(.+)/);
         if (m && m[2].trim()) srcAllKeys.push(m[1]);
       }
-      const MIGRATABLE_KEYS = srcAllKeys.length > 0 ? srcAllKeys : [
-        'TELEGRAM_BOT_TOKEN',
-        'TELEGRAM_CHAT_ID',
-        'WHATSAPP_SESSION',
-        'DISCORD_TOKEN',
-        'DISCORD_GUILD_ID',
-        'SLACK_BOT_TOKEN',
-        'SLACK_APP_TOKEN',
-        'RETELL_API_KEY',
-        'GROQ_API_KEY',
-        'ANTHROPIC_API_KEY',
-        'OPENAI_API_KEY',
-        'CLAUDE_CODE_OAUTH_TOKEN',
-        'RESEND_API_KEY',
-        'GITHUB_TOKEN',
-        'GOOGLE_API_KEY',
-      ];
+      const MIGRATABLE_KEYS =
+        srcAllKeys.length > 0
+          ? srcAllKeys
+          : [
+              'TELEGRAM_BOT_TOKEN',
+              'TELEGRAM_CHAT_ID',
+              'WHATSAPP_SESSION',
+              'DISCORD_TOKEN',
+              'DISCORD_GUILD_ID',
+              'SLACK_BOT_TOKEN',
+              'SLACK_APP_TOKEN',
+              'RETELL_API_KEY',
+              'GROQ_API_KEY',
+              'ANTHROPIC_API_KEY',
+              'OPENAI_API_KEY',
+              'CLAUDE_CODE_OAUTH_TOKEN',
+              'RESEND_API_KEY',
+              'GITHUB_TOKEN',
+              'GOOGLE_API_KEY',
+            ];
       if (fs.existsSync(clawbridgeEnvPath)) {
         const existingEnv = fs.readFileSync(clawbridgeEnvPath, 'utf-8');
         const linesToAdd: string[] = [];
@@ -928,6 +944,7 @@ export async function runMigration(
       'config/whatsapp',
       'session',
       'auth_info_baileys',
+      'store/auth',
       'whatsapp-session',
       'store/whatsapp',
       'data/whatsapp',
@@ -1415,6 +1432,7 @@ export async function verifyMigration(
         'config/whatsapp',
         'session',
         'auth_info_baileys',
+        'store/auth',
         'whatsapp-session',
         'store/whatsapp',
         'data/whatsapp',

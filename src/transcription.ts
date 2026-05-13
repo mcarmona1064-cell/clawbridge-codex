@@ -31,12 +31,7 @@ const execFileAsync = promisify(execFile);
 const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const GROQ_MODEL = 'whisper-large-v3-turbo';
 
-async function transcribeWithGroq(
-  apiKey: string,
-  data: Buffer,
-  filename: string,
-  mimeType: string,
-): Promise<string> {
+async function transcribeWithGroq(apiKey: string, data: Buffer, filename: string, mimeType: string): Promise<string> {
   const form = new FormData();
   const blob = new Blob([new Uint8Array(data)], { type: mimeType });
   form.append('file', blob, filename);
@@ -68,7 +63,9 @@ async function hasFfmpeg(): Promise<boolean> {
     ffmpegAvailable = true;
   } catch {
     ffmpegAvailable = false;
-    log.warn('[transcription] ffmpeg not found — audio format conversion unavailable. Install ffmpeg to enable local transcription.');
+    log.warn(
+      '[transcription] ffmpeg not found — audio format conversion unavailable. Install ffmpeg to enable local transcription.',
+    );
   }
   return ffmpegAvailable;
 }
@@ -85,9 +82,9 @@ async function getLocalPipeline(): Promise<((audio: string) => Promise<{ text: s
     // Dynamic import so the package is optional at startup
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod = await import('@xenova/transformers' as any);
-    pipeline = await mod.pipeline('automatic-speech-recognition', 'Xenova/whisper-small', {
+    pipeline = (await mod.pipeline('automatic-speech-recognition', 'Xenova/whisper-small', {
       quantized: true,
-    }) as (audio: string) => Promise<{ text: string }>;
+    })) as (audio: string) => Promise<{ text: string }>;
     log.info('[transcription] Local Whisper model ready (Xenova/whisper-small)');
   } catch (err) {
     log.warn('[transcription] @xenova/transformers unavailable — run: npm install @xenova/transformers', {
@@ -127,11 +124,7 @@ async function transcribeLocal(data: Buffer, filename: string): Promise<string |
 
 /** Returns true for MIME types that represent audio worth transcribing. */
 export function isAudioLike(mimeType: string): boolean {
-  return (
-    mimeType.startsWith('audio/') ||
-    mimeType === 'video/ogg' ||
-    mimeType === 'video/webm'
-  );
+  return mimeType.startsWith('audio/') || mimeType === 'video/ogg' || mimeType === 'video/webm';
 }
 
 /**
@@ -139,11 +132,7 @@ export function isAudioLike(mimeType: string): boolean {
  * Falls back to local Whisper (via @xenova/transformers + ffmpeg) when no key is set.
  * Returns null when transcription is unavailable or fails.
  */
-export async function transcribeAudio(
-  data: Buffer,
-  filename: string,
-  mimeType: string,
-): Promise<string | null> {
+export async function transcribeAudio(data: Buffer, filename: string, mimeType: string): Promise<string | null> {
   const { GROQ_API_KEY: groqKey } = readEnvFile(['GROQ_API_KEY']);
   try {
     if (groqKey) return await transcribeWithGroq(groqKey, data, filename, mimeType);

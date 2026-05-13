@@ -104,6 +104,24 @@ function parseArgs(args: string[]): { method: AuthMethod; phone?: string } {
 export async function run(args: string[]): Promise<void> {
   const { method, phone } = parseArgs(args);
 
+  // Auto-restore Baileys auth from an OpenClaw migration if store/auth is empty
+  const migratedCreds = path.join(process.env.HOME ?? '', '.clawbridge', 'credentials', 'whatsapp');
+  if (
+    !fs.existsSync(path.join(AUTH_DIR, 'creds.json')) &&
+    fs.existsSync(path.join(migratedCreds, 'creds.json'))
+  ) {
+    const copyDir = (src: string, dest: string): void => {
+      fs.mkdirSync(dest, { recursive: true });
+      for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        const s = path.join(src, entry.name);
+        const d = path.join(dest, entry.name);
+        if (entry.isDirectory()) copyDir(s, d);
+        else fs.copyFileSync(s, d);
+      }
+    };
+    copyDir(migratedCreds, AUTH_DIR);
+  }
+
   if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) {
     emitStatus('WHATSAPP_AUTH', {
       STATUS: 'skipped',
