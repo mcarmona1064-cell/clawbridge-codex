@@ -15,13 +15,7 @@ import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { namespacedPlatformId } from '../platform-id.js';
-import type {
-  ChannelAdapter,
-  ChannelSetup,
-  InboundFile,
-  InboundMessage,
-  OutboundMessage,
-} from './adapter.js';
+import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 
 const CHANNEL_TYPE = 'discord';

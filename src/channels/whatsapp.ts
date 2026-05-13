@@ -18,13 +18,7 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { namespacedPlatformId } from '../platform-id.js';
 import { registerRawWebhookHandler } from '../webhook-server.js';
-import type {
-  ChannelAdapter,
-  ChannelSetup,
-  InboundFile,
-  InboundMessage,
-  OutboundMessage,
-} from './adapter.js';
+import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 
 const CHANNEL_TYPE = 'whatsapp';
@@ -68,9 +62,7 @@ function createAdapter(): ChannelAdapter | null {
    * caller should still produce a textual hint so the agent knows a media
    * message arrived even if download failed.
    */
-  async function waDownloadMedia(
-    mediaId: string,
-  ): Promise<{ data: Buffer; mimeType: string; size: number } | null> {
+  async function waDownloadMedia(mediaId: string): Promise<{ data: Buffer; mimeType: string; size: number } | null> {
     try {
       const metaRes = await fetch(`${GRAPH_API}/${mediaId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -110,12 +102,17 @@ function createAdapter(): ChannelAdapter | null {
   function fileNameFor(type: MediaType, desc: WaMediaDescriptor): string {
     if (desc.filename) return desc.filename;
     const ext =
-      type === 'image' ? '.jpg' :
-      type === 'video' ? '.mp4' :
-      type === 'audio' ? '.ogg' :
-      type === 'voice' ? '.ogg' :
-      type === 'sticker' ? '.webp' :
-      ''; // 'document' usually carries .filename; bare fallback otherwise
+      type === 'image'
+        ? '.jpg'
+        : type === 'video'
+          ? '.mp4'
+          : type === 'audio'
+            ? '.ogg'
+            : type === 'voice'
+              ? '.ogg'
+              : type === 'sticker'
+                ? '.webp'
+                : ''; // 'document' usually carries .filename; bare fallback otherwise
     return `${type}${ext}`;
   }
 
@@ -182,9 +179,7 @@ function createAdapter(): ChannelAdapter | null {
                   if (downloaded) {
                     const sizeStr = ` size=${downloaded.size}`;
                     const mimeStr = ` mime=${downloaded.mimeType}`;
-                    text =
-                      (text ? text + '\n' : '') +
-                      `[${type}] ${filename}${mimeStr}${sizeStr}`;
+                    text = (text ? text + '\n' : '') + `[${type}] ${filename}${mimeStr}${sizeStr}`;
                     files.push({
                       filename,
                       mimeType: downloaded.mimeType,
@@ -193,9 +188,7 @@ function createAdapter(): ChannelAdapter | null {
                   } else {
                     // Hint without download — agent should still acknowledge.
                     const mimeStr = desc.mime_type ? ` mime=${desc.mime_type}` : '';
-                    text =
-                      (text ? text + '\n' : '') +
-                      `[${type}] ${filename}${mimeStr} (download failed)`;
+                    text = (text ? text + '\n' : '') + `[${type}] ${filename}${mimeStr} (download failed)`;
                   }
                 }
               }

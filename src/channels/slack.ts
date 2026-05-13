@@ -12,13 +12,7 @@ import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
 import { namespacedPlatformId } from '../platform-id.js';
 import { registerRawWebhookHandler } from '../webhook-server.js';
-import type {
-  ChannelAdapter,
-  ChannelSetup,
-  InboundFile,
-  InboundMessage,
-  OutboundMessage,
-} from './adapter.js';
+import type { ChannelAdapter, ChannelSetup, InboundFile, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 
 const CHANNEL_TYPE = 'slack';
