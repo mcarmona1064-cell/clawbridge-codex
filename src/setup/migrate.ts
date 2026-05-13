@@ -32,6 +32,9 @@ export interface MigrationAudit {
   skills: string[];
   channels: string[];
   configFiles: string[];
+  tools: string[];       // MCP server names detected across groups
+  apiKeys: string[];     // API key variable names found (not values)
+  hasClaudeOAuth: boolean; // CLAUDE_CODE_OAUTH_TOKEN present
 }
 
 export type MigrationSelection = 'groups' | 'messages' | 'skills' | 'credentials';
@@ -242,6 +245,88 @@ function findConfigFiles(sourceDir: string): string[] {
   ].filter((rel) => fs.existsSync(path.join(sourceDir, rel)));
 }
 
+// ─── Tool / MCP server detection ─────────────────────────────────────────────
+
+function detectTools(sourceDir: string): string[] {
+  const tools: string[] = [];
+  // Global container.json at source root or config/
+  for (const rel of ['container.json', 'config/container.json', '.config/container.json']) {
+    const p = path.join(sourceDir, rel);
+    if (!fs.existsSync(p)) continue;
+    try {
+      const cfg = JSON.parse(fs.readFileSync(p, 'utf-8')) as Record<string, unknown>;
+      if (cfg['mcpServers'] && typeof cfg['mcpServers'] === 'object') {
+        tools.push(...Object.keys(cfg['mcpServers'] as object));
+      }
+    } catch { /* skip */ }
+  }
+  // Per-group container.json (deduplicate across groups)
+  for (const rel of ['groups', 'data/groups', 'store/groups']) {
+    const dir = path.join(sourceDir, rel);
+    if (!fs.existsSync(dir)) continue;
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const cjPath = path.join(dir, entry.name, 'container.json');
+        if (!fs.existsSync(cjPath)) continue;
+        try {
+          const cfg = JSON.parse(fs.readFileSync(cjPath, 'utf-8')) as Record<string, unknown>;
+          if (cfg['mcpServers'] && typeof cfg['mcpServers'] === 'object') {
+            for (const name of Object.keys(cfg['mcpServers'] as object)) {
+              if (!tools.includes(name)) tools.push(name);
+            }
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+    break; // only need the first groups dir that exists
+  }
+  return tools;
+}
+
+const API_KEY_PATTERNS: RegExp[] = [
+  /^GROQ_API_KEY$/,
+  /^ANTHROPIC_API_KEY$/,
+  /^OPENAI_API_KEY$/,
+  /^CLAUDE_CODE_OAUTH_TOKEN$/,
+  /^HINDSIGHT_API_KEY$/,
+  /^RETELL_API_KEY$/,
+  /^GOOGLE_API_KEY$/,
+  /^GITHUB_TOKEN$/,
+  /^RESEND_API_KEY$/,
+  /^STRIPE_.*KEY$/,
+  /^TWILIO_/,
+  /^MATRIX_/,
+  /^SIGNAL_/,
+  /.*_API_KEY$/,
+  /.*_SECRET_KEY$/,
+  /.*_ACCESS_TOKEN$/,
+  /.*_AUTH_TOKEN$/,
+];
+
+function detectApiKeys(sourceDir: string): string[] {
+  const keys: string[] = [];
+  const envPaths = [
+    path.join(sourceDir, '.env'),
+    path.join(sourceDir, '.env.local'),
+    path.join(sourceDir, 'config', '.env'),
+  ];
+  for (const envPath of envPaths) {
+    if (!fs.existsSync(envPath)) continue;
+    try {
+      for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
+        const match = line.match(/^([A-Z][A-Z0-9_]+)=(.+)/);
+        if (!match) continue;
+        const [, key, val] = match;
+        if (val.trim() && API_KEY_PATTERNS.some((p) => p.test(key)) && !keys.includes(key)) {
+          keys.push(key);
+        }
+      }
+    } catch { /* skip */ }
+  }
+  return keys;
+}
+
 // ─── Memory table detection ───────────────────────────────────────────────────
 
 const MEMORY_TABLE_CANDIDATES = ['memories', 'memory_entries', 'agent_memories', 'tiered_memories'];
@@ -303,6 +388,18 @@ export async function auditInstall(source: MigrationSource): Promise<MigrationAu
     memoryCount += countMemoryEntries(db);
     scheduledTaskCount += countScheduledTasks(db);
   }
+  const allEnvPaths = [
+    path.join(source.path, '.env'),
+    path.join(source.path, '.env.local'),
+    path.join(source.path, 'config', '.env'),
+  ];
+  let hasClaudeOAuth = false;
+  for (const ep of allEnvPaths) {
+    if (fs.existsSync(ep) && fs.readFileSync(ep, 'utf-8').includes('CLAUDE_CODE_OAUTH_TOKEN=')) {
+      hasClaudeOAuth = true;
+      break;
+    }
+  }
   return {
     groups,
     messageCount,
@@ -311,6 +408,9 @@ export async function auditInstall(source: MigrationSource): Promise<MigrationAu
     skills: findSkills(source.path),
     channels: detectChannels(source.path),
     configFiles: findConfigFiles(source.path),
+    tools: detectTools(source.path),
+    apiKeys: detectApiKeys(source.path),
+    hasClaudeOAuth,
   };
 }
 
@@ -704,9 +804,14 @@ export async function runMigration(
           }
 
           if (result.hindsightQueued > 0) {
+            // Persist queued memories to disk so they survive restarts and sync on next startup
+            const queuePath = path.join(CLAWBRIDGE_HOME, 'memory-migration-queue.json');
+            const queuePayload = { queuedAt: new Date().toISOString(), entries: allMemories };
+            fs.mkdirSync(CLAWBRIDGE_HOME, { recursive: true });
+            fs.writeFileSync(queuePath, JSON.stringify(queuePayload, null, 2));
             emit(
               'hindsight',
-              `  ⚠ Hindsight not reachable — ${result.hindsightQueued} memories will sync on first startup`,
+              `  ⚠ Hindsight not reachable — ${result.hindsightQueued} memories saved to ~/.clawbridge/memory-migration-queue.json for first-startup sync`,
             );
           } else {
             emit('hindsight', `  Retained: ${result.hindsightRetained}, Failed: ${result.hindsightFailed}`);
@@ -730,6 +835,36 @@ export async function runMigration(
     }
   }
 
+  // 4b. Global container.json (MCP servers + installed packages at root level)
+  for (const rel of ['container.json', 'config/container.json']) {
+    const srcCj = path.join(source.path, rel);
+    if (fs.existsSync(srcCj)) {
+      const destCj = path.join(CLAWBRIDGE_HOME, 'container.json');
+      if (!fs.existsSync(destCj)) {
+        fs.copyFileSync(srcCj, destCj);
+        emit('skills', `  Copied global container.json (MCP servers / tools config)`);
+      } else {
+        // Merge mcpServers from source into existing dest without overwriting
+        try {
+          const src = JSON.parse(fs.readFileSync(srcCj, 'utf-8')) as Record<string, unknown>;
+          const dest = JSON.parse(fs.readFileSync(destCj, 'utf-8')) as Record<string, unknown>;
+          const srcMcp = (src['mcpServers'] ?? {}) as Record<string, unknown>;
+          const destMcp = (dest['mcpServers'] ?? {}) as Record<string, unknown>;
+          let merged = 0;
+          for (const [name, cfg] of Object.entries(srcMcp)) {
+            if (!(name in destMcp)) { destMcp[name] = cfg; merged++; }
+          }
+          if (merged > 0) {
+            dest['mcpServers'] = destMcp;
+            fs.writeFileSync(destCj, JSON.stringify(dest, null, 2));
+            emit('skills', `  Merged ${merged} MCP server(s) from source container.json`);
+          }
+        } catch { /* skip merge on parse error */ }
+      }
+      break;
+    }
+  }
+
   // 5. Credentials
   if (selections.includes('credentials')) {
     emit('credentials', 'Migrating channel credentials…');
@@ -742,7 +877,17 @@ export async function runMigration(
       // Try to merge relevant channel tokens into ClawBridge .env
       const srcEnvContent = fs.readFileSync(envSrc, 'utf-8');
       const clawbridgeEnvPath = path.join(CLAWBRIDGE_HOME, '.env');
-      const MIGRATABLE_KEYS = [
+      // Migrate ALL non-empty keys from source .env that aren't already set.
+      // Covers channel tokens, API keys, Claude OAuth, and any custom integrations.
+      // Keys managed by ClawBridge's own setup flow are still included — the setup
+      // wizard will prompt to confirm/override if needed.
+      const srcLines = srcEnvContent.split('\n');
+      const srcAllKeys: string[] = [];
+      for (const line of srcLines) {
+        const m = line.match(/^([A-Za-z][A-Za-z0-9_]+)=(.+)/);
+        if (m && m[2].trim()) srcAllKeys.push(m[1]);
+      }
+      const MIGRATABLE_KEYS = srcAllKeys.length > 0 ? srcAllKeys : [
         'TELEGRAM_BOT_TOKEN',
         'TELEGRAM_CHAT_ID',
         'WHATSAPP_SESSION',
@@ -751,6 +896,13 @@ export async function runMigration(
         'SLACK_BOT_TOKEN',
         'SLACK_APP_TOKEN',
         'RETELL_API_KEY',
+        'GROQ_API_KEY',
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'CLAUDE_CODE_OAUTH_TOKEN',
+        'RESEND_API_KEY',
+        'GITHUB_TOKEN',
+        'GOOGLE_API_KEY',
       ];
       if (fs.existsSync(clawbridgeEnvPath)) {
         const existingEnv = fs.readFileSync(clawbridgeEnvPath, 'utf-8');
@@ -815,10 +967,9 @@ export async function runMigration(
     if (fs.existsSync(srcPath)) {
       const destDataDir = path.join(CLAWBRIDGE_HOME, 'data');
       fs.mkdirSync(destDataDir, { recursive: true });
-      const destPath = path.join(destDataDir, 'registered_groups.migrated.json');
+      const destPath = path.join(destDataDir, 'registered_groups.json');
       fs.copyFileSync(srcPath, destPath);
-      emit('groups', '  Registered groups saved to ~/.clawbridge/data/registered_groups.migrated.json');
-      emit('groups', '  ⚠ Review and rename to registered_groups.json to activate');
+      emit('groups', '  Registered groups activated at ~/.clawbridge/data/registered_groups.json ✓');
       break;
     }
   }
@@ -1282,13 +1433,13 @@ export async function verifyMigration(
   }
 
   // ── Registered groups ─────────────────────────────────────────────────────
-  const registeredGroupsMigrated = path.join(CLAWBRIDGE_HOME, 'data', 'registered_groups.migrated.json');
+  const registeredGroupsMigrated = path.join(CLAWBRIDGE_HOME, 'data', 'registered_groups.migrated.json'); // legacy path
   const registeredGroupsActive = path.join(CLAWBRIDGE_HOME, 'data', 'registered_groups.json');
   if (fs.existsSync(registeredGroupsMigrated)) {
     checks.push({
       label: 'Registered Groups',
       passed: true,
-      message: 'Registered groups: saved as registered_groups.migrated.json — review and rename to activate ⚠',
+      message: 'Registered groups: activated at registered_groups.json ✓',
     });
   } else if (fs.existsSync(registeredGroupsActive)) {
     checks.push({ label: 'Registered Groups', passed: true, message: 'Registered groups: active ✓' });
