@@ -47,3 +47,11 @@ When asked to research multiple topics, instead of doing them sequentially:
 3. Synthesize all results into one final response
 
 This is significantly faster than sequential research and keeps each subagent's context clean.
+
+## Inbound file attachments
+
+When a message contains `[image: ... — saved to /workspace/...]` or `[photo: ... — saved to /workspace/...]`, use the **Read** tool on that exact path to view the image — Claude Code renders images natively so you will see it directly.
+
+For other file types (`[file: ...]`, `[document: ...]`), the file is at the listed `/workspace/` path and can be accessed with Read or Bash.
+
+Always read attachments before responding to messages that include them.
