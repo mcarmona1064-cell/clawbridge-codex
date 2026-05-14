@@ -706,6 +706,7 @@ function printAuditReport(source: MigrationSource, audit: MigrationAudit): void 
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
+    clawbridge: 'clawbridge-agent',
   };
   const label = typeLabel[source.type] ?? source.type;
   const rows: Array<[string, string]> = [
@@ -728,6 +729,7 @@ async function runMigrationFlow(): Promise<void> {
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
+    clawbridge: 'clawbridge-agent',
   };
 
   // 1. Detect install
