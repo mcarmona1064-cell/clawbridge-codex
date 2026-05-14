@@ -28,7 +28,7 @@ export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 export const CONTAINER_IMAGE_BASE = process.env.CONTAINER_IMAGE_BASE || getContainerImageBase(PROJECT_ROOT);
 export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || getDefaultContainerImage(PROJECT_ROOT);
 
-export const AGENT_PROVIDER = 'claude' as const;
+export const AGENT_PROVIDER = 'codex' as const;
 // Install slug — stamped onto every spawned container via --label so
 // cleanupOrphans only reaps containers from this install, not peers.
 export const INSTALL_SLUG = getInstallSlug(PROJECT_ROOT);

@@ -553,7 +553,7 @@ These are ephemeral to the container's lifetime. When the container is killed an
 
 The agent-runner receives configuration via:
 
-- **Environment variables:** `AGENT_PROVIDER` (default: claude), `CLAWBRIDGE_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
+- **Environment variables:** `AGENT_PROVIDER` (default: codex), `CLAWBRIDGE_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
 - **Fixed mount paths:** Session DB at `/workspace/session.db`. Agent group folder at `/workspace/agent/`. System prompt from `/workspace/agent/CLAUDE.md` and `/workspace/global/CLAUDE.md`.
 - **Optional startup config:** Some config may be passed as a JSON file at a fixed path (e.g., `/workspace/config.json`) for things like the session ID to resume, assistant name, and admin user ID. This avoids overloading environment variables.
 

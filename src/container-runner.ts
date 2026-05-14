@@ -265,7 +265,7 @@ export function killContainer(sessionId: string, reason: string): void {
  *   sessions.agent_provider
  *     → agent_groups.agent_provider
  *     → container.json `provider`
- *     → 'claude'
+ *     → 'codex'
  *
  * Pure so the precedence can be unit-tested without a DB or filesystem.
  */

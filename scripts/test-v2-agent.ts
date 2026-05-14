@@ -1,6 +1,6 @@
 /**
  * Quick integration test: create a session DB, insert a message,
- * run the v2 poll loop with the Claude provider, verify output.
+ * run the v2 poll loop with the Codex provider, verify output.
  *
  * Usage: pnpm exec tsx scripts/test-v2-agent.ts
  */
@@ -42,7 +42,7 @@ db.close();
 
 // Set env and run the poll loop
 process.env.SESSION_DB_PATH = DB_PATH;
-process.env.AGENT_PROVIDER = 'claude';
+process.env.AGENT_PROVIDER = 'codex';
 
 const { getSessionDb, closeSessionDb } = await import('../container/agent-runner/src/db/connection.js');
 const { getUndeliveredMessages } = await import('../container/agent-runner/src/db/messages-out.js');
@@ -50,9 +50,9 @@ const { getPendingMessages } = await import('../container/agent-runner/src/db/me
 const { createProvider } = await import('../container/agent-runner/src/providers/factory.js');
 const { runPollLoop } = await import('../container/agent-runner/src/poll-loop.js');
 
-const provider = createProvider('claude');
+const provider = createProvider('codex');
 
-console.log('✓ Claude provider created');
+console.log('✓ Codex provider created');
 console.log('⏳ Starting poll loop (will timeout after 60s)...');
 
 // Run with timeout
