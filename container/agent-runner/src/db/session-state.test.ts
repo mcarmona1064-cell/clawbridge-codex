@@ -20,28 +20,28 @@ function seedLegacy(value: string): void {
 
 describe('session-state — per-provider continuations', () => {
   test('set/get round-trip, case-insensitive provider key', () => {
-    setContinuation('claude', 'claude-conv-1');
-    expect(getContinuation('claude')).toBe('claude-conv-1');
-    expect(getContinuation('Claude')).toBe('claude-conv-1');
-    expect(getContinuation('CLAUDE')).toBe('claude-conv-1');
+    setContinuation('codex', 'codex-conv-1');
+    expect(getContinuation('codex')).toBe('codex-conv-1');
+    expect(getContinuation('Codex')).toBe('codex-conv-1');
+    expect(getContinuation('CODEX')).toBe('codex-conv-1');
   });
 
   test('providers are isolated — switching reads the right slot', () => {
-    setContinuation('claude', 'claude-conv-1');
-    setContinuation('claude', 'claude-thread-xyz');
+    setContinuation('codex', 'codex-conv-1');
+    setContinuation('codex', 'codex-thread-xyz');
 
-    expect(getContinuation('claude')).toBe('claude-conv-1');
-    expect(getContinuation('claude')).toBe('claude-thread-xyz');
+    expect(getContinuation('codex')).toBe('codex-conv-1');
+    expect(getContinuation('codex')).toBe('codex-thread-xyz');
   });
 
   test('clearContinuation only affects the specified provider', () => {
-    setContinuation('claude', 'keep-me');
-    setContinuation('claude', 'drop-me');
+    setContinuation('codex', 'keep-me');
+    setContinuation('codex', 'drop-me');
 
-    clearContinuation('claude');
+    clearContinuation('codex');
 
-    expect(getContinuation('claude')).toBe('keep-me');
-    expect(getContinuation('claude')).toBeUndefined();
+    expect(getContinuation('codex')).toBe('keep-me');
+    expect(getContinuation('codex')).toBeUndefined();
   });
 
   test('unknown provider returns undefined', () => {
@@ -53,48 +53,48 @@ describe('session-state — legacy migration', () => {
   test('adopts legacy value into current provider when current is empty', () => {
     seedLegacy('old-session-id');
 
-    const adopted = migrateLegacyContinuation('claude');
+    const adopted = migrateLegacyContinuation('codex');
 
     expect(adopted).toBe('old-session-id');
-    expect(getContinuation('claude')).toBe('old-session-id');
+    expect(getContinuation('codex')).toBe('old-session-id');
   });
 
   test('always deletes legacy row regardless of migration outcome', () => {
     seedLegacy('old-session-id');
-    setContinuation('claude', 'existing');
+    setContinuation('codex', 'existing');
 
-    migrateLegacyContinuation('claude');
+    migrateLegacyContinuation('codex');
 
     // After migration the legacy key must be gone, whether or not it was adopted.
     // A subsequent migration for a different provider must not see it.
-    const resultAfterSecondCall = migrateLegacyContinuation('claude');
+    const resultAfterSecondCall = migrateLegacyContinuation('codex');
     expect(resultAfterSecondCall).toBeUndefined();
   });
 
   test('prefers existing current-provider slot over legacy', () => {
     seedLegacy('legacy-value');
-    setContinuation('claude', 'claude-value');
+    setContinuation('codex', 'codex-value');
 
-    const result = migrateLegacyContinuation('claude');
+    const result = migrateLegacyContinuation('codex');
 
-    expect(result).toBe('claude-value');
-    expect(getContinuation('claude')).toBe('claude-value');
+    expect(result).toBe('codex-value');
+    expect(getContinuation('codex')).toBe('codex-value');
   });
 
   test('no legacy row — returns current provider value (possibly undefined)', () => {
-    expect(migrateLegacyContinuation('claude')).toBeUndefined();
+    expect(migrateLegacyContinuation('codex')).toBeUndefined();
 
-    setContinuation('claude', 'claude-value');
-    expect(migrateLegacyContinuation('claude')).toBe('claude-value');
+    setContinuation('codex', 'codex-value');
+    expect(migrateLegacyContinuation('codex')).toBe('codex-value');
   });
 
   test('migration is idempotent on a second call (legacy already gone)', () => {
     seedLegacy('once');
 
-    const first = migrateLegacyContinuation('claude');
+    const first = migrateLegacyContinuation('codex');
     expect(first).toBe('once');
 
-    const second = migrateLegacyContinuation('claude');
+    const second = migrateLegacyContinuation('codex');
     expect(second).toBe('once');
   });
 });
