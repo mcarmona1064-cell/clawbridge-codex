@@ -20,6 +20,7 @@ ARG INSTALL_CJK_FONTS=false
 # mean every rebuild silently picks up the latest and can break in lockstep
 # across all users.
 ARG CLAUDE_CODE_VERSION=2.1.116
+ARG CODEX_VERSION=0.124.0
 ARG AGENT_BROWSER_VERSION=0.27.0
 ARG VERCEL_VERSION=53.3.0
 ARG BUN_VERSION=1.3.12
@@ -114,6 +115,10 @@ RUN --mount=type=cache,target=/root/.cache/pnpm     pnpm install -g "@anthropic-
         [ -n "$CLAUDE_PKG" ] && cd "$CLAUDE_PKG" && node scripts/postinstall.js 2>&1 || true; \
       fi; \
     fi
+# Codex CLI (per add-codex skill recipe)
+RUN --mount=type=cache,target=/root/.cache/pnpm \
+    pnpm install -g "@openai/codex@${CODEX_VERSION}"
+
 
 # ---- Fix Bun-installed agent-SDK native binary ------------------------------
 # `bun install` resolves @anthropic-ai/claude-agent-sdk's optional native deps
