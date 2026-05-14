@@ -18,7 +18,7 @@ import {
 } from './config.js';
 import { readContainerConfig, writeContainerConfig } from './container-config.js';
 import { CONTAINER_RUNTIME_BIN, hostGatewayArgs, readonlyMountArgs, stopContainer } from './container-runtime.js';
-import { composeGroupClaudeMd } from './claude-md-compose.js';
+import { composeGroupAgentsMd } from './agents-md-compose.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getDb, hasTable } from './db/connection.js';
 import { initGroupFilesystem } from './group-init.js';
@@ -308,12 +308,12 @@ function buildMounts(
   initGroupFilesystem(agentGroup);
 
   // Sync skill symlinks based on container.json selection before mounting.
-  const claudeDir = path.join(DATA_DIR, 'v2-sessions', agentGroup.id, '.claude-shared');
-  syncSkillSymlinks(claudeDir, containerConfig);
+  const stateDir = path.join(DATA_DIR, 'v2-sessions', agentGroup.id, '.codex-shared');
+  syncSkillSymlinks(stateDir, containerConfig);
 
-  // Compose CLAUDE.md fresh every spawn from the shared base, enabled skill
-  // fragments, and MCP server instructions. See `claude-md-compose.ts`.
-  composeGroupClaudeMd(agentGroup);
+  // Compose AGENTS.md fresh every spawn from the shared base, enabled skill
+  // fragments, and MCP server instructions. See `agents-md-compose.ts`.
+  composeGroupAgentsMd(agentGroup);
 
   const mounts: VolumeMount[] = [];
   const sessDir = sessionDir(agentGroup.id, session.id);
@@ -322,7 +322,7 @@ function buildMounts(
   // Session folder at /workspace (contains inbound.db, outbound.db, outbox/, .claude/)
   mounts.push({ hostPath: sessDir, containerPath: '/workspace', readonly: false });
 
-  // Agent group folder at /workspace/agent (RW for working files + CLAUDE.local.md)
+  // Agent group folder at /workspace/agent (RW for working files + AGENTS.local.md)
   mounts.push({ hostPath: groupDir, containerPath: '/workspace/agent', readonly: false });
 
   // container.json — nested RO mount on top of RW group dir so the agent
@@ -332,23 +332,16 @@ function buildMounts(
     mounts.push({ hostPath: containerJsonPath, containerPath: '/workspace/agent/container.json', readonly: true });
   }
 
-  // Composer-managed artifacts — nested RO mounts. These are regenerated
-  // from the shared base + fragments on every spawn; any agent-side writes
-  // would be clobbered, so enforce read-only. Only CLAUDE.local.md
-  // (per-group user-editable persona) remains RW via the group-dir mount.
+  // Composer-managed artifact — nested RO mount on top of RW group dir.
   // `_composed.md` is the machine-managed entry point (underscore prefix =
-  // internal, do not edit). It is mounted as CLAUDE.md inside the container
-  // so Claude Code picks it up automatically.
-  // `.claude-shared.md` is a symlink whose target (`/app/CLAUDE.md`) is
-  // already RO-mounted, so writes through it fail regardless — no need for
-  // a nested mount there.
-  const composedClaudeMd = path.join(groupDir, '_composed.md');
-  if (fs.existsSync(composedClaudeMd)) {
-    mounts.push({ hostPath: composedClaudeMd, containerPath: '/workspace/agent/CLAUDE.md', readonly: true });
-  }
-  const fragmentsDir = path.join(groupDir, '.claude-fragments');
-  if (fs.existsSync(fragmentsDir)) {
-    mounts.push({ hostPath: fragmentsDir, containerPath: '/workspace/agent/.claude-fragments', readonly: true });
+  // internal, do not edit) regenerated from the shared base + fragments on
+  // every spawn. It is mounted as AGENTS.md inside the container so the
+  // Codex CLI picks it up from /workspace/agent automatically. The
+  // user-editable persona file `AGENTS.local.md` is read at compose time
+  // and inlined into the composed output.
+  const composedAgentsMd = path.join(groupDir, '_composed.md');
+  if (fs.existsSync(composedAgentsMd)) {
+    mounts.push({ hostPath: composedAgentsMd, containerPath: '/workspace/agent/AGENTS.md', readonly: true });
   }
 
   // Global memory directory — always read-only.
@@ -357,22 +350,16 @@ function buildMounts(
     mounts.push({ hostPath: globalDir, containerPath: '/workspace/global', readonly: true });
   }
 
-  // Shared CLAUDE.md — read-only, imported by the composed entry point via
-  // the `.claude-shared.md` symlink inside the group dir.
-  const sharedClaudeMd = path.join(process.cwd(), 'container', 'CLAUDE.md');
-  if (fs.existsSync(sharedClaudeMd)) {
-    mounts.push({ hostPath: sharedClaudeMd, containerPath: '/app/CLAUDE.md', readonly: true });
-  }
-
-  // Per-group .claude-shared at /home/node/.claude (Claude state, settings,
-  // skill symlinks)
-  mounts.push({ hostPath: claudeDir, containerPath: '/home/node/.claude', readonly: false });
+  // Per-group state dir at /home/node/.codex (codex sessions, settings,
+  // skill symlinks). Inlined fragments live inside AGENTS.md already, so
+  // no separate /app/AGENTS.md mount is needed.
+  mounts.push({ hostPath: stateDir, containerPath: '/home/node/.codex', readonly: false });
 
   // Shared agent-runner source — read-only, same code for all groups.
   const agentRunnerSrc = path.join(projectRoot, 'container', 'agent-runner', 'src');
   mounts.push({ hostPath: agentRunnerSrc, containerPath: '/app/src', readonly: true });
 
-  // Shared skills — read-only, symlinks in .claude-shared/skills/ point here.
+  // Shared skills — read-only, symlinks in .codex-shared/skills/ point here.
   const skillsSrc = path.join(projectRoot, 'container', 'skills');
   if (fs.existsSync(skillsSrc)) {
     mounts.push({ hostPath: skillsSrc, containerPath: '/app/skills', readonly: true });
@@ -509,7 +496,10 @@ async function buildContainerArgs(
     args.push('-e', `OPENAI_API_KEY=${creds['OPENAI_API_KEY']}`);
     log.info('Injecting OPENAI_API_KEY from .env', { containerName });
   } else {
-    log.warn('No OPENAI_API_KEY found in ~/.clawbridge/.env — container will rely on ~/.codex/auth.json (mounted from host)', { containerName });
+    log.warn(
+      'No OPENAI_API_KEY found in ~/.clawbridge/.env — container will rely on ~/.codex/auth.json (mounted from host)',
+      { containerName },
+    );
   }
 
   // Per-group env vars from container.json — injected after credential vars.

@@ -16,7 +16,7 @@ import { DATA_DIR } from '../config.js';
 import { registerProviderContainerConfig } from './provider-container-registry.js';
 
 registerProviderContainerConfig('codex', ({ agentGroupId }) => {
-  // Per-group .codex sessions directory — mirrors .claude-shared for Claude
+  // Per-group .codex sessions directory
   const codexDir = path.join(DATA_DIR, 'v2-sessions', agentGroupId, '.codex-shared');
   fs.mkdirSync(codexDir, { recursive: true });
 

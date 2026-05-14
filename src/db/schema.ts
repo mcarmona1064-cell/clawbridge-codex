@@ -5,7 +5,7 @@
  */
 
 export const SCHEMA = `
--- Agent workspaces: folder, skills, CLAUDE.md.
+-- Agent workspaces: folder, skills, AGENTS.md.
 -- All workspaces are equal; privilege lives on users, not groups.
 -- Container config (mcpServers, packages, imageTag, additionalMounts) lives
 -- in groups/<folder>/container.json on disk, not in the DB.

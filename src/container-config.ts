@@ -20,7 +20,7 @@ export interface McpServerConfig {
   env?: Record<string, string>;
   // Optional always-in-context guidance. When set, the host writes the
   // content to `.claude-fragments/mcp-<name>.md` at spawn and imports it
-  // into the composed CLAUDE.md.
+  // into the composed AGENTS.md.
   instructions?: string;
 }
 

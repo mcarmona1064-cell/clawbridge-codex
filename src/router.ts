@@ -446,7 +446,7 @@ async function deliverToAgent(
         // The formatter prepends /workspace/ when building the prompt.
         // The `type` label becomes the prompt-hint prefix the agent reads
         // (e.g. `[image: photo.jpg ...]`). PDFs get their own label so the
-        // agent — and any per-type CLAUDE.md guidance — can branch on it.
+        // agent — and any per-type AGENTS.md guidance — can branch on it.
         // Everything not explicitly recognized falls through to `file`,
         // which the agent handles generically with Read or Bash.
         const mime = file.mimeType ?? '';

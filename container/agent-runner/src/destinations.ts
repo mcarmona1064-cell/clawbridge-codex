@@ -75,7 +75,7 @@ export function findByRouting(
 /**
  * Generate the system-prompt addendum: agent identity + destination map.
  *
- * Identity is injected here (not in the shared CLAUDE.md) because it's
+ * Identity is injected here (not in the shared AGENTS.md) because it's
  * per-agent-group and changes when the operator renames an agent, while
  * the shared base is identical across all agents.
  */

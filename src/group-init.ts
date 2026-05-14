@@ -67,9 +67,9 @@ const DEFAULT_SETTINGS_JSON =
  * Source code and skills are shared RO mounts — not copied per-group.
  * Skill symlinks are synced at spawn time by container-runner.ts.
  *
- * The composed `CLAUDE.md` is NOT written here — it's regenerated on every
- * spawn by `composeGroupClaudeMd()` (see `claude-md-compose.ts`). Initial
- * per-group instructions (if provided) seed `CLAUDE.local.md`.
+ * The composed `AGENTS.md` is NOT written here — it's regenerated on every
+ * spawn by `composeGroupAgentsMd()` (see `agents-md-compose.ts`). Initial
+ * per-group instructions (if provided) seed `AGENTS.local.md`.
  */
 export function initGroupFilesystem(group: AgentGroup, opts?: { instructions?: string }): void {
   const initialized: string[] = [];
@@ -81,17 +81,16 @@ export function initGroupFilesystem(group: AgentGroup, opts?: { instructions?: s
     initialized.push('groupDir');
   }
 
-  // groups/<folder>/CLAUDE.local.md — user-editable agent persona, auto-loaded
-  // by Claude Code alongside the machine-managed _composed.md entry point.
-  // Seeded with caller-provided instructions, or a default template on first
-  // creation. The underscore-prefixed _composed.md is internal — this is the
-  // only CLAUDE.md file the user should ever edit.
-  const claudeLocalFile = path.join(groupDir, 'CLAUDE.local.md');
-  if (!fs.existsSync(claudeLocalFile)) {
+  // groups/<folder>/AGENTS.local.md — user-editable agent persona, read at
+  // compose time and inlined into the machine-managed _composed.md
+  // (mounted RO as AGENTS.md inside the container). Seeded with
+  // caller-provided instructions, or a default template on first creation.
+  const agentsLocalFile = path.join(groupDir, 'AGENTS.local.md');
+  if (!fs.existsSync(agentsLocalFile)) {
     const defaultBody = `# Your Agent Persona
 
 Edit this file to customize your agent's personality, knowledge, and behavior.
-This file is merged with the system configuration automatically.
+The contents are inlined into AGENTS.md (which Codex CLI reads) on every spawn.
 
 ## About me
 I am ClawBridge, your AI assistant.
@@ -102,8 +101,8 @@ I am ClawBridge, your AI assistant.
 - Proactive with reminders and follow-ups
 `;
     const body = opts?.instructions ? opts.instructions + '\n' : defaultBody;
-    fs.writeFileSync(claudeLocalFile, body);
-    initialized.push('CLAUDE.local.md');
+    fs.writeFileSync(agentsLocalFile, body);
+    initialized.push('AGENTS.local.md');
   }
 
   // groups/<folder>/container.json — empty container config, replaces the
@@ -113,14 +112,15 @@ I am ClawBridge, your AI assistant.
     initialized.push('container.json');
   }
 
-  // 2. data/v2-sessions/<id>/.claude-shared/ — Claude state + per-group skills
-  const claudeDir = path.join(DATA_DIR, 'v2-sessions', group.id, '.claude-shared');
-  if (!fs.existsSync(claudeDir)) {
-    fs.mkdirSync(claudeDir, { recursive: true });
-    initialized.push('.claude-shared');
+  // 2. data/v2-sessions/<id>/.codex-shared/ — Codex per-group state +
+  // per-group skill symlinks
+  const stateDir = path.join(DATA_DIR, 'v2-sessions', group.id, '.codex-shared');
+  if (!fs.existsSync(stateDir)) {
+    fs.mkdirSync(stateDir, { recursive: true });
+    initialized.push('.codex-shared');
   }
 
-  const settingsFile = path.join(claudeDir, 'settings.json');
+  const settingsFile = path.join(stateDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
     fs.writeFileSync(settingsFile, DEFAULT_SETTINGS_JSON);
     initialized.push('settings.json');
@@ -128,7 +128,7 @@ I am ClawBridge, your AI assistant.
 
   // Skills directory — created empty here; symlinks are synced at spawn
   // time by container-runner.ts based on container.json skills selection.
-  const skillsDst = path.join(claudeDir, 'skills');
+  const skillsDst = path.join(stateDir, 'skills');
   if (!fs.existsSync(skillsDst)) {
     fs.mkdirSync(skillsDst, { recursive: true });
     initialized.push('skills/');

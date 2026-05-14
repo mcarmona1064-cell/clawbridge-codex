@@ -776,16 +776,16 @@ export async function runMigration(
     }
   }
 
-  // 2. Groups (including CLAUDE.md and conversations/ subdirs — full recursive copy)
+  // 2. Groups (including legacy CLAUDE.md/CLAUDE.local.md and conversations/ subdirs — full recursive copy; rename to AGENTS.* happens at first spawn via migrateGroupsToAgentsLocal)
   if (selections.includes('groups') && audit.groups.length > 0) {
-    emit('groups', `Migrating ${audit.groups.length} group(s) (including CLAUDE.md and conversation history)…`);
+    emit('groups', `Migrating ${audit.groups.length} group(s) (including persona files and conversation history)…`);
     const srcGroupsDir = resolveGroupsDir(source.path);
     if (srcGroupsDir) {
       const destGroupsDir = path.join(CLAWBRIDGE_HOME, 'groups');
       fs.mkdirSync(destGroupsDir, { recursive: true });
       for (const group of audit.groups) {
         emit('groups', `  Copying: ${group}`);
-        // copyDirRecursive copies everything recursively — CLAUDE.md, conversations/, etc.
+        // copyDirRecursive copies everything recursively — persona files, conversations/, etc.
         copyDirRecursive(path.join(srcGroupsDir, group), path.join(destGroupsDir, group));
       }
     }

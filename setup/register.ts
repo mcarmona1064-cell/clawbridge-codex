@@ -208,15 +208,15 @@ export async function run(args: string[]): Promise<void> {
     log.info('Onboarding message written', { sessionId: session.id, channel: parsed.channel });
   }
 
-  // 5. Update assistant name in CLAUDE.md files if different from default
+  // 5. Update assistant name in AGENTS.local.md files if different from default
   let nameUpdated = false;
   if (parsed.assistantName) {
-    log.info('Updating assistant name in CLAUDE.md files', { to: parsed.assistantName });
+    log.info('Updating assistant name in AGENTS.local.md files', { to: parsed.assistantName });
 
     const groupsDir = path.join(projectRoot, 'groups');
     const mdFiles = fs
       .readdirSync(groupsDir)
-      .map((d) => path.join(groupsDir, d, 'CLAUDE.md'))
+      .map((d) => path.join(groupsDir, d, 'AGENTS.local.md'))
       .filter((f) => fs.existsSync(f));
 
     for (const mdFile of mdFiles) {
@@ -224,7 +224,7 @@ export async function run(args: string[]): Promise<void> {
       content = content.replace(/^# Andy$/m, `# ${parsed.assistantName}`);
       content = content.replace(/You are Andy/g, `You are ${parsed.assistantName}`);
       fs.writeFileSync(mdFile, content);
-      log.info('Updated CLAUDE.md', { file: mdFile });
+      log.info('Updated AGENTS.local.md', { file: mdFile });
     }
 
     // Update .env
