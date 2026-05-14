@@ -21,7 +21,7 @@
  *
  * Timezone is auto-detected after the CLI agent step. UTC resolves are
  * confirmed with the user, and free-text replies fall through to a
- * headless `claude -p` call for IANA-zone resolution.
+ * headless `codex exec` call for IANA-zone resolution.
  */
 import fs from 'fs';
 import path from 'path';
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
     if (!res.ok) {
       const notes: string[] = [];
       if (res.terminal?.fields.CREDENTIALS !== 'configured') {
-        notes.push('• Your Claude account isn\'t connected. Re-run setup and try again.');
+        notes.push('• Your Codex account isn\'t connected. Re-run setup and try again.');
       }
       const service = res.terminal?.fields.SERVICE;
       if (service === 'running_other_checkout') {
@@ -302,7 +302,7 @@ async function main(): Promise<void> {
         p.note(notes.join('\n'), "What's left");
       }
       // "What's left" is a soft failure — we don't abort like fail(), but the
-      // user is still stuck; downstream LLM assist hook was removed with Claude.
+      // user is still stuck; downstream LLM assist hook was removed in the codex port.
       const summary = notes
         .map((n) => n.replace(/^•\s*/, '').split('\n')[0].trim())
         .filter(Boolean)
@@ -321,7 +321,7 @@ async function main(): Promise<void> {
   const rows: [string, string][] = [
     ['Chat in the terminal:', 'pnpm run chat hi'],
     ["See what's happening:", 'tail -f logs/clawbridge.log'],
-    ['Open Claude Code:', 'claude'],
+    ['Open Codex:', 'codex'],
   ];
   const labelWidth = Math.max(...rows.map(([l]) => l.length));
   const nextSteps = rows
@@ -544,7 +544,7 @@ async function runSubscriptionAuth(): Promise<void> {
  * Auto-detect TZ, confirm with the user when it comes back as UTC (a
  * common sign we're on a VPS that wasn't localised), and persist through
  * the usual `--step timezone -- --tz <zone>` path. Free-text answers get
- * a headless `claude -p` pass to resolve them to a real IANA zone.
+ * a headless `codex exec` pass to resolve them to a real IANA zone.
  */
 async function runTimezoneStep(): Promise<void> {
   const res = await runQuietStep('timezone', {

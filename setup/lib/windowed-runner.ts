@@ -5,7 +5,7 @@
  * output stream goes silent for too long.
  *
  * Used for the container build (3–10 minutes on a fresh machine, no user
- * feedback with a plain spinner). Models the UI on claude-assist.ts's
+ * feedback with a plain spinner). Models the UI on codex-assist.ts's
  * 3-line action window — a single-line spinner header sitting above three
  * gutter-prefixed lines of the most recent output, redrawn in place via
  * ANSI cursor controls.
@@ -203,7 +203,7 @@ async function handleStall(
         },
         {
           value: 'help',
-          label: 'Ask Claude to take a look',
+          label: 'Ask Codex to take a look',
           hint: 'reads the raw build log and suggests a fix',
         },
       ],
@@ -212,7 +212,7 @@ async function handleStall(
 
   if (choice === 'help') {
     // offerCodexAssist runs its own spinner and may propose a fix command.
-    // We don't attempt to restart the stalled build from here — if Claude
+    // We don't attempt to restart the stalled build from here — if Codex
     // proposes a command the user accepts, they can retry setup afterwards.
     await offerCodexAssist({
       stepName,
@@ -221,7 +221,7 @@ async function handleStall(
       rawLogPath: rawLog,
     });
     // Keep the spinner going — the underlying process is still running,
-    // and cancelling it here would race with Claude's investigation. The
+    // and cancelling it here would race with Codex's investigation. The
     // user can Ctrl-C if they want to bail.
   }
 

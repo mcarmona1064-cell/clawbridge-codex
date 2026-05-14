@@ -352,7 +352,7 @@ export function dumpTranscriptOnFailure(transcript: string): void {
  * progression log. Takes the step name explicitly so callers are clear
  * about which step they're failing from — no hidden module state.
  *
- * Before aborting we offer Claude-assisted debugging. Callers must
+ * Before aborting we offer Codex-assisted debugging. Callers must
  * `await fail(...)` so the offer can actually run before we call
  * process.exit. The return type is `Promise<never>`; control-flow
  * narrowing still works after `await`.
@@ -371,7 +371,7 @@ export async function fail(
 
   const ranFix = await offerCodexAssist({ stepName, msg, hint, rawLogPath });
 
-  // If the user just ran a Claude-suggested fix, offer to resume the flow
+  // If the user just ran a Codex-suggested fix, offer to resume the flow
   // at the step that failed instead of aborting. We re-exec via spawnSync
   // and pass CLAWBRIDGE_SKIP with every step that already completed so the
   // child skips them and picks up where we left off.

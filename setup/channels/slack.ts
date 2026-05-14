@@ -239,7 +239,7 @@ function showPostInstallChecklist(info: WorkspaceInfo): void {
         '     • Save, then reinstall the app when Slack prompts',
         '',
         `  3. DM @${info.botName} from Slack once — that bootstraps the`,
-        '     messaging group. Then run `/manage-channels` in `claude` to',
+        '     messaging group. Then run `/manage-channels` from your assistant CLI to',
         '     wire an agent to it.',
       ].join('\n'),
       6,

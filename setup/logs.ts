@@ -31,7 +31,7 @@ export const progressLogPath = PROGRESS_LOG;
 export const stepsDir = STEPS_DIR;
 
 // Track steps that finished cleanly in this run. Used by fail() to build
-// a CLAWBRIDGE_SKIP list when re-executing after a Claude-assisted fix, so
+// a CLAWBRIDGE_SKIP list when re-executing after a Codex-assisted fix, so
 // the retry picks up at the failing step instead of redoing every step
 // before it.
 const completedInRun = new Set<string>();

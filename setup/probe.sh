@@ -1,7 +1,7 @@
 #!/bin/bash
 # Setup step: probe — single upfront parallel-ish scan that snapshots every
 # prerequisite and dependency for /new-setup's dynamic context injection.
-# Rendered into the SKILL.md prompt via `!bash setup/probe.sh` so Claude sees
+# Rendered into the SKILL.md prompt via `!bash setup/probe.sh` so the assistant sees
 # the current system state before generating its first response.
 #
 # Pure bash by design: this runs BEFORE setup.sh has installed Node, pnpm, and

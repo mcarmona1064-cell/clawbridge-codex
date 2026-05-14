@@ -11,7 +11,7 @@
  *   1. Print a clack note with the exact sub-steps and the portal URL.
  *   2. Ask for the value(s) that step yields (App ID, secret, tenant, etc.).
  *   3. At every step boundary, offer `stepGate` — a Done / Stuck / Show-again
- *      select. "Stuck" hands off to interactive Claude with full context.
+ *      select. "Stuck" hands off to interactive Codex with full context.
  *
  * Text/password prompts also accept `?` as an answer to trigger the handoff,
  * so the operator can escape at any paste point without scrolling back to a
@@ -85,7 +85,7 @@ function printIntro(): void {
       '7 steps across the Azure portal and Teams admin.',
       '',
       k.dim("At any prompt you can type '?' and press Enter to hand off"),
-      k.dim("to Claude interactive mode with your current progress."),
+      k.dim("to Codex interactive mode with your current progress."),
       k.dim("You can also pick 'Stuck' at any Done/Stuck/Show-again prompt."),
     ].join('\n'),
     'Microsoft Teams setup',
@@ -237,7 +237,7 @@ async function askAppType(args: {
             label: 'Multi tenant',
             hint: 'any Microsoft 365 tenant can install the bot',
           },
-          { value: 'help', label: 'Stuck — hand me off to Claude' },
+          { value: 'help', label: 'Stuck — hand me off to Codex' },
         ],
       }),
     );
@@ -495,7 +495,7 @@ async function installAdapter(collected: Collected): Promise<void> {
   }
 }
 
-// ─── post-install: hand off to Claude for the final wiring ────────────
+// ─── post-install: hand off to Codex for the final wiring ────────────
 
 async function finishWithHandoff(
   collected: Collected,
@@ -507,7 +507,7 @@ async function finishWithHandoff(
       '',
       "One thing left: your Teams bot's platform ID (which ClawBridge needs",
       'to wire to an agent group) only becomes known after you DM the bot',
-      'for the first time. Claude can walk you through that interactively —',
+      'for the first time. Codex can walk you through that interactively —',
       'watch the logs for your first inbound, find the auto-created',
       'messaging group in the DB, run scripts/init-first-agent.ts with',
       'the right flags, and verify end-to-end.',
@@ -521,7 +521,7 @@ async function finishWithHandoff(
       options: [
         {
           value: 'handoff',
-          label: 'Hand me off to Claude to walk me through it',
+          label: 'Hand me off to Codex to walk me through it',
           hint: 'recommended',
         },
         { value: 'self', label: "I'll do it myself" },
@@ -576,7 +576,7 @@ async function stepGate(args: {
         message: 'How did that go?',
         options: [
           { value: 'done', label: "Done — let's continue" },
-          { value: 'help', label: 'Stuck — hand me off to Claude' },
+          { value: 'help', label: 'Stuck — hand me off to Codex' },
           { value: 'reshow', label: 'Show me the steps again' },
         ],
       }),
