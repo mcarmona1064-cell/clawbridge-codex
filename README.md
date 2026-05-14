@@ -45,22 +45,6 @@ npx clawbridge-agent setup --migrate
 
 ---
 
-## 🏢 Need a Managed Setup?
-
-Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency** handles everything for you — VPS provisioning, full installation, channel setup, custom AI persona, and ongoing support.
-
-| | Self-Host | Managed by Clawbridge Agency |
-|---|---|---|
-| Setup | You do it | We handle everything |
-| Updates | `clawbridge upgrade` | Done for you |
-| Channel config | DIY | Included |
-| Custom persona & memory | DIY | Included |
-| Support | Community / GitHub | Direct email |
-
-🌐 **[clawbridgeagency.com](https://clawbridgeagency.com)** • 📩 **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
-
----
-
 ## Features
 
 - 🤖 **Multi-channel AI agents** — Telegram, WhatsApp, Discord, Slack, and more
