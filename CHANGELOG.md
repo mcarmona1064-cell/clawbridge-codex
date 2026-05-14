@@ -1,5 +1,47 @@
 # Changelog
 
+## v3.0.0-codex.0 — 2026-05-14
+
+**Fork**: `clawbridge-agent` → `clawbridge-codex`. Repository moved to
+`mcarmona1064-cell/clawbridge-codex`. This is a hard fork that swaps the
+default AI provider from Anthropic Claude to OpenAI Codex; the Claude
+provider has been removed entirely.
+
+### Breaking changes
+- **Default AI provider is now `codex`** (`AGENT_PROVIDER=codex`). The
+  `claude` provider was removed from both host (`src/providers/`) and
+  container (`container/agent-runner/src/providers/`).
+- **Auth model**: `CLAUDE_CODE_OAUTH_TOKEN` env var is no longer used.
+  Codex stores credentials in `~/.codex/auth.json` (populated by
+  `codex login --device-auth`).
+- **CLI binary renamed** from `clawbridge` / `clawbridge-agent` to
+  `clawbridge-codex`.
+- **Docker image tag base** renamed from `clawbridge-agent-v2-<slug>` to
+  `clawbridge-codex-v2-<slug>`. Existing installs need to rebuild.
+- **Integrations MCP server**: vision tools (analyze_image,
+  extract_text_from_image, analyze_document, describe_chart) now call
+  `gpt-4o` via `openai` SDK instead of Claude 3.5 Sonnet via
+  `@anthropic-ai/sdk`.
+- **Setup wizard**: `setup/install-claude.sh` / `setup/register-claude-token.sh`
+  removed; replaced by `setup/install-codex.sh` / `setup/register-codex.sh`.
+
+### Carried forward from clawbridge-agent
+All features from clawbridge-agent v2.9.2 are preserved: multi-channel
+adapters (Telegram, WhatsApp, Discord, Slack), Hindsight memory, scheduling,
+host-exec, OpenClaw migration, unified transcription, attachment forwarding.
+
+### Known follow-ups
+- The container-side composition pipeline still uses `CLAUDE.md` /
+  `CLAUDE.local.md` filenames. A follow-up commit will rename these to
+  `AGENTS.md` / `AGENTS.local.md` so Codex picks up agent persona files
+  by default. Until then, the runtime continues to read `CLAUDE.local.md`.
+- The container Dockerfile still installs the Claude binary alongside
+  Codex. To be removed in a follow-up once the runtime composition switch
+  lands.
+
+---
+
+
 ## v2.1.2 — 2026-04-27
 - fix: #22 — Hindsight env vars clarified as host-only; added explicit exclusion comment in container-runner.ts so the non-passthrough is intentional and documented; updated .env.example section header
 - fix: #23 — composed CLAUDE.md renamed to `_composed.md` (underscore prefix = machine-managed, do not edit); `CLAUDE.local.md` is now the sole user-editable persona file, seeded with a default template on first group init; README documents the distinction

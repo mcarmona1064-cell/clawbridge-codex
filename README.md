@@ -21,7 +21,7 @@
 
 [OpenClaw](https://github.com/openclaw/openclaw) is an impressive project, but I wouldn't have been able to sleep if I had given complex software I didn't understand full access to my life. OpenClaw has nearly half a million lines of code, 53 config files, and 70+ dependencies. Its security is at the application level (allowlists, pairing codes) rather than true OS-level isolation. Everything runs in one Node process with shared memory.
 
-ClawBridge provides that same core functionality, but in a codebase small enough to understand: one process and a handful of files. Claude agents run in their own Linux containers with filesystem isolation, not merely behind permission checks.
+ClawBridge provides that same core functionality, but in a codebase small enough to understand: one process and a handful of files. Codex agents run in their own Linux containers with filesystem isolation, not merely behind permission checks.
 
 ## Quick Start
 
@@ -64,10 +64,10 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 ## Features
 
 - 🤖 **Multi-channel AI agents** — Telegram, WhatsApp, Discord, Slack, and more
-- 🤖 **Claude (Anthropic OAuth)** — no per-message API billing, uses your Claude Pro/Max subscription
+- 🤖 **OpenAI Codex (subscription OAuth)** — no per-message API billing, uses your ChatGPT Plus/Pro/Team subscription
 - 🧠 **Persistent memory** — Hindsight memory system with retain, recall, and reflect — agents remember context across sessions
 - 🔌 **Connect your tools** — Google, HubSpot, Slack, and more via MCP
-- 👁 **Vision & document analysis** via Claude
+- 👁 **Vision & document analysis** via GPT-4o
 - 🔒 **Container-isolated, self-hosted** — your data stays yours, agents run in Docker sandboxes
 - 🛡️ **Prompt injection protection** — built-in skill guards against malicious message injection attacks
 - 🤝 **Multi-agent orchestration** — agents can delegate tasks to other specialist agents, pass files between them, and run parallel workflows
@@ -78,37 +78,37 @@ Don't want to deal with servers, Docker, and configuration? **Clawbridge Agency*
 ## Architecture
 
 ```
-messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent) → outbound.db → host process (delivery) → messaging apps
+messaging apps → host process (router) → inbound.db → container (Bun, Codex Agent) → outbound.db → host process (delivery) → messaging apps
 ```
 
 A single Node host orchestrates per-session agent containers. Agents run in Docker with explicit filesystem mounts. Credentials are injected directly from `~/.clawbridge/.env` into container environment variables at spawn time. See [docs/architecture.md](docs/architecture.md) for the full writeup.
 
 ## AI Provider
 
-ClawBridge uses Claude via Anthropic's official Claude Agent SDK. Authenticate once with `claude setup-token`. Hindsight memory uses Claude Haiku for retain/recall and Sonnet for reflect.
+ClawBridge uses OpenAI Codex via the official `@openai/codex` CLI. Authenticate once with `codex login --device-auth` (subscription OAuth — no API billing). Hindsight memory uses GPT-4o-mini for retain/recall and GPT-4o for reflect.
 
 ## Philosophy
 
-**Small enough to understand.** One process, a few source files and no microservices. If you want to understand the full ClawBridge codebase, just ask Claude Code to walk you through it.
+**Small enough to understand.** One process, a few source files and no microservices. If you want to understand the full ClawBridge codebase, just ask Codex to walk you through it.
 
 **Secure by isolation.** Agents run in Linux containers and they can only see what's explicitly mounted. Bash access is safe because commands run inside the container, not on your host.
 
-**Built for the individual user.** ClawBridge isn't a monolithic framework; it's software that fits each user's exact needs. Instead of becoming bloatware, ClawBridge is designed to be bespoke. You make your own fork and have Claude Code modify it to match your needs.
+**Built for the individual user.** ClawBridge isn't a monolithic framework; it's software that fits each user's exact needs. Instead of becoming bloatware, ClawBridge is designed to be bespoke. You make your own fork and have Codex modify it to match your needs.
 
 **Customization = code changes.** No configuration sprawl. Want different behavior? Modify the code. The codebase is small enough that it's safe to make changes.
 
-**AI-native, hybrid by design.** The install and onboarding flow is an optimized scripted path, fast and deterministic. When a step needs judgment, whether a failed install, a guided decision, or a customization, control hands off to Claude Code seamlessly. Beyond setup there's no monitoring dashboard or debugging UI either: describe the problem in chat and Claude Code handles it.
+**AI-native, hybrid by design.** The install and onboarding flow is an optimized scripted path, fast and deterministic. When a step needs judgment, whether a failed install, a guided decision, or a customization, control hands off to Codex seamlessly. Beyond setup there's no monitoring dashboard or debugging UI either: describe the problem in chat and Codex handles it.
 
 **Skills over features.** Trunk ships the registry and infrastructure, not specific channel adapters or alternative agent providers. Channels (Discord, Slack, Telegram, WhatsApp, …) live on a long-lived `channels` branch; Ollama lives on `providers`. You run `/add-telegram`, etc. and the skill copies exactly the module(s) you need into your fork. No feature you didn't ask for.
 
-**Best harness, best model.** ClawBridge natively uses Claude Code via Anthropic's official Claude Agent SDK, so you get the latest Claude models and Claude Code's full toolset, including the ability to modify and expand your own ClawBridge fork. For local open-weight models, use `/add-ollama-provider`.
+**Best harness, best model.** ClawBridge natively uses the OpenAI Codex CLI via subscription OAuth, so you get the latest GPT models and Codex's full toolset, including the ability to modify and expand your own ClawBridge fork. For local open-weight models, use `/add-ollama-provider`.
 
 ## What It Supports
 
 - **Multi-channel messaging** — WhatsApp, Telegram, Discord, Slack, Microsoft Teams, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email via Resend. Installed on demand with `/add-<channel>` skills. Run one or many at the same time.
 - **Flexible isolation** — connect each channel to its own agent for full privacy, share one agent across many channels for unified memory with separate conversations, or fold multiple channels into a single shared session so one conversation spans many surfaces. Pick per channel via `/manage-channels`. See [docs/isolation-model.md](docs/isolation-model.md).
 - **Per-agent workspace** — each agent group has its own persona, its own memory, its own container, and only the mounts you allow. Nothing crosses the boundary unless you wire it to.
-- **Scheduled tasks** — recurring jobs that run Claude and can message you back
+- **Scheduled tasks** — recurring jobs that run Codex and can message you back
 - **Web access** — search and fetch content from the web
 - **Container isolation** — agents are sandboxed in Docker (macOS/Linux/WSL2), with optional [Docker Sandboxes](docs/docker-sandboxes.md) micro-VM isolation or Apple Container as a macOS-native opt-in
 - **Credential security** — agents never hold raw API keys. Credentials are injected directly from ~/.clawbridge/.env at container spawn time, so the agent process never sees them as environment variables it can exfiltrate.
@@ -141,7 +141,7 @@ The file is created with a default template on first run. Open it and change any
 
 ## Customizing
 
-ClawBridge doesn't use configuration files. To make changes, just tell Claude Code what you want:
+ClawBridge doesn't use configuration files. To make changes, just tell Codex what you want:
 
 - "Change the trigger word to @Bob"
 - "Remember in the future to make responses shorter and more direct"
@@ -172,7 +172,7 @@ Skills we'd like to see:
 - macOS or Linux VPS (Ubuntu, Debian, CentOS — any distro with Docker)
 - Node.js 20+ and pnpm 10+ (the installer will install both if missing)
 - [Docker Desktop](https://docker.com/products/docker-desktop) (macOS/Windows) or Docker Engine (Linux)
-- [Claude Code](https://claude.ai/download) for `/customize`, `/debug`, error recovery during setup, and all `/add-<channel>` skills
+- [Codex CLI](https://github.com/openai/codex) for `/customize`, `/debug`, error recovery during setup, and all `/add-<channel>` skills
 
 ## Key Files
 
@@ -182,11 +182,11 @@ Skills we'd like to see:
 - `src/host-sweep.ts` — 60s sweep: stale detection, due-message wake, recurrence
 - `src/session-manager.ts` — resolves sessions, opens `inbound.db` / `outbound.db`
 - `src/container-runner.ts` — spawns per-agent-group containers, credential injection
-- `src/providers/` — host-side provider config (Claude built in)
+- `src/providers/` — host-side provider config (Codex built in)
 - `src/db/` — central DB (users, roles, agent groups, messaging groups, wiring, migrations)
 - `src/channels/` — channel adapter infra (adapters installed via `/add-<channel>` skills)
 - `container/agent-runner/` — Bun agent-runner: poll loop, MCP tools, provider abstraction
-- `container/Dockerfile` — Claude container image
+- `container/Dockerfile` — Codex container image
 - `groups/<folder>/` — per-agent-group filesystem (persona, memory, skills, container config)
 
 ## FAQ
@@ -205,7 +205,7 @@ Agents run in containers, not behind application-level permission checks. They c
 
 **Do I need to pay per message?**
 
-No. ClawBridge uses OAuth subscriptions, not API billing. You pay a flat monthly rate to Anthropic — not per token.
+No. ClawBridge uses OAuth subscriptions, not API billing. You pay a flat monthly rate to OpenAI — not per token.
 
 **Can I use third-party or open-source models?**
 
@@ -213,11 +213,11 @@ Yes. Use `/add-ollama-provider` for local open-weight models via Ollama.
 
 **How do I debug issues?**
 
-Ask Claude Code. "Why isn't the scheduler running?" "What's in the recent logs?" "Why did this message not get a response?" That's the AI-native approach that underlies ClawBridge.
+Ask Codex. "Why isn't the scheduler running?" "What's in the recent logs?" "Why did this message not get a response?" That's the AI-native approach that underlies ClawBridge.
 
 **Why isn't the setup working for me?**
 
-If a step fails, `clawbridge.sh` hands off to Claude Code to diagnose and resume. If that doesn't resolve it, run `claude`, then `/debug`.
+If a step fails, `clawbridge.sh` hands off to Codex to diagnose and resume. If that doesn't resolve it, run `codex`, then `/debug`.
 
 **What changes will be accepted into the codebase?**
 
