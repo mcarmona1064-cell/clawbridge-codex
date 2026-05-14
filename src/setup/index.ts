@@ -177,7 +177,6 @@ req.end();
 
 interface FreshConfig {
   agentName: string;
-  oauthToken: string;
   telegramToken?: string;
   channels: string[];
   hindsightDbPassword?: string;
@@ -192,10 +191,6 @@ function buildEnvFile(cfg: FreshConfig, existingEnv?: Map<string, string>): stri
     '',
     '# Agent identity',
     `ASSISTANT_NAME=${cfg.agentName}`,
-    '',
-    '# Claude Auth (Claude Pro/Max subscription)',
-    '# Get this token by running: claude setup-token',
-    `CLAUDE_CODE_OAUTH_TOKEN=${cfg.oauthToken}`,
     '',
   ];
 
@@ -226,8 +221,7 @@ function buildEnvFile(cfg: FreshConfig, existingEnv?: Map<string, string>): stri
       `HINDSIGHT_URL=${cfg.hindsightUrl}`,
       `HINDSIGHT_API_KEY=${cfg.hindsightApiKey}`,
       `HINDSIGHT_DB_PASSWORD=${cfg.hindsightDbPassword}`,
-      '# Optional: separate API key for Hindsight LLM ops (avoids sharing main OAuth rate limit)',
-      '# Leave empty to fall back to CLAUDE_CODE_OAUTH_TOKEN',
+      '# Optional: separate API key for Hindsight LLM ops.',
       `HINDSIGHT_LLM_API_KEY=${existingEnv?.get('HINDSIGHT_LLM_API_KEY') ?? ''}`,
       '',
     );
@@ -257,83 +251,55 @@ function parseEnvFile(envPath: string): Map<string, string> {
 
 // ─── Shared prompt helpers ────────────────────────────────────────────────────
 
-async function setupClaudeAuth(existingValue?: string): Promise<string> {
-  if (existingValue) {
-    p.log.success('Claude OAuth token found in source ✓');
-    return existingValue;
-  }
-
-  // 1. Check if claude CLI is installed
-  const claudeCheck = spawnSync('which', ['claude'], { encoding: 'utf8' });
-  if (claudeCheck.status !== 0) {
-    p.log.info('Claude Code is not installed. Installing now...');
+async function setupCodexAuth(_existingValue?: string): Promise<void> {
+  // 1. Check if codex CLI is installed
+  const codexCheck = spawnSync('which', ['codex'], { encoding: 'utf8' });
+  if (codexCheck.status !== 0) {
+    p.log.info('Codex CLI is not installed. Installing now...');
     const s = p.spinner();
-    s.start('Installing Claude Code (npm install -g @anthropic-ai/claude-code)…');
-    const installResult = spawnSync('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
+    s.start('Installing Codex (npm install -g @openai/codex)…');
+    const installResult = spawnSync('npm', ['install', '-g', '@openai/codex'], {
       encoding: 'utf8',
       stdio: 'pipe',
     });
     if (installResult.status !== 0) {
-      s.stop(k.red('Failed to install Claude Code.'));
-      p.log.error('Please install manually: npm install -g @anthropic-ai/claude-code');
+      s.stop(k.red('Failed to install Codex CLI.'));
+      p.log.error('Please install manually: npm install -g @openai/codex');
       process.exit(1);
     }
-    s.stop(k.green('Claude Code installed ✓'));
+    s.stop(k.green('Codex CLI installed ✓'));
   } else {
-    p.log.success('Claude Code detected ✓');
+    p.log.success('Codex CLI detected ✓');
   }
 
-  // 2. Check if already authenticated (try reading credentials)
-  const existingToken = tryReadClaudeToken();
-  if (existingToken) {
-    p.log.success('Claude authentication found ✓');
-    return existingToken;
+  // 2. Check if already authenticated (~/.codex/auth.json)
+  if (codexAuthExists()) {
+    p.log.success('Codex authentication found ✓');
+    return;
   }
 
-  // 3. Run claude setup-token interactively
-  p.log.message(dim('  Your browser will open to authenticate with Claude.\n  Complete the login, then return here.'));
-  p.log.message(dim('  Running: claude setup-token'));
+  // 3. Run codex login --device-auth interactively
+  p.log.message(dim('  Your browser will open to authenticate with ChatGPT.\n  Complete the login, then return here.'));
+  p.log.message(dim('  Running: codex login --device-auth'));
 
-  // Run interactively so user sees the browser flow
-  spawnSync('claude', ['setup-token'], { stdio: 'inherit', encoding: 'utf8' });
+  spawnSync('codex', ['login', '--device-auth'], { stdio: 'inherit', encoding: 'utf8' });
 
-  // 4. Try reading the token that claude just saved
-  const token = tryReadClaudeToken();
-  if (token) {
-    p.log.success('Claude authenticated successfully ✓');
-    return token;
+  if (codexAuthExists()) {
+    p.log.success('Codex authenticated successfully ✓');
+    return;
   }
 
-  // 5. Fallback: ask user to paste token once
-  p.log.message(dim('  Could not read token automatically. Please paste it below.'));
-  const pasted = ensure(
-    await p.password({
-      message: 'Paste your Claude OAuth token',
-      validate: validateOAuthToken,
-    }),
-  ) as string;
-  return pasted.trim();
+  p.log.error('Codex authentication failed (~/.codex/auth.json not written).');
+  p.log.message(dim('  Re-run setup and try again.'));
+  process.exit(1);
 }
 
-function tryReadClaudeToken(): string | null {
+function codexAuthExists(): boolean {
   try {
-    // claude setup-token saves to ~/.claude/.credentials.json
-    const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
-    if (fs.existsSync(credPath)) {
-      const creds = JSON.parse(fs.readFileSync(credPath, 'utf8'));
-      // Try known key shapes
-      const token =
-        creds?.claudeAiOauth?.accessToken ||
-        creds?.claudeAiOauth?.longLivedToken ||
-        creds?.oauthToken ||
-        creds?.token ||
-        null;
-      if (token && typeof token === 'string' && token.length > 20) return token;
-    }
+    return fs.existsSync(path.join(os.homedir(), '.codex', 'auth.json'));
   } catch {
-    /* ignore */
+    return false;
   }
-  return null;
 }
 
 async function promptAgentName(existingValue?: string): Promise<string> {
@@ -478,7 +444,7 @@ async function runFreshInstall(): Promise<void> {
   p.log.step('Starting fresh install…');
 
   // Step 1 — Auth
-  const oauthToken = await setupClaudeAuth();
+  await setupCodexAuth();
 
   // Step 2 — Channels
   type ChannelOption = { value: string; label: string; hint?: string };
@@ -519,7 +485,6 @@ async function runFreshInstall(): Promise<void> {
   // Generate .env
   const cfg: FreshConfig = {
     agentName,
-    oauthToken: oauthToken.trim(),
     telegramToken,
     channels: channelChoices,
     hindsightDbPassword,
@@ -1007,8 +972,8 @@ async function runMigrationFlow(): Promise<void> {
     }
   }
 
-  // Step A — Claude OAuth token
-  const migratedOauthToken = await setupClaudeAuth(sourceEnv.get('CLAUDE_CODE_OAUTH_TOKEN'));
+  // Step A — Codex auth
+  await setupCodexAuth();
 
   // Step B — Agent name
   const migratedAgentName = await promptAgentName(sourceEnv.get('ASSISTANT_NAME') ?? sourceEnv.get('AGENT_NAME'));
@@ -1038,7 +1003,6 @@ async function runMigrationFlow(): Promise<void> {
   // Step F — Generate complete .env
   const migratedCfg: FreshConfig = {
     agentName: migratedAgentName,
-    oauthToken: migratedOauthToken,
     telegramToken: sourceEnv.get('TELEGRAM_BOT_TOKEN'),
     channels: migratedChannels,
     hindsightDbPassword: migratedHindsightDbPw ?? sourceEnv.get('HINDSIGHT_DB_PASSWORD'),

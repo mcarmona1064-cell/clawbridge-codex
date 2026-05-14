@@ -42,31 +42,26 @@ ${c}   ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═�
 
 export async function main(): Promise<void> {
   const env = loadEnv();
-  const token = env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN;
 
-  if (!token) {
-    console.error('No Claude OAuth token found. Run clawbridge-agent setup first.');
-    process.exit(1);
-  }
-
-  // Check if claude is installed
-  let claudePath = '';
+  // Codex stores its auth in ~/.codex/auth.json — no .env token needed.
+  // Just check the codex CLI is present and signed in.
+  let codexPath = '';
   try {
-    claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
+    codexPath = execSync('which codex', { encoding: 'utf8' }).trim();
   } catch {
     // not found
   }
 
-  if (!claudePath) {
-    console.log('Claude Code is not installed.');
-    console.log('Install it with: npm install -g @anthropic-ai/claude-code\n');
+  if (!codexPath) {
+    console.log('Codex CLI is not installed.');
+    console.log('Install it with: npm install -g @openai/codex\n');
     process.exit(1);
   }
 
   const agentName = env.ASSISTANT_NAME || process.env.ASSISTANT_NAME || 'ClawBridge';
 
-  // Load system prompt from ~/.clawbridge/CLAUDE.md, falling back to built-in default
-  const claudeMdPath = join(homedir(), '.clawbridge', 'CLAUDE.md');
+  // Load system prompt from ~/.clawbridge/AGENTS.md, falling back to built-in default
+  const agentsMdPath = join(homedir(), '.clawbridge', 'AGENTS.md');
   const DEFAULT_SYSTEM_PROMPT = `# ClawBridge
 
 You are ${agentName}, a self-hosted AI agent platform built on ClawBridge. You help the user manage their ClawBridge installation, connected messaging channels, agent groups, memory, and settings.
@@ -83,33 +78,27 @@ You are ${agentName}, a self-hosted AI agent platform built on ClawBridge. You h
 
 ## CLI commands
 
-- \`clawbridge setup\` — initial setup wizard
-- \`clawbridge doctor\` — health check (add --fix to auto-repair channel issues)
-- \`clawbridge upgrade\` — update to latest version + rebuild container
-- \`clawbridge chat\` — this CLI chat session
+- \`clawbridge-codex setup\` — initial setup wizard
+- \`clawbridge-codex doctor\` — health check (add --fix to auto-repair channel issues)
+- \`clawbridge-codex upgrade\` — update to latest version + rebuild container
+- \`clawbridge-codex chat\` — this CLI chat session
 
-Customize your persona by editing ~/.clawbridge/CLAUDE.md`;
+Customize your persona by editing ~/.clawbridge/AGENTS.md`;
 
-  const systemPrompt = existsSync(claudeMdPath) ? readFileSync(claudeMdPath, 'utf8') : DEFAULT_SYSTEM_PROMPT;
+  const systemPrompt = existsSync(agentsMdPath) ? readFileSync(agentsMdPath, 'utf8') : DEFAULT_SYSTEM_PROMPT;
 
-  // Build args: inject --name and optionally --system-prompt before user args
+  // codex exec runs a single prompt; the persistent interactive mode is plain `codex`.
+  // We pass the system prompt via -c instructions and pass through any user args.
   const extraArgs = process.argv.slice(3);
-  const claudeArgs: string[] = ['--name', agentName];
-  if (systemPrompt) {
-    claudeArgs.push('--system-prompt', systemPrompt);
-  }
-  claudeArgs.push(...extraArgs);
+  const codexArgs: string[] = ['-c', `instructions=${JSON.stringify(systemPrompt)}`];
+  codexArgs.push(...extraArgs);
 
   printSplash(agentName);
-  console.log(`Starting Claude Code...\n`);
+  console.log(`Starting Codex...\n`);
 
-  // Launch claude with ClawBridge's token
-  const result = spawnSync(claudePath, claudeArgs, {
+  const result = spawnSync(codexPath, codexArgs, {
     stdio: 'inherit',
-    env: {
-      ...process.env,
-      CLAUDE_CODE_OAUTH_TOKEN: token,
-    },
+    env: { ...process.env },
   });
 
   process.exit(result.status ?? 0);

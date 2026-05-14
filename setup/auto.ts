@@ -39,13 +39,8 @@ import { runTelegramChannel } from './channels/telegram.js';
 import { runWhatsAppChannel } from './channels/whatsapp.js';
 import { pingCliAgent, type PingResult } from './lib/agent-ping.js';
 import { brightSelect } from './lib/bright-select.js';
-import { offerClaudeAssist } from './lib/claude-assist.js';
 import { runWindowedStep } from './lib/windowed-runner.js';
 import { getLaunchdLabel, getSystemdUnit } from '../src/install-slug.js';
-import {
-  claudeCliAvailable,
-  resolveTimezoneViaClaude,
-} from './lib/tz-from-claude.js';
 import * as setupLog from './logs.js';
 import { ensureAnswer, fail, runQuietStep } from './lib/runner.js';
 import { emit as phEmit } from './lib/diagnostics.js';
@@ -231,17 +226,6 @@ async function main(): Promise<void> {
       } else {
         phEmit('first_chat_failed', { reason: ping });
         renderPingFailureNote(ping);
-        await offerClaudeAssist({
-          stepName: 'cli-agent',
-          msg:
-            ping === 'socket_error'
-              ? "ClawBridge service isn't listening on its CLI socket."
-              : "No reply from the assistant within 30 seconds.",
-          hint:
-            ping === 'socket_error'
-              ? 'Socket at data/cli.sock did not accept a connection.'
-              : 'Agent container may be failing to start or authenticate.',
-        });
       }
     }
   }
@@ -318,7 +302,7 @@ async function main(): Promise<void> {
         p.note(notes.join('\n'), "What's left");
       }
       // "What's left" is a soft failure — we don't abort like fail(), but the
-      // user is still stuck and a fix is exactly what claude-assist is for.
+      // user is still stuck; downstream LLM assist hook was removed with Claude.
       const summary = notes
         .map((n) => n.replace(/^•\s*/, '').split('\n')[0].trim())
         .filter(Boolean)
@@ -328,12 +312,6 @@ async function main(): Promise<void> {
         service_running: res.terminal?.fields.SERVICE === 'running',
         has_credentials: res.terminal?.fields.CREDENTIALS === 'configured',
         agent_responds: res.terminal?.fields.AGENT_PING === 'ok',
-      });
-      await offerClaudeAssist({
-        stepName: 'verify',
-        msg: summary || 'Verification completed with unresolved issues.',
-        hint: `Terminal block: ${JSON.stringify(res.terminal?.fields ?? {})}`,
-        rawLogPath: res.rawLog,
       });
       p.outro(k.yellow('Almost there. A few things still need your attention.'));
       return;
@@ -521,53 +499,26 @@ function sendChatMessage(message: string): Promise<void> {
 // ─── auth step (select → branch) ────────────────────────────────────────
 
 async function runAuthStep(): Promise<void> {
-  if (anthropicSecretExists()) {
-    p.log.success('Your Claude account is already connected.');
+  if (codexAuthExists()) {
+    p.log.success('Codex is already signed in.');
     setupLog.step('auth', 'skipped', 0, { REASON: 'secret-already-present' });
     return;
   }
 
-  const method = ensureAnswer(
-    await brightSelect({
-      message: 'How would you like to connect to Claude?',
-      options: [
-        {
-          value: 'subscription',
-          label: 'Sign in with my Claude subscription',
-          hint: 'recommended if you have Pro or Max',
-        },
-        {
-          value: 'oauth',
-          label: 'Paste an OAuth token I already have',
-          hint: 'sk-ant-oat…',
-        },
-        {
-          value: 'api',
-          label: 'Paste an Anthropic API key',
-          hint: 'pay-per-use via console.anthropic.com',
-        },
-      ],
-    }),
-  ) as 'subscription' | 'oauth' | 'api';
-  setupLog.userInput('auth_method', method);
-  phEmit('auth_method_chosen', { method });
-
-  if (method === 'subscription') {
-    await runSubscriptionAuth();
-  } else {
-    await runPasteAuth(method);
-  }
+  setupLog.userInput('auth_method', 'subscription');
+  phEmit('auth_method_chosen', { method: 'subscription' });
+  await runSubscriptionAuth();
 }
 
 async function runSubscriptionAuth(): Promise<void> {
-  p.log.step("Opening the Claude sign-in flow…");
+  p.log.step('Opening the Codex sign-in flow…');
   console.log(
-    k.dim('   (a browser will open for sign-in; this part is interactive)'),
+    k.dim('   (a browser will open for device-auth sign-in; this part is interactive)'),
   );
   console.log();
   const start = Date.now();
   const code = await runInheritScript('bash', [
-    'setup/register-claude-token.sh',
+    'setup/register-codex.sh',
   ]);
   const durationMs = Date.now() - start;
   console.log();
@@ -578,49 +529,14 @@ async function runSubscriptionAuth(): Promise<void> {
     });
     await fail(
       'auth',
-      "Couldn't complete the Claude sign-in.",
-      'Re-run setup and try again, or choose a paste option instead.',
+      "Couldn't complete the Codex sign-in.",
+      'Re-run setup and try again.',
     );
   }
   setupLog.step('auth', 'interactive', durationMs, { METHOD: 'subscription' });
-  p.log.success('Claude account connected.');
+  p.log.success('Codex account connected.');
 }
 
-async function runPasteAuth(method: 'oauth' | 'api'): Promise<void> {
-  const label = method === 'oauth' ? 'OAuth token' : 'API key';
-  const prefix = method === 'oauth' ? 'sk-ant-oat' : 'sk-ant-api';
-
-  const answer = ensureAnswer(
-    await p.password({
-      message: `Paste your ${label}`,
-      validate: (v) => {
-        if (!v || !v.trim()) return 'Required';
-        if (!v.trim().startsWith(prefix)) {
-          return `Should start with ${prefix}…`;
-        }
-        return undefined;
-      },
-    }),
-  );
-  const token = (answer as string).trim();
-
-  const envKey = method === 'oauth' ? 'CLAUDE_CODE_OAUTH_TOKEN' : 'ANTHROPIC_API_KEY';
-  const res = await runQuietStep(
-    'set-env',
-    {
-      running: `Saving your ${label} to .env…`,
-      done: 'Claude account connected.',
-    },
-    ['--key', envKey, '--value', token],
-  );
-  if (!res.ok) {
-    await fail(
-      'auth',
-      `Couldn't save your ${label} to .env.`,
-      'Check that the project directory is writable, then retry.',
-    );
-  }
-}
 
 // ─── timezone step ─────────────────────────────────────────────────────
 
@@ -705,16 +621,12 @@ async function runTimezoneStep(): Promise<void> {
 
   let tz: string | null = isValidTimezone(raw) ? raw : null;
   if (!tz) {
-    if (claudeCliAvailable()) {
-      tz = await resolveTimezoneViaClaude(raw);
-    } else {
-      p.log.warn(
-        wrapForGutter(
-          "That's not a standard IANA zone and I can't call Claude to interpret it here — try again with a zone like `America/New_York` or `Europe/London`.",
-          4,
-        ),
-      );
-    }
+    p.log.warn(
+      wrapForGutter(
+        "That's not a standard IANA zone — try again with a zone like `America/New_York` or `Europe/London`.",
+        4,
+      ),
+    );
   }
 
   if (!tz) {
@@ -800,12 +712,10 @@ async function askChannelChoice(): Promise<ChannelChoice> {
 
 // ─── interactive / env helpers ─────────────────────────────────────────
 
-function anthropicSecretExists(): boolean {
+function codexAuthExists(): boolean {
   try {
-    const envFile = path.join(process.cwd(), '.env');
-    if (!fs.existsSync(envFile)) return false;
-    const envContent = fs.readFileSync(envFile, 'utf-8');
-    return /^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)=.+/m.test(envContent);
+    const authFile = path.join(os.homedir(), '.codex', 'auth.json');
+    return fs.existsSync(authFile);
   } catch {
     return false;
   }

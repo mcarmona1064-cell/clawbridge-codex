@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run a command suggested by claude-assist, giving the user a chance to
-# edit it first. Same pattern as setup/register-claude-token.sh: bash 4+
+# edit it first. Same pattern as setup/register-codex.sh: bash 4+
 # pre-fills readline so Enter literally submits; bash 3.x (macOS default
 # /bin/bash) shows the command and waits for Enter.
 #

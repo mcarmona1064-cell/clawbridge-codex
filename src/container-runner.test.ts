@@ -3,15 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { resolveProviderName } from './container-runner.js';
 
 describe('resolveProviderName', () => {
-  it('defaults to claude when nothing is set', () => {
-    expect(resolveProviderName(null, null, undefined)).toBe('claude');
+  it('defaults to codex when nothing is set', () => {
+    expect(resolveProviderName(null, null, undefined)).toBe('codex');
   });
 
   it('lowercases the resolved name', () => {
-    expect(resolveProviderName(null, null, 'Claude')).toBe('claude');
+    expect(resolveProviderName(null, null, 'Codex')).toBe('codex');
   });
 
   it('treats empty string as unset (falls through to default)', () => {
-    expect(resolveProviderName('', null, undefined)).toBe('claude');
+    expect(resolveProviderName('', null, undefined)).toBe('codex');
   });
 });
