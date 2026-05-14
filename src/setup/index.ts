@@ -538,10 +538,10 @@ async function runFreshInstall(): Promise<void> {
     const existingForHindsight = parseEnvFile(envPath);
     const hindsightLines: string[] = [''];
     const hindsightProviderVars = {
-      HINDSIGHT_API_LLM_PROVIDER: 'claude-code',
-      HINDSIGHT_API_LLM_MODEL: 'claude-haiku-4-20250514',
-      HINDSIGHT_API_RETAIN_LLM_MODEL: 'claude-haiku-4-20250514',
-      HINDSIGHT_API_REFLECT_LLM_MODEL: 'claude-sonnet-4-20250514',
+      HINDSIGHT_API_LLM_PROVIDER: 'openai',
+      HINDSIGHT_API_LLM_MODEL: 'gpt-4o-mini',
+      HINDSIGHT_API_RETAIN_LLM_MODEL: 'gpt-4o-mini',
+      HINDSIGHT_API_REFLECT_LLM_MODEL: 'gpt-4o',
     };
     for (const [key, value] of Object.entries(hindsightProviderVars)) {
       if (!existingForHindsight.get(key)) {

@@ -760,22 +760,24 @@ function checkProvider(env: Map<string, string>): void {
   // Report current provider
   pass('AGENT_PROVIDER', AGENT_PROVIDER);
 
-  // Check CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
-  const oauthToken = env.get('CLAUDE_CODE_OAUTH_TOKEN');
-  const apiKey = env.get('ANTHROPIC_API_KEY');
-  if (oauthToken) {
-    pass('Claude auth', dim('CLAUDE_CODE_OAUTH_TOKEN set'));
-  } else if (apiKey) {
-    pass('Claude auth', dim('ANTHROPIC_API_KEY set'));
+  // Codex is authenticated via `codex login` (writes ~/.codex/auth.json).
+  // Accept either the subscription auth file or an OPENAI_API_KEY env var.
+  const codexAuthPath = path.join(os.homedir(), '.codex', 'auth.json');
+  const hasCodexAuth = fs.existsSync(codexAuthPath);
+  const openaiKey = env.get('OPENAI_API_KEY') ?? process.env.OPENAI_API_KEY;
+  if (hasCodexAuth) {
+    pass('Codex auth', dim('~/.codex/auth.json present'));
+  } else if (openaiKey) {
+    pass('Codex auth', dim('OPENAI_API_KEY set'));
   } else {
-    fail('Claude auth', 'no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY', 'run: claude setup-token');
+    fail('Codex auth', 'no ~/.codex/auth.json and no OPENAI_API_KEY', 'run: codex login');
   }
 
   // Auto-fix Hindsight LLM vars if HINDSIGHT_URL is set
   const hindsightUrl = env.get('HINDSIGHT_URL');
   if (hindsightUrl) {
-    const expectedLlmProvider = 'claude-code';
-    const expectedModels = { retain: 'claude-haiku-4-5', recall: 'claude-haiku-4-5', reflect: 'claude-sonnet-4-5' };
+    const expectedLlmProvider = 'openai';
+    const expectedModels = { retain: 'gpt-4o-mini', recall: 'gpt-4o-mini', reflect: 'gpt-4o' };
 
     const envPath = path.join(os.homedir(), '.clawbridge', '.env');
     const autoFixEnv = (key: string, value: string): void => {
