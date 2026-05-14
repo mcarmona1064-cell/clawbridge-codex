@@ -1,12 +1,13 @@
 /**
- * OpenAI Codex CLI provider (@openai/codex@0.129.0).
+ * OpenAI Codex CLI provider (@openai/codex >= 0.124.0).
  *
- * Runs `codex app-server --listen stdio://` as a persistent subprocess and
- * communicates via JSON-RPC over its stdin/stdout.
+ * Drives one `codex exec --json` subprocess per turn. The JSONL event stream
+ * is mapped onto ProviderEvent. Multi-turn continuity comes from
+ * `codex exec resume --json <thread_id>`.
  *
  * Auth model: subscription OAuth only — `codex login --device-auth`.
- * OPENAI_API_KEY and CODEX_API_KEY must NOT be present in env to avoid
- * bypassing subscription OAuth with API billing.
+ * OPENAI_API_KEY / CODEX_API_KEY are stripped from env so a stray key cannot
+ * silently flip the CLI into API-billing mode.
  */
 
 import { spawn, type ChildProcess } from 'child_process';
@@ -25,28 +26,15 @@ function log(msg: string): void {
   console.error(`[codex-provider] ${msg}`);
 }
 
-/**
- * Serialize MCP server configs to TOML dotted-key lines for Codex
- * `-c mcp_servers=...` flag.
- *
- * Each server becomes lines like:
- *   mcp_servers.myserver.command = "node"
- *   mcp_servers.myserver.args = ["/path/to/server.js"]
- *   mcp_servers.myserver.env.KEY = "value"
- */
-function serializeMcpToToml(servers: Record<string, McpServerConfig>): string {
-  const lines: string[] = [];
-  for (const [name, cfg] of Object.entries(servers)) {
-    const prefix = `mcp_servers.${tomlKey(name)}`;
-    lines.push(`${prefix}.command = ${tomlStr(cfg.command)}`);
-    if (cfg.args.length > 0) {
-      lines.push(`${prefix}.args = [${cfg.args.map(tomlStr).join(', ')}]`);
-    }
-    for (const [k, v] of Object.entries(cfg.env)) {
-      lines.push(`${prefix}.env.${tomlKey(k)} = ${tomlStr(v)}`);
-    }
-  }
-  return lines.join('\n');
+const STALE_SESSION_RE =
+  /session.*not found|no recorded session|missing transcript|unknown.*thread|invalid.*session/i;
+
+function stripApiKeyEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = { ...env };
+  delete out['OPENAI_API_KEY'];
+  delete out['CODEX_API_KEY'];
+  delete out['OPENAI_BASE_URL'];
+  return out;
 }
 
 function tomlStr(s: string): string {
@@ -57,21 +45,64 @@ function tomlKey(k: string): string {
   return /^[A-Za-z0-9_-]+$/.test(k) ? k : `"${k.replace(/"/g, '\\"')}"`;
 }
 
-/** Stale-session detection for Codex error messages. */
-const STALE_SESSION_RE = /session.*not found|unknown.*thread|invalid.*session/i;
+/**
+ * Render MCP server configs as `-c mcp_servers.NAME.field=value` args.
+ * One `-c` per dotted key, which the Codex CLI parses as TOML overrides.
+ */
+function mcpServerArgs(servers: Record<string, McpServerConfig>): string[] {
+  const out: string[] = [];
+  for (const [rawName, cfg] of Object.entries(servers)) {
+    const name = tomlKey(rawName);
+    out.push('-c', `mcp_servers.${name}.command=${tomlStr(cfg.command)}`);
+    if (cfg.args.length > 0) {
+      const arr = `[${cfg.args.map(tomlStr).join(', ')}]`;
+      out.push('-c', `mcp_servers.${name}.args=${arr}`);
+    }
+    for (const [k, v] of Object.entries(cfg.env)) {
+      out.push('-c', `mcp_servers.${name}.env.${tomlKey(k)}=${tomlStr(v)}`);
+    }
+  }
+  return out;
+}
+
+function buildInitialArgs(
+  cwd: string,
+  mcpServers: Record<string, McpServerConfig>,
+): string[] {
+  return [
+    'exec',
+    '--json',
+    '--sandbox',
+    'workspace-write',
+    '--skip-git-repo-check',
+    '-C',
+    cwd,
+    ...mcpServerArgs(mcpServers),
+  ];
+}
+
+function buildResumeArgs(threadId: string): string[] {
+  return ['exec', 'resume', '--json', '--skip-git-repo-check', threadId];
+}
+
+interface CodexEvent {
+  type?: string;
+  thread_id?: string;
+  message?: string;
+  item?: { type?: string; text?: string };
+}
 
 export class CodexProvider implements AgentProvider {
   readonly supportsNativeSlashCommands = false;
 
   private mcpServers: Record<string, McpServerConfig>;
-  private additionalDirectories?: string[];
 
   constructor(options: ProviderOptions = {}) {
     this.mcpServers = options.mcpServers ?? {};
-    this.additionalDirectories = options.additionalDirectories;
-    // Note: assistantName not used by Codex — system prompt is set via -c instructions
+    // Codex has no concept of assistantName / additionalDirectories at the
+    // CLI level — they're embedded in the prompt by the agent-runner.
     void options.assistantName;
-    void this.additionalDirectories;
+    void options.additionalDirectories;
   }
 
   isSessionInvalid(err: unknown): boolean {
@@ -80,151 +111,148 @@ export class CodexProvider implements AgentProvider {
   }
 
   query(input: QueryInput): AgentQuery {
-    const args = buildCodexArgs(this.mcpServers, input);
+    const mcpServers = this.mcpServers;
+    const cwd = input.cwd;
 
-    // Strip API key env vars — must not be present for subscription OAuth
-    const env: NodeJS.ProcessEnv = { ...process.env };
-    delete env['OPENAI_API_KEY'];
-    delete env['CODEX_API_KEY'];
-    delete env['OPENAI_BASE_URL'];
+    const instructions = input.systemContext?.instructions?.trim();
+    const initialPrompt = instructions
+      ? `${instructions}\n\n---\n\n${input.prompt}`
+      : input.prompt;
 
-    log(`Spawning: codex ${args.join(' ')}`);
-    const proc = spawn('codex', args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env,
-      cwd: input.cwd,
-    });
-
-    let aborted = false;
-    const pushQueue: string[] = [];
-    let ended = false;
-
-    const pushToProc = (text: string) => {
-      if (aborted || ended) return;
-      const msg = JSON.stringify({ jsonrpc: '2.0', id: nextId++, method: 'turn/submit', params: { input: text } });
-      proc.stdin!.write(msg + '\n');
+    const state: {
+      threadId: string | undefined;
+      aborted: boolean;
+      ended: boolean;
+      current: ChildProcess | undefined;
+      pushQueue: string[];
+      wake: (() => void) | undefined;
+    } = {
+      threadId: input.continuation,
+      aborted: false,
+      ended: false,
+      current: undefined,
+      pushQueue: [],
+      wake: undefined,
     };
 
-    let nextId = 1;
+    async function* runTurns(): AsyncGenerator<ProviderEvent> {
+      let pending: string | undefined = initialPrompt;
+      while (!state.aborted) {
+        if (pending === undefined) {
+          if (state.pushQueue.length > 0) {
+            pending = state.pushQueue.shift();
+          } else {
+            // Idle — let poll-loop re-enter on next inbound message.
+            return;
+          }
+        }
+        const prompt = pending!;
+        pending = undefined;
 
-    // Send initial turn after process starts
-    const sendInitial = () => {
-      if (input.continuation) {
-        const resumeMsg = JSON.stringify({
-          jsonrpc: '2.0', id: nextId++, method: 'session/resume', params: { sessionId: input.continuation },
+        const baseArgs = state.threadId
+          ? buildResumeArgs(state.threadId)
+          : buildInitialArgs(cwd, mcpServers);
+        const args = [...baseArgs, '--', prompt];
+
+        log(`Spawning: codex ${args.slice(0, baseArgs.length).join(' ')} -- <prompt>`);
+        const proc = spawn('codex', args, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: stripApiKeyEnv(process.env),
+          cwd,
         });
-        proc.stdin!.write(resumeMsg + '\n');
+        state.current = proc;
+
+        let collectedText = '';
+        let turnDone = false;
+        let providerErrorMsg: string | undefined;
+
+        for await (const line of lineIterator(proc, () => state.aborted)) {
+          if (!line.trim()) continue;
+
+          let evt: CodexEvent;
+          try {
+            evt = JSON.parse(line) as CodexEvent;
+          } catch {
+            continue;
+          }
+
+          yield { type: 'activity' };
+
+          switch (evt.type) {
+            case 'thread.started': {
+              if (typeof evt.thread_id === 'string' && evt.thread_id !== state.threadId) {
+                state.threadId = evt.thread_id;
+                log(`Thread: ${state.threadId}`);
+                yield { type: 'init', continuation: state.threadId };
+              }
+              break;
+            }
+            case 'item.completed': {
+              if (evt.item?.type === 'agent_message' && typeof evt.item.text === 'string') {
+                collectedText = evt.item.text;
+              }
+              break;
+            }
+            case 'turn.completed': {
+              turnDone = true;
+              yield { type: 'result', text: collectedText || null };
+              break;
+            }
+            case 'error':
+            case 'turn.error':
+            case 'thread.error': {
+              providerErrorMsg = evt.message ?? 'Codex error';
+              break;
+            }
+            default:
+              break;
+          }
+        }
+
+        const exitCode: number | null = await new Promise((resolve) => {
+          if (proc.exitCode !== null) resolve(proc.exitCode);
+          else proc.once('exit', (code) => resolve(code));
+        });
+        state.current = undefined;
+
+        if (state.aborted) return;
+
+        if (!turnDone) {
+          const msg =
+            providerErrorMsg ??
+            (exitCode !== 0
+              ? `codex exec exited ${exitCode}`
+              : 'codex exec ended without turn.completed');
+          const retryable = exitCode !== 1 && !STALE_SESSION_RE.test(msg);
+          yield { type: 'error', message: msg, retryable };
+          // After an error we still loop — next push() / next turn may succeed,
+          // or the poll-loop will drop the continuation if isSessionInvalid().
+        }
       }
-      pushToProc(input.prompt);
-      // Drain any queued messages
-      for (const msg of pushQueue) pushToProc(msg);
-      pushQueue.length = 0;
-    };
-
-    proc.on('spawn', sendInitial);
-
-    const events = translateEvents(proc, () => aborted);
+    }
 
     return {
       push: (msg) => {
-        if (proc.pid) {
-          pushToProc(msg);
-        } else {
-          pushQueue.push(msg);
-        }
+        if (state.aborted || state.ended) return;
+        state.pushQueue.push(msg);
+        state.wake?.();
       },
       end: () => {
-        ended = true;
-        try { proc.stdin!.end(); } catch { /* ignore */ }
+        state.ended = true;
+        state.wake?.();
       },
-      events,
+      events: runTurns(),
       abort: () => {
-        aborted = true;
-        ended = true;
-        try { proc.kill('SIGTERM'); } catch { /* ignore */ }
+        state.aborted = true;
+        state.ended = true;
+        state.wake?.();
+        try {
+          state.current?.kill('SIGTERM');
+        } catch {
+          /* ignore */
+        }
       },
     };
-  }
-}
-
-function buildCodexArgs(
-  mcpServers: Record<string, McpServerConfig>,
-  input: QueryInput,
-): string[] {
-  const args = ['app-server', '--listen', 'stdio://'];
-
-  if (Object.keys(mcpServers).length > 0) {
-    const toml = serializeMcpToToml(mcpServers);
-    args.push('-c', `mcp_servers=${toml}`);
-  }
-
-  const instructions = input.systemContext?.instructions;
-  if (instructions) {
-    const escaped = instructions.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-    args.push('-c', `instructions="${escaped}"`);
-  }
-
-  return args;
-}
-
-async function* translateEvents(
-  proc: ChildProcess,
-  isAborted: () => boolean,
-): AsyncGenerator<ProviderEvent> {
-  let buffer = '';
-  let continuation: string | undefined;
-
-  const lines = lineIterator(proc, isAborted);
-
-  for await (const line of lines) {
-    if (isAborted()) return;
-    if (!line.trim()) continue;
-
-    let msg: Record<string, unknown>;
-    try {
-      msg = JSON.parse(line) as Record<string, unknown>;
-    } catch {
-      // Non-JSON stdout (progress/debug), ignore
-      continue;
-    }
-
-    // Yield activity on every message for poll-loop idle timer
-    yield { type: 'activity' };
-
-    const method = msg['method'] as string | undefined;
-    const params = msg['params'] as Record<string, unknown> | undefined;
-    const error = msg['error'] as Record<string, unknown> | undefined;
-
-    if (error) {
-      const message = String(error['message'] ?? 'Codex error');
-      const code = error['code'];
-      const retryable = code === -32603 || code === 429;
-      yield { type: 'error', message, retryable };
-      return;
-    }
-
-    if (method === 'session/created' || method === 'session/resumed') {
-      if (params && typeof params['sessionId'] === 'string') {
-        continuation = params['sessionId'];
-        log(`Session: ${continuation}`);
-        yield { type: 'init', continuation };
-      }
-    } else if (method === 'output/text') {
-      if (params && typeof params['text'] === 'string') {
-        yield { type: 'progress', message: params['text'] };
-      }
-    } else if (method === 'turn/complete') {
-      const result = params && typeof params['text'] === 'string' ? params['text'] : null;
-      yield { type: 'result', text: result };
-      return;
-    } else if (method === 'turn/delta') {
-      // Streaming delta — activity already yielded above
-    }
-  }
-
-  // Process ended without turn/complete
-  if (!isAborted()) {
-    yield { type: 'result', text: null };
   }
 }
 
@@ -270,7 +298,9 @@ async function* lineIterator(
       yield queue.shift()!;
     }
     if (done || isAborted()) return;
-    await new Promise<void>((r) => { resolve = r; });
+    await new Promise<void>((r) => {
+      resolve = r;
+    });
     resolve = null;
   }
 }
