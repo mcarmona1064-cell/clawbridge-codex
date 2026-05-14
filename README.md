@@ -211,8 +211,6 @@ Only security fixes, bug fixes, and clear improvements will be accepted to the b
 
 Questions? Ideas? [Join the Discord](https://discord.gg/VDdww8qS42).
 
-Need a managed setup? Visit **[clawbridgeagency.com](https://clawbridgeagency.com)** or email **[hello@clawbridgeagency.com](mailto:hello@clawbridgeagency.com)**
-
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for breaking changes, or the [full release history](https://docs.clawbridge.dev/changelog) on the documentation site.
