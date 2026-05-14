@@ -18,7 +18,7 @@ import * as p from '@clack/prompts';
 import k from 'kleur';
 
 import * as setupLog from '../logs.js';
-import { offerClaudeAssist } from './claude-assist.js';
+import { offerCodexAssist } from './codex-assist.js';
 import { emit as phEmit } from './diagnostics.js';
 import { fitToWidth } from './theme.js';
 
@@ -369,7 +369,7 @@ export async function fail(
   if (hint) p.log.message(k.dim(hint));
   p.log.message(k.dim('Logs: logs/setup.log · Raw: logs/setup-steps/'));
 
-  const ranFix = await offerClaudeAssist({ stepName, msg, hint, rawLogPath });
+  const ranFix = await offerCodexAssist({ stepName, msg, hint, rawLogPath });
 
   // If the user just ran a Claude-suggested fix, offer to resume the flow
   // at the step that failed instead of aborting. We re-exec via spawnSync

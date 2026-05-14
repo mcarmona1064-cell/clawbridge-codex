@@ -34,10 +34,10 @@ import { brightSelect } from '../lib/bright-select.js';
 import { confirmThenOpen } from '../lib/browser.js';
 import {
   isHelpEscape,
-  offerClaudeHandoff,
+  offerCodexHandoff,
   validateWithHelpEscape,
   type HandoffContext,
-} from '../lib/claude-handoff.js';
+} from '../lib/codex-handoff.js';
 import { ensureAnswer, fail, runQuietChild } from '../lib/runner.js';
 import { buildTeamsAppPackage } from '../lib/teams-manifest.js';
 import * as setupLog from '../logs.js';
@@ -545,7 +545,7 @@ async function finishWithHandoff(
     return;
   }
 
-  await offerClaudeHandoff({
+  await offerCodexHandoff({
     channel: CHANNEL,
     step: 'teams-finish-wiring',
     stepDescription:
@@ -610,7 +610,7 @@ async function offerHandoff(args: {
     collectedValues: redactCollected(args.args.collected),
     files: ['setup/channels/teams.ts', 'setup/add-teams.sh'],
   };
-  await offerClaudeHandoff(ctx);
+  await offerCodexHandoff(ctx);
 }
 
 function redactCollected(c: Collected): Record<string, string> {

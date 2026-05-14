@@ -11,14 +11,14 @@
  * ANSI cursor controls.
  *
  * Stall detection: a silence timer resets on every new line. When it hits
- * STALL_THRESHOLD_MS we pause the render, show `offerClaudeAssist` with
+ * STALL_THRESHOLD_MS we pause the render, show `offerCodexAssist` with
  * the step's raw log, and either resume (user said "keep waiting") or
  * let the step run its course while giving them the exit path.
  */
 import * as p from '@clack/prompts';
 import k from 'kleur';
 
-import { offerClaudeAssist } from './claude-assist.js';
+import { offerCodexAssist } from './codex-assist.js';
 import { emit as phEmit } from './diagnostics.js';
 import type { StepResult, SpinnerLabels } from './runner.js';
 import { dumpTranscriptOnFailure, spawnStep, writeStepEntry } from './runner.js';
@@ -211,10 +211,10 @@ async function handleStall(
   );
 
   if (choice === 'help') {
-    // offerClaudeAssist runs its own spinner and may propose a fix command.
+    // offerCodexAssist runs its own spinner and may propose a fix command.
     // We don't attempt to restart the stalled build from here — if Claude
     // proposes a command the user accepts, they can retry setup afterwards.
-    await offerClaudeAssist({
+    await offerCodexAssist({
       stepName,
       msg: `The ${stepName} step has produced no output for 60 seconds.`,
       hint: 'It may be hung on a slow network pull or a failing Dockerfile step.',
