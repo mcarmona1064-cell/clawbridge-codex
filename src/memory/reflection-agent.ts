@@ -7,27 +7,10 @@ import { MemoryManager } from './manager.js';
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-const envCfg = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+const envCfg = readEnvFile(['OPENAI_API_KEY']);
 
-function getAuthHeaders(): Record<string, string> | null {
-  const oauthToken = process.env['CLAUDE_CODE_OAUTH_TOKEN'] || envCfg['CLAUDE_CODE_OAUTH_TOKEN'];
-  const apiKey = process.env['ANTHROPIC_API_KEY'] || envCfg['ANTHROPIC_API_KEY'];
-
-  if (oauthToken) {
-    return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      Authorization: `Bearer ${oauthToken}`,
-    };
-  }
-  if (apiKey) {
-    return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'x-api-key': apiKey,
-    };
-  }
-  return null;
+function getApiKey(): string | null {
+  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null;
 }
 
 // ── Minimum memories needed to draw patterns ──────────────────────────────────
@@ -42,16 +25,16 @@ interface RawInsight {
 }
 
 /**
- * Reads all memories for a client, sends them to Claude, and stores
+ * Reads all memories for a client, sends them to OpenAI, and stores
  * behavioral pattern insights back as 'behavioral' segment memories.
  *
  * Returns the number of behavioral memories written.
  * Skips silently when fewer than MIN_MEMORIES_FOR_REFLECTION exist.
  */
 export async function runReflectionAgent(clientId: string): Promise<number> {
-  const headers = getAuthHeaders();
-  if (!headers) {
-    log.warn('[memory:reflection] No Anthropic credentials — skipping');
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    log.warn('[memory:reflection] No OPENAI_API_KEY — skipping');
     return 0;
   }
 
@@ -61,13 +44,16 @@ export async function runReflectionAgent(clientId: string): Promise<number> {
   // Count lines that look like memory entries (start with "- [")
   const memoryLineCount = dump.split('\n').filter((l) => l.trimStart().startsWith('- [')).length;
   if (memoryLineCount < MIN_MEMORIES_FOR_REFLECTION) {
-    log.debug('[memory:reflection] Not enough memories for reflection', { clientId, memoryLineCount });
+    log.debug('[memory:reflection] Not enough memories for reflection', {
+      clientId,
+      memoryLineCount,
+    });
     return 0;
   }
 
   const systemPrompt = `You are a reflection agent. Analyze these memories about a user and identify clear behavioral patterns.
 
-Output a JSON array of behavioral insights. Each insight must have:
+Output a JSON object with a single key "insights" whose value is an array of behavioral insights. Each insight must have:
 - content: one sentence describing a pattern (max 25 words, e.g. "Consistently raises cost concerns before approving new features")
 - importance: 0.5-0.8
 
@@ -75,39 +61,46 @@ Rules:
 - Only output patterns with clear evidence from 3+ memories
 - Focus on actionable patterns the assistant should proactively act on
 - Skip generic or obvious observations
-- Output valid JSON array only, no explanation`;
+- Output valid JSON only, no explanation`;
 
   let insights: RawInsight[];
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'gpt-4o-mini',
         max_tokens: 512,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: dump }],
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: dump },
+        ],
       }),
     });
 
     const data = (await res.json()) as {
-      content?: Array<{ type: string; text: string }>;
+      choices?: Array<{ message?: { content?: string } }>;
       error?: { message: string };
     };
 
     if (data.error) {
-      log.error('[memory:reflection] Claude API error', { error: data.error.message });
+      log.error('[memory:reflection] OpenAI API error', { error: data.error.message });
       return 0;
     }
 
-    const textBlock = data.content?.find((b) => b.type === 'text')?.text;
+    const textBlock = data.choices?.[0]?.message?.content;
     if (!textBlock) return 0;
 
     const json = textBlock
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    insights = JSON.parse(json) as RawInsight[];
+    const parsed = JSON.parse(json) as { insights?: RawInsight[] } | RawInsight[];
+    insights = Array.isArray(parsed) ? parsed : (parsed.insights ?? []);
   } catch (err) {
     log.error('[memory:reflection] Failed to run reflection', { err });
     return 0;

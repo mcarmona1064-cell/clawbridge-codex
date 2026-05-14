@@ -3,7 +3,7 @@
  *
  * Call initErrorHandler() once at startup. It registers uncaughtException and
  * unhandledRejection handlers, logs errors to ~/.clawbridge/errors.log,
- * sends Telegram alerts, requests Claude diagnosis, and optionally watches for
+ * sends Telegram alerts, requests OpenAI diagnosis, and optionally watches for
  * a "fix it" reply.
  */
 
@@ -19,8 +19,7 @@ const envCfg = readEnvFile([
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_CHAT_ID',
   'TELEGRAM_ALERT_CHAT_ID',
-  'CLAUDE_CODE_OAUTH_TOKEN',
-  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
   'ERROR_AUTO_FIX',
 ]);
 
@@ -178,14 +177,11 @@ async function pollForFixIt(afterMessageId: number): Promise<boolean> {
   return false;
 }
 
-// ── Claude diagnosis ─────────────────────────────────────────────────────────
+// ── OpenAI diagnosis ─────────────────────────────────────────────────────────
 
 async function getDiagnosis(error: Error, fileContext: string): Promise<string> {
-  const apiKey = cfg('ANTHROPIC_API_KEY');
-  const oauthToken = cfg('CLAUDE_CODE_OAUTH_TOKEN');
-  const authHeader = oauthToken ? `Bearer ${oauthToken}` : apiKey ? undefined : null;
-
-  if (authHeader === null && !apiKey) return '(no Anthropic credentials configured)';
+  const apiKey = cfg('OPENAI_API_KEY');
+  if (!apiKey) return '(no OPENAI_API_KEY configured)';
 
   const prompt =
     `Error: ${error.message}\n` +
@@ -194,45 +190,37 @@ async function getDiagnosis(error: Error, fileContext: string): Promise<string> 
     `Diagnose this error in 2-3 sentences. Suggest the specific fix.`;
 
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-    };
-    if (oauthToken) {
-      headers['Authorization'] = `Bearer ${oauthToken}`;
-    } else {
-      headers['x-api-key'] = apiKey;
-    }
-
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        model: 'claude-opus-4-5-20251001',
+        model: 'gpt-4o',
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
 
     const data = (await res.json()) as {
-      content?: Array<{ type: string; text: string }>;
+      choices?: Array<{ message?: { content?: string } }>;
       error?: { message: string };
     };
 
-    if (data.error) return `(Claude API error: ${data.error.message})`;
-    const text = data.content?.find((b) => b.type === 'text')?.text;
+    if (data.error) return `(OpenAI API error: ${data.error.message})`;
+    const text = data.choices?.[0]?.message?.content;
     return text || '(empty diagnosis)';
   } catch (metaErr) {
-    console.error('[error-handler] Failed to call Claude API:', metaErr);
+    console.error('[error-handler] Failed to call OpenAI API:', metaErr);
     return '(diagnosis unavailable)';
   }
 }
 
-// ── Apply fix via Claude Code SDK ────────────────────────────────────────────
+// ── Apply fix via Codex CLI ──────────────────────────────────────────────────
 
 async function applyFix(error: Error, fileContext: string): Promise<void> {
   try {
-    // Dynamically import to avoid hard dep if package not present
     const { execFile } = await import('child_process');
     const { promisify } = await import('util');
     const execFileAsync = promisify(execFile);
@@ -244,8 +232,12 @@ async function applyFix(error: Error, fileContext: string): Promise<void> {
       `File content:\n${fileContext}\n\n` +
       `Apply the minimal fix needed to resolve this error. Edit the file in place.`;
 
-    log.info('[error-handler] Applying auto-fix via Claude Code SDK');
-    await execFileAsync('claude', ['--print', prompt], { timeout: 120_000, cwd: process.cwd() });
+    log.info('[error-handler] Applying auto-fix via Codex CLI');
+    await execFileAsync(
+      'codex',
+      ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', prompt],
+      { timeout: 120_000, cwd: process.cwd() },
+    );
     log.info('[error-handler] Auto-fix applied, restarting...');
 
     // Restart: re-exec current process
@@ -293,7 +285,7 @@ async function handleError(error: Error, context?: string): Promise<void> {
   // 4. Get file context
   const fileContext = fileInfo ? readFileContext(fileInfo.file, fileInfo.line) : '(no source context)';
 
-  // 5. Call Claude for diagnosis
+  // 5. Call OpenAI for diagnosis
   const diagnosis = await getDiagnosis(error, fileContext);
 
   // 6. Send diagnosis follow-up

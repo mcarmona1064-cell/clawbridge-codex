@@ -8,27 +8,10 @@ import { getMemories } from './db.js';
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-const envCfg = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+const envCfg = readEnvFile(['OPENAI_API_KEY']);
 
-function getAuthHeaders(): Record<string, string> | null {
-  const oauthToken = process.env['CLAUDE_CODE_OAUTH_TOKEN'] || envCfg['CLAUDE_CODE_OAUTH_TOKEN'];
-  const apiKey = process.env['ANTHROPIC_API_KEY'] || envCfg['ANTHROPIC_API_KEY'];
-
-  if (oauthToken) {
-    return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      Authorization: `Bearer ${oauthToken}`,
-    };
-  }
-  if (apiKey) {
-    return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'x-api-key': apiKey,
-    };
-  }
-  return null;
+function getApiKey(): string | null {
+  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null;
 }
 
 // ── Keyword overlap helper ────────────────────────────────────────────────────
@@ -108,7 +91,7 @@ function findCommonThemes(allMemoryContents: string[], minClients: number): Them
 
 /**
  * Analyzes memories across all provided client IDs, finds common patterns,
- * calls Claude to generate an agency-level insight report, and saves it.
+ * calls OpenAI to generate an agency-level insight report, and saves it.
  *
  * Returns the report as a markdown string.
  */
@@ -118,9 +101,9 @@ export async function generateCrossClientReport(clientIds: string[]): Promise<st
     return '';
   }
 
-  const headers = getAuthHeaders();
-  if (!headers) {
-    log.warn('[memory:cross-client] No Anthropic credentials — skipping');
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    log.warn('[memory:cross-client] No OPENAI_API_KEY — skipping');
     return '';
   }
 
@@ -166,28 +149,33 @@ Format as markdown with bullet points. Max 300 words. Be specific and actionable
 
   let report: string;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'gpt-4o-mini',
         max_tokens: 600,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
       }),
     });
 
     const data = (await res.json()) as {
-      content?: Array<{ type: string; text: string }>;
+      choices?: Array<{ message?: { content?: string } }>;
       error?: { message: string };
     };
 
     if (data.error) {
-      log.error('[memory:cross-client] Claude API error', { error: data.error.message });
+      log.error('[memory:cross-client] OpenAI API error', { error: data.error.message });
       return '';
     }
 
-    report = data.content?.find((b) => b.type === 'text')?.text ?? '';
+    report = data.choices?.[0]?.message?.content ?? '';
   } catch (err) {
     log.error('[memory:cross-client] Report generation failed', { err });
     return '';

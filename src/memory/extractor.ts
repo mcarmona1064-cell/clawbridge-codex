@@ -6,34 +6,17 @@ import type { Memory, MemorySegment } from './types.js';
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-const envCfg = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+const envCfg = readEnvFile(['OPENAI_API_KEY']);
 
-function getAuthHeaders(): Record<string, string> | null {
-  const oauthToken = process.env['CLAUDE_CODE_OAUTH_TOKEN'] || envCfg['CLAUDE_CODE_OAUTH_TOKEN'];
-  const apiKey = process.env['ANTHROPIC_API_KEY'] || envCfg['ANTHROPIC_API_KEY'];
-
-  if (oauthToken) {
-    return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      Authorization: `Bearer ${oauthToken}`,
-    };
-  }
-  if (apiKey) {
-    return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'x-api-key': apiKey,
-    };
-  }
-  return null;
+function getApiKey(): string | null {
+  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null;
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a memory extraction agent. Given a conversation or summary, extract factual memories worth storing long-term.
 
-Output a JSON array of memory objects. Each has:
+Output a JSON object with a single key "memories" whose value is an array of memory objects. Each has:
 - segment: one of identity|preference|correction|relationship|knowledge|behavioral|context
 - content: one plain-english sentence (max 20 words)
 - importance: 0.0-1.0 based on segment defaults and how specific/useful this is
@@ -61,44 +44,51 @@ interface RawMemory {
 // ── Extractor ─────────────────────────────────────────────────────────────────
 
 export async function extractMemories(text: string, clientId: string): Promise<Memory[]> {
-  const headers = getAuthHeaders();
-  if (!headers) {
-    log.warn('[memory] No Anthropic credentials — skipping extraction');
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    log.warn('[memory] No OPENAI_API_KEY — skipping extraction');
     return [];
   }
 
   let raw: RawMemory[];
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'gpt-4o-mini',
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: text }],
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: text },
+        ],
       }),
     });
 
     const data = (await res.json()) as {
-      content?: Array<{ type: string; text: string }>;
+      choices?: Array<{ message?: { content?: string } }>;
       error?: { message: string };
     };
 
     if (data.error) {
-      log.error('[memory] Claude API error during extraction', { error: data.error.message });
+      log.error('[memory] OpenAI API error during extraction', { error: data.error.message });
       return [];
     }
 
-    const textBlock = data.content?.find((b) => b.type === 'text')?.text;
+    const textBlock = data.choices?.[0]?.message?.content;
     if (!textBlock) return [];
 
-    // Strip markdown code fences if present
+    // Strip markdown code fences if present (json_object mode shouldn't add them, but be tolerant)
     const json = textBlock
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-    raw = JSON.parse(json) as RawMemory[];
+    const parsed = JSON.parse(json) as { memories?: RawMemory[] } | RawMemory[];
+    raw = Array.isArray(parsed) ? parsed : (parsed.memories ?? []);
   } catch (err) {
     log.error('[memory] Failed to extract memories', { err });
     return [];

@@ -164,8 +164,8 @@ describe('MemoryManager.loadForSession', () => {
 });
 
 describe('extractMemories', () => {
-  it('parses Claude response and returns memories', async () => {
-    // Mock fetch to return a valid Claude-style response
+  it('parses OpenAI response and returns memories', async () => {
+    // Mock fetch to return a valid OpenAI-style chat completion response
     const mockMemories = [
       { segment: 'preference', content: 'Prefers concise answers without filler', importance: 0.75 },
       { segment: 'identity', content: 'User is a senior software engineer', importance: 0.85 },
@@ -175,13 +175,13 @@ describe('extractMemories', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         json: async () => ({
-          content: [{ type: 'text', text: JSON.stringify(mockMemories) }],
+          choices: [{ message: { content: JSON.stringify({ memories: mockMemories }) } }],
         }),
       }),
     );
 
     // Give it credentials so it doesn't bail early
-    process.env['ANTHROPIC_API_KEY'] = 'test-key';
+    process.env['OPENAI_API_KEY'] = 'test-key';
 
     const { extractMemories } = await import('./extractor.js');
     const results = await extractMemories('User said they prefer short answers and mentioned their job', 'test-client');
@@ -195,12 +195,11 @@ describe('extractMemories', () => {
     expect(results[0].createdAt).toBeTruthy();
 
     vi.unstubAllGlobals();
-    delete process.env['ANTHROPIC_API_KEY'];
+    delete process.env['OPENAI_API_KEY'];
   });
 
   it('returns empty array when no credentials configured', async () => {
-    delete process.env['ANTHROPIC_API_KEY'];
-    delete process.env['CLAUDE_CODE_OAUTH_TOKEN'];
+    delete process.env['OPENAI_API_KEY'];
 
     // Re-import with no credentials (env mock returns {})
     const mod = await import('./extractor.js');
