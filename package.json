@@ -43,8 +43,7 @@
     "white-label"
   ],
   "bin": {
-    "clawbridge-agent": "./dist/setup/index.js",
-    "clawbridge": "./dist/setup/index.js"
+    "clawbridge-codex": "./dist/setup/index.js"
   },
   "scripts": {
     "build": "tsc",
