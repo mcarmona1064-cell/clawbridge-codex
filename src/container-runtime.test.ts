@@ -13,8 +13,10 @@ vi.mock('./log.js', () => ({
 
 // Mock child_process — store the mock fn so tests can configure it
 const mockExecSync = vi.fn();
+const mockExecFileSync = vi.fn();
 vi.mock('child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
+  execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
 }));
 
 import {
@@ -91,29 +93,35 @@ describe('cleanupOrphans', () => {
     cleanupOrphans();
 
     expect(mockExecSync).toHaveBeenCalledWith(
-      `${CONTAINER_RUNTIME_BIN} ps --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}'`,
+      `${CONTAINER_RUNTIME_BIN} ps -a --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}\t{{.State}}'`,
       expect.any(Object),
     );
   });
 
   it('stops orphaned clawbridge containers', () => {
-    // docker ps returns container names, one per line
-    mockExecSync.mockReturnValueOnce('clawbridge-group1-111\nclawbridge-group2-222\n');
-    // stop calls succeed
+    // docker ps returns container name + state, one per line
+    mockExecSync.mockReturnValueOnce('clawbridge-group1-111\trunning\nclawbridge-group2-222\texited\n');
+    // stop/rm calls succeed
     mockExecSync.mockReturnValue('');
+    mockExecFileSync.mockReturnValue('');
 
     cleanupOrphans();
 
-    // ps + 2 stop calls
-    expect(mockExecSync).toHaveBeenCalledTimes(3);
+    // ps + 1 stop call for the running container
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
     expect(mockExecSync).toHaveBeenNthCalledWith(2, `${CONTAINER_RUNTIME_BIN} stop -t 1 clawbridge-group1-111`, {
       stdio: 'pipe',
     });
-    expect(mockExecSync).toHaveBeenNthCalledWith(3, `${CONTAINER_RUNTIME_BIN} stop -t 1 clawbridge-group2-222`, {
+    expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+    expect(mockExecFileSync).toHaveBeenNthCalledWith(1, CONTAINER_RUNTIME_BIN, ['rm', '-f', 'clawbridge-group1-111'], {
       stdio: 'pipe',
     });
-    expect(log.info).toHaveBeenCalledWith('Stopped orphaned containers', {
-      count: 2,
+    expect(mockExecFileSync).toHaveBeenNthCalledWith(2, CONTAINER_RUNTIME_BIN, ['rm', '-f', 'clawbridge-group2-222'], {
+      stdio: 'pipe',
+    });
+    expect(log.info).toHaveBeenCalledWith('Cleaned up orphaned containers', {
+      running: 1,
+      stopped: 1,
       names: ['clawbridge-group1-111', 'clawbridge-group2-222'],
     });
   });
@@ -141,19 +149,22 @@ describe('cleanupOrphans', () => {
   });
 
   it('continues stopping remaining containers when one stop fails', () => {
-    mockExecSync.mockReturnValueOnce('clawbridge-a-1\nclawbridge-b-2\n');
+    mockExecSync.mockReturnValueOnce('clawbridge-a-1\trunning\nclawbridge-b-2\trunning\n');
     // First stop fails
     mockExecSync.mockImplementationOnce(() => {
       throw new Error('already stopped');
     });
     // Second stop succeeds
     mockExecSync.mockReturnValueOnce('');
+    mockExecFileSync.mockReturnValue('');
 
     cleanupOrphans(); // should not throw
 
     expect(mockExecSync).toHaveBeenCalledTimes(3);
-    expect(log.info).toHaveBeenCalledWith('Stopped orphaned containers', {
-      count: 2,
+    expect(mockExecFileSync).toHaveBeenCalledTimes(2);
+    expect(log.info).toHaveBeenCalledWith('Cleaned up orphaned containers', {
+      running: 2,
+      stopped: 0,
       names: ['clawbridge-a-1', 'clawbridge-b-2'],
     });
   });

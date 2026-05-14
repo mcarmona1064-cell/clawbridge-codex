@@ -6,56 +6,6 @@ import { initContainerConfig } from './container-config.js';
 import { log } from './log.js';
 import type { AgentGroup } from './types.js';
 
-const DEFAULT_SETTINGS_JSON =
-  JSON.stringify(
-    {
-      env: {
-        CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-        CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-      },
-      permissions: {
-        allow: [
-          'Bash(ls*)',
-          'Bash(ls -* *)',
-          'Bash(cat *)',
-          'Bash(head *)',
-          'Bash(tail *)',
-          'Bash(grep *)',
-          'Bash(grep -* *)',
-          'Bash(find *)',
-          'Bash(wc *)',
-          'Bash(echo *)',
-          'Bash(pwd)',
-          'Bash(which *)',
-          'Bash(file *)',
-          'Bash(stat *)',
-          'Bash(du *)',
-          'Bash(df *)',
-          'Bash(ps *)',
-          'Bash(env)',
-          'Bash(printenv *)',
-          'Bash(sort *)',
-          'Bash(uniq *)',
-          'Bash(cut *)',
-          'Bash(awk *)',
-          'Bash(sed -n *)',
-          'Bash(jq *)',
-          'Bash(python3 -c *)',
-          'Bash(node -e *)',
-          'Bash(date*)',
-          'Bash(id)',
-          'Bash(whoami)',
-          'Bash(uname *)',
-          'Read(*)',
-          'Glob(*)',
-        ],
-      },
-    },
-    null,
-    2,
-  ) + '\n';
-
 /**
  * Initialize the on-disk filesystem state for an agent group. Idempotent —
  * every step is gated on the target not already existing, so re-running on
@@ -118,12 +68,6 @@ I am ClawBridge, your AI assistant.
   if (!fs.existsSync(stateDir)) {
     fs.mkdirSync(stateDir, { recursive: true });
     initialized.push('.codex-shared');
-  }
-
-  const settingsFile = path.join(stateDir, 'settings.json');
-  if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(settingsFile, DEFAULT_SETTINGS_JSON);
-    initialized.push('settings.json');
   }
 
   // Skills directory — created empty here; symlinks are synced at spawn

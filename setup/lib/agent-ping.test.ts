@@ -7,7 +7,7 @@ describe('classifyPingResult', () => {
     expect(classifyPingResult(0, 'pong\n')).toBe('ok');
   });
 
-  it('detects Anthropic auth errors printed as a chat reply', () => {
+  it('detects provider auth errors printed as a chat reply', () => {
     expect(
       classifyPingResult(
         0,

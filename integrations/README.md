@@ -4,9 +4,9 @@ This folder contains the integration layer that gives ClawBridge agents access t
 
 ## What This Is
 
-| Component | Path | Purpose |
-|-----------|------|---------|
-| MCP server | `mcp-server/` | Exposes integration tools to agents over MCP |
+| Component   | Path           | Purpose                                      |
+| ----------- | -------------- | -------------------------------------------- |
+| MCP server  | `mcp-server/`  | Exposes integration tools to agents over MCP |
 | Auth portal | `auth-portal/` | Web UI for clients to connect their accounts |
 
 Agents call tools on the MCP server (e.g. `send_email`, `create_calendar_event`). The MCP server proxies requests to the integration server, which holds the OAuth tokens and proxies requests to the upstream APIs. Clients authorize their accounts once via the auth portal.
@@ -89,40 +89,40 @@ cd integrations/mcp-server && npm install && npm run dev
 
 ## Featured Integrations
 
-| Integration | Key | What the Agent Can Do |
-|-------------|-----|-----------------------|
-| **Google Calendar** | `google-calendar` | List events, create events, check availability |
-| **Gmail** | `gmail` | Send emails, read inbox, fetch message metadata |
-| **HubSpot** | `hubspot` | List/create contacts, create deals, manage pipeline |
-| **Slack** | `slack` | Send messages, list channels, post notifications |
-| **Notion** | `notion` | Search pages/databases, create new pages |
-| **Google Drive** | `google-drive` | Read/write files, search documents |
-| **LinkedIn** | `linkedin` | Post updates, look up profiles |
-| **Calendly** | `calendly` | Check scheduling links, manage availability |
-| **QuickBooks** | `quickbooks` | View invoices, expenses, and financial summaries |
-| **Shopify** | `shopify` | Manage orders, products, and customers |
-| **Salesforce** | `salesforce` | CRM contacts, opportunities, accounts |
+| Integration         | Key               | What the Agent Can Do                               |
+| ------------------- | ----------------- | --------------------------------------------------- |
+| **Google Calendar** | `google-calendar` | List events, create events, check availability      |
+| **Gmail**           | `gmail`           | Send emails, read inbox, fetch message metadata     |
+| **HubSpot**         | `hubspot`         | List/create contacts, create deals, manage pipeline |
+| **Slack**           | `slack`           | Send messages, list channels, post notifications    |
+| **Notion**          | `notion`          | Search pages/databases, create new pages            |
+| **Google Drive**    | `google-drive`    | Read/write files, search documents                  |
+| **LinkedIn**        | `linkedin`        | Post updates, look up profiles                      |
+| **Calendly**        | `calendly`        | Check scheduling links, manage availability         |
+| **QuickBooks**      | `quickbooks`      | View invoices, expenses, and financial summaries    |
+| **Shopify**         | `shopify`         | Manage orders, products, and customers              |
+| **Salesforce**      | `salesforce`      | CRM contacts, opportunities, accounts               |
 
 ---
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `INTEGRATION_SECRET_KEY` | Secret key for integration server API auth |
+| Variable                 | Description                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| `INTEGRATION_SECRET_KEY` | Secret key for integration server API auth                       |
 | `INTEGRATION_SERVER_URL` | URL of the integration server (default: `http://localhost:3003`) |
 
 ---
 
-## Claude Vision Tools
+## Vision Tools
 
-The MCP server includes Claude vision tools powered by each client's stored Anthropic API key.
+The MCP server includes image and document analysis tools powered by the configured OpenAI/Codex-compatible credential.
 
-| Tool | Description |
-|------|-------------|
-| `analyze_image` | Describe any image/photo |
-| `extract_text_from_image` | OCR: extract all text from an image |
-| `analyze_document` | Parse invoices, contracts, forms → structured JSON |
-| `describe_chart` | Analyze charts/graphs → key insights |
+| Tool                      | Description                                        |
+| ------------------------- | -------------------------------------------------- |
+| `analyze_image`           | Describe any image/photo                           |
+| `extract_text_from_image` | OCR: extract all text from an image                |
+| `analyze_document`        | Parse invoices, contracts, forms → structured JSON |
+| `describe_chart`          | Analyze charts/graphs → key insights               |
 
-These tools automatically use the client's Anthropic API key stored in the portal (encrypted AES-256). Set `PORTAL_API_URL` and `PORTAL_ADMIN_TOKEN` in your MCP server env so it can fetch keys at runtime.
+These tools automatically use the client's OpenAI API key stored in the portal (encrypted AES-256). Set `PORTAL_API_URL` and `PORTAL_ADMIN_TOKEN` in your MCP server env so it can fetch keys at runtime.

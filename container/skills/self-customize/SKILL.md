@@ -1,6 +1,6 @@
 ---
 name: self-customize
-description: Customize your own agent — add capabilities, install packages, add MCP servers, edit code or CLAUDE.md. Use when the user asks you to add a feature, install a tool, or modify how you work. For non-trivial code changes, delegate to a builder agent via create_agent.
+description: Customize your own agent — add capabilities, install packages, add MCP servers, edit code or AGENTS.md. Use when the user asks you to add a feature, install a tool, or modify how you work. For non-trivial code changes, delegate to a builder agent via create_agent.
 ---
 
 # Self-Customization
@@ -11,7 +11,7 @@ You can modify your own environment. Different kinds of changes have different w
 
 **What needs to change?**
 
-- **`CLAUDE.local.md` or files in your workspace** → Edit directly, no approval needed. Your workspace (`/workspace/agent/`) is persisted on the host. (Note: the composed `CLAUDE.md` itself is read-only and regenerated every spawn — write to `CLAUDE.local.md` instead.)
+- **`AGENTS.local.md` or files in your workspace** → Edit directly, no approval needed. Your workspace (`/workspace/agent/`) is persisted on the host. (Note: the composed `AGENTS.md` itself is read-only and regenerated every spawn — write to `AGENTS.local.md` instead.)
 - **System package (apt) or global npm package** → `install_packages`. Requires admin approval. On approval, image rebuild + container restart happen automatically.
 - **MCP server** → `add_mcp_server`. Requires admin approval. On approval, container restarts with the new server wired up (no rebuild — bun runs TS directly).
 - **Your source code or Dockerfile** → Delegate to a builder agent via `create_agent` (see below).
@@ -27,7 +27,7 @@ For anything that requires editing source files (your own code, Dockerfile, etc.
 4. The builder works in its own container, makes the changes, and reports back
 5. You review the builder's summary and confirm with the user. Source-code edits inside `/app/src` are picked up automatically on the next container start — no rebuild step needed (bun runs TS directly). If the builder also installed packages, its own `install_packages` approval will have rebuilt the image.
 
-### Builder Agent Instructions (use as CLAUDE.md when creating)
+### Builder Agent Instructions (use as AGENTS.md when creating)
 
 ```
 You are a builder agent. Your job is to make precise, minimal code changes to ClawBridge source files when the main agent requests it.

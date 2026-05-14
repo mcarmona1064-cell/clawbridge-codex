@@ -105,7 +105,7 @@ async function processRequest(reqDir: string, resDir: string, filename: string, 
     // terminates this host process (e.g. `launchctl kickstart -k` on its own
     // service, `launchctl bootout` of the current service, `kill -- -$$`)
     // can trap us in a restart loop: launchd reboots us, we find the same
-    // file, run it again, get killed again, forever — burning Anthropic
+    // file, run it again, get killed again, forever — burning model credits
     // API tokens each cycle as the container agent fires on every reboot.
     // Trade-off: if the host crashes between unlink and writing the
     // response, the agent gets no reply for that one command. We accept

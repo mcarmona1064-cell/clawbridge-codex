@@ -183,16 +183,16 @@ probe_docker
 SERVICE_STATUS=$(probe_service_status "$OS")
 
 # Check for credentials in .env
-probe_anthropic_env() {
+probe_openai_env() {
   local envfile="$PROJECT_ROOT/.env"
   [[ -f "$envfile" ]] || { echo "false"; return; }
-  if grep -qE '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)=.+' "$envfile" 2>/dev/null; then
+  if grep -qE '^(OPENAI_API_KEY)=.+' "$envfile" 2>/dev/null || [ -f "$HOME/.codex/auth.json" ]; then
     echo "true"
   else
     echo "false"
   fi
 }
-ANTHROPIC_SECRET=$(probe_anthropic_env)
+OPENAI_SECRET=$(probe_openai_env)
 DISPLAY_NAME=$(probe_display_name "$OS")
 
 END_S=$(date +%s)
@@ -205,7 +205,7 @@ SHELL: ${SHELL_NAME}
 HOST_DEPS: ${HOST_DEPS}
 DOCKER: ${DOCKER_STATUS}
 IMAGE_PRESENT: ${IMAGE_PRESENT}
-ANTHROPIC_SECRET: ${ANTHROPIC_SECRET}
+OPENAI_SECRET: ${OPENAI_SECRET}
 SERVICE_STATUS: ${SERVICE_STATUS}
 INFERRED_DISPLAY_NAME: ${DISPLAY_NAME}
 ELAPSED_MS: ${ELAPSED_MS}

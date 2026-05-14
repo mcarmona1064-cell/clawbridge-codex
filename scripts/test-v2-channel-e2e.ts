@@ -29,7 +29,7 @@ runMigrations(centralDb);
 const groupsDir = path.resolve(process.cwd(), 'groups');
 const testGroupDir = path.join(groupsDir, 'test-channel-e2e');
 fs.mkdirSync(testGroupDir, { recursive: true });
-fs.writeFileSync(path.join(testGroupDir, 'CLAUDE.md'), '# Test Agent\nYou are a test agent. Be brief.\n');
+fs.writeFileSync(path.join(testGroupDir, 'AGENTS.local.md'), '# Test Agent\nYou are a test agent. Be brief.\n');
 
 createAgentGroup({
   id: 'ag-chan',
@@ -99,7 +99,9 @@ const mockAdapter: ChannelAdapter = {
 
   async setTyping() {},
   async teardown() {},
-  isConnected() { return true; },
+  isConnected() {
+    return true;
+  },
 };
 
 // Register mock adapter
@@ -179,12 +181,16 @@ console.log(`✓ Container status: ${session.container_status}`);
 import { execSync } from 'child_process';
 const checkContainerLogs = () => {
   try {
-    const containers = execSync('docker ps -a --filter name=clawbridge-v2-test-channel --format "{{.Names}}"').toString().trim();
+    const containers = execSync('docker ps -a --filter name=clawbridge-v2-test-channel --format "{{.Names}}"')
+      .toString()
+      .trim();
     for (const name of containers.split('\n').filter(Boolean)) {
       console.log(`\nContainer logs (${name}):`);
       console.log(execSync(`docker logs ${name} 2>&1`).toString());
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 };
 
 const sessDbPath = sessionDbPath('ag-chan', session.id);
@@ -210,7 +216,9 @@ await new Promise<void>((resolve) => {
         console.log(`  messages_out rows: ${out.length}`);
         if (out.length > 0) console.log('  (messages exist but delivery failed)');
         db.close();
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       checkContainerLogs();
       cleanup();
       process.exit(1);

@@ -108,6 +108,7 @@ Talk to your assistant with the trigger word (default: `@Andy`):
 ```
 
 From a channel you own or administer, you can manage groups and tasks:
+
 ```
 @Andy list all scheduled tasks across groups
 @Andy pause the Monday briefing task
@@ -116,9 +117,10 @@ From a channel you own or administer, you can manage groups and tasks:
 
 ## Customizing your agent
 
-Edit `~/.clawbridge/groups/main/CLAUDE.local.md` to customize your agent's persona. This is the only file you need to touch — the system configuration is managed automatically.
+Edit `~/.clawbridge/groups/main/AGENTS.local.md` to customize your agent's persona. This is the only file you need to touch — the system configuration is managed automatically.
 
 The file is created with a default template on first run. Open it and change anything:
+
 - Agent name and personality
 - Background knowledge about you or your team
 - Behavioral preferences and response style
@@ -149,6 +151,7 @@ This keeps trunk as pure registry and infra, and every fork stays lean — users
 Skills we'd like to see:
 
 **Communication Channels**
+
 - `/add-signal` — Add Signal as a channel
 
 ## Requirements

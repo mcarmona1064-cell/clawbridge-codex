@@ -32,11 +32,12 @@ The wizard walks you through these steps:
 2. **Enable channels** — multi-select: Telegram, WhatsApp, Discord, Slack, Gmail
 3. **Telegram bot token** — paste the token from @BotFather (if Telegram selected)
 4. **Agent name** — what your assistant is called (default: `ClawBridge`)
-7. **Retell AI key** (optional) — for voice agents
-8. **Generate `.env`** — writes all config to `.env` in your project root
-9. **docker compose up -d** — starts ClawBridge in the background
+5. **Retell AI key** (optional) — for voice agents
+6. **Generate `.env`** — writes all config to `.env` in your project root
+7. **docker compose up -d** — starts ClawBridge in the background
 
 Success output:
+
 ```
 ✅ ClawBridge is running!
 ```
@@ -82,6 +83,7 @@ The wizard will:
 6. **Optionally deactivate OpenClaw** — adds a `.clawbridge-deactivated` marker, does not delete data
 
 Migrated data lands in `~/.clawbridge/`:
+
 ```
 ~/.clawbridge/
   groups/           # copied group folders
@@ -93,6 +95,7 @@ Migrated data lands in `~/.clawbridge/`:
 ```
 
 > **Note for OpenClaw users:** The message database schema may differ. After migration, verify with:
+>
 > ```bash
 > sqlite3 ~/.clawbridge/store/messages.db .tables
 > ```
@@ -109,6 +112,7 @@ npx clawbridge-agent setup
 Same flow as OpenClaw migration. NanoClaw uses a near-identical schema to ClawBridge, so message history migrates as a direct copy without transformation.
 
 Auto-detected paths:
+
 - `~/.nanoclaw/`, `~/nanoclaw/`
 
 ---
@@ -129,26 +133,27 @@ This restores from `~/.clawbridge/migration-backup/` and removes the migrated fi
 
 ## Environment Variables Reference
 
-| Variable | Required | Description |
-|---|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | ✅ | OAuth token from `claude setup-token` (Claude Pro/Max) |
-| `AGENT_NAME` | ✅ | Display name for your agent |
-| `TELEGRAM_BOT_TOKEN` | Channel | From @BotFather |
-| `DISCORD_BOT_TOKEN` | Channel | Discord bot token |
-| `SLACK_BOT_TOKEN` | Channel | Slack bot token |
-| `SLACK_SIGNING_SECRET` | Channel | Slack signing secret |
-| `WHATSAPP_PHONE_NUMBER_ID` | Channel | WhatsApp Cloud API |
-| `WHATSAPP_ACCESS_TOKEN` | Channel | WhatsApp Cloud API |
-| `GMAIL_CLIENT_ID` | Channel | Google OAuth client |
-| `GMAIL_CLIENT_SECRET` | Channel | Google OAuth secret |
-| `RETELL_API_KEY` | Optional | Voice agent integration |
+| Variable                                 | Required | Description                                                           |
+| ---------------------------------------- | -------- | --------------------------------------------------------------------- |
+| `OPENAI_API_KEY` or `~/.codex/auth.json` | ✅       | OpenAI API key, or Codex login created by `codex login --device-auth` |
+| `AGENT_NAME`                             | ✅       | Display name for your agent                                           |
+| `TELEGRAM_BOT_TOKEN`                     | Channel  | From @BotFather                                                       |
+| `DISCORD_BOT_TOKEN`                      | Channel  | Discord bot token                                                     |
+| `SLACK_BOT_TOKEN`                        | Channel  | Slack bot token                                                       |
+| `SLACK_SIGNING_SECRET`                   | Channel  | Slack signing secret                                                  |
+| `WHATSAPP_PHONE_NUMBER_ID`               | Channel  | WhatsApp Cloud API                                                    |
+| `WHATSAPP_ACCESS_TOKEN`                  | Channel  | WhatsApp Cloud API                                                    |
+| `GMAIL_CLIENT_ID`                        | Channel  | Google OAuth client                                                   |
+| `GMAIL_CLIENT_SECRET`                    | Channel  | Google OAuth secret                                                   |
+| `RETELL_API_KEY`                         | Optional | Voice agent integration                                               |
 
 ### Example `.env`
 
 ```dotenv
-# Claude Auth (client's Claude Pro/Max subscription)
-# Run `claude setup-token` to get this token
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat…
+# Codex Auth
+# Option A: run `codex login --device-auth` to create ~/.codex/auth.json
+# Option B: set an API key directly
+OPENAI_API_KEY=sk-…
 
 AGENT_NAME=ClawBridge
 TELEGRAM_BOT_TOKEN=123456789:ABCdef…
@@ -161,11 +166,7 @@ TELEGRAM_BOT_TOKEN=123456789:ABCdef…
 For CI or scripted installs, use the migration engine directly:
 
 ```typescript
-import {
-  detectInstall,
-  auditInstall,
-  runMigration,
-} from './src/setup/migrate.js';
+import { detectInstall, auditInstall, runMigration } from './src/setup/migrate.js';
 
 const source = await detectInstall();
 if (!source) throw new Error('No install found');

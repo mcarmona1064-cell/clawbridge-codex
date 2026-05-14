@@ -14,13 +14,13 @@ services:
       POSTGRES_USER: hindsight
       POSTGRES_PASSWORD: ${HINDSIGHT_DB_PASSWORD}
     ports:
-      - "5434:5432"
+      - '5434:5432'
     volumes:
       - hindsight-db-data:/var/lib/postgresql/data
     networks:
       - clawbridge
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hindsight -d hindsight"]
+      test: ['CMD-SHELL', 'pg_isready -U hindsight -d hindsight']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,8 +31,8 @@ services:
     container_name: hindsight-api
     restart: unless-stopped
     ports:
-      - "8888:8888"
-      - "9999:9999"
+      - '8888:8888'
+      - '9999:9999'
     depends_on:
       hindsight-db:
         condition: service_healthy
@@ -40,11 +40,10 @@ services:
       - clawbridge
     environment:
       HINDSIGHT_API_DATABASE_URL: postgresql://hindsight:${HINDSIGHT_DB_PASSWORD}@hindsight-db:5432/hindsight
-      # LLM — uses your Claude subscription OAuth token
+      # LLM — uses OpenAI by default; set HINDSIGHT_LLM_API_KEY to isolate billing/limits
       HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_LLM_PROVIDER:-openai}
       HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY:-${OPENAI_API_KEY}}
-      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
-      # Haiku for all LLM ops — keeps reflect off the main OAuth token rate limit
+      # Small model for retain/consolidation, larger model for reflection
       HINDSIGHT_API_RETAIN_LLM_MODEL: gpt-4o-mini
       HINDSIGHT_API_CONSOLIDATION_LLM_MODEL: gpt-4o-mini
       HINDSIGHT_API_REFLECT_LLM_MODEL: gpt-4o
@@ -54,7 +53,7 @@ services:
       # Auth
       HINDSIGHT_API_TENANT_API_KEY: ${HINDSIGHT_API_KEY}
       # MCP server (lets Claude Code/Desktop agents use memory as tools)
-      HINDSIGHT_API_MCP_ENABLED: "true"
+      HINDSIGHT_API_MCP_ENABLED: 'true'
       HINDSIGHT_API_LOG_LEVEL: info
 
 volumes:

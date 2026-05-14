@@ -31,7 +31,7 @@ runMigrations(centralDb);
 const groupsDir = path.resolve(process.cwd(), 'groups');
 const testGroupDir = path.join(groupsDir, 'test-agent-e2e');
 fs.mkdirSync(testGroupDir, { recursive: true });
-fs.writeFileSync(path.join(testGroupDir, 'CLAUDE.md'), '# Test Agent\nYou are a test agent. Be brief.\n');
+fs.writeFileSync(path.join(testGroupDir, 'AGENTS.local.md'), '# Test Agent\nYou are a test agent. Be brief.\n');
 
 createAgentGroup({
   id: 'ag-e2e',

@@ -140,39 +140,6 @@ function validateRequired(value: string | undefined): string | undefined {
   return !(value ?? '').trim() ? 'Required' : undefined;
 }
 
-function testOAuthToken(token: string): boolean {
-  try {
-    const result = spawnSync(
-      'node',
-      [
-        '--input-type=module',
-        '-e',
-        `
-import https from 'https';
-const opts = {
-  hostname: 'api.anthropic.com',
-  path: '/v1/models',
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer ${token.trim()}',
-    'anthropic-version': '2023-06-01',
-  },
-};
-const req = https.request(opts, (res) => {
-  process.exit(res.statusCode === 200 || res.statusCode === 404 ? 0 : 1);
-});
-req.on('error', () => process.exit(0));
-req.end();
-        `,
-      ],
-      { encoding: 'utf-8', timeout: 8000 },
-    );
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
-
 // ─── .env generation ─────────────────────────────────────────────────────────
 
 interface FreshConfig {

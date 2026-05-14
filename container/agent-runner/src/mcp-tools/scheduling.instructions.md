@@ -36,5 +36,5 @@ If a user wants a task to run more than a few times a day and a script can't be 
 
 - Explain that each time the task fires it uses API credits and risks rate limits
 - Suggest adjusting the task requirements in a way that will allow you to use a script
-- If the user needs an LLM to evaluate data, suggest using an API key with direct Anthropic API calls inside the script
+- If the user needs an LLM to evaluate data, suggest using an API key with direct OpenAI-compatible API calls inside the script
 - Help the user find the minimum viable frequency

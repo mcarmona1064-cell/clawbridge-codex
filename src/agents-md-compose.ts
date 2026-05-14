@@ -30,8 +30,7 @@ const MCP_TOOLS_HOST_SUBPATH = path.join('container', 'agent-runner', 'src', 'mc
 const SKILLS_HOST_SUBPATH = path.join('container', 'skills');
 const SHARED_BASE_HOST_SUBPATH = path.join('container', 'AGENTS.md');
 
-const COMPOSED_HEADER =
-  '<!-- Composed at spawn — do not edit. Edit AGENTS.local.md for per-group content. -->';
+const COMPOSED_HEADER = '<!-- Composed at spawn — do not edit. Edit AGENTS.local.md for per-group content. -->';
 
 interface Fragment {
   title: string;
@@ -96,9 +95,7 @@ export function composeGroupAgentsMd(group: AgentGroup): void {
 
   // 4. MCP server inline instructions from container.json.
   const config = readContainerConfig(group.folder);
-  for (const [name, mcp] of Object.entries(config.mcpServers).sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
+  for (const [name, mcp] of Object.entries(config.mcpServers).sort(([a], [b]) => a.localeCompare(b))) {
     if (mcp.instructions) {
       fragments.push({
         title: `MCP server: ${name}`,
