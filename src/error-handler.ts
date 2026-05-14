@@ -233,11 +233,10 @@ async function applyFix(error: Error, fileContext: string): Promise<void> {
       `Apply the minimal fix needed to resolve this error. Edit the file in place.`;
 
     log.info('[error-handler] Applying auto-fix via Codex CLI');
-    await execFileAsync(
-      'codex',
-      ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', prompt],
-      { timeout: 120_000, cwd: process.cwd() },
-    );
+    await execFileAsync('codex', ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', prompt], {
+      timeout: 120_000,
+      cwd: process.cwd(),
+    });
     log.info('[error-handler] Auto-fix applied, restarting...');
 
     // Restart: re-exec current process

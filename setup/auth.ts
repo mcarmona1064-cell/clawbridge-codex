@@ -1,15 +1,19 @@
 /**
- * Step: auth — Verify or write an Anthropic credential to .env.
+ * Step: auth — Verify or write an OpenAI/Codex credential.
  *
  * Modes:
- *   --check                   (default) Verify a credential exists in .env.
- *   --create --value <token>  Write a credential to .env. Errors if one
- *                             already exists unless --force is passed.
+ *   --check                   (default) Verify a credential is available.
+ *                             Considers ~/.codex/auth.json (subscription
+ *                             login) OR OPENAI_API_KEY in .env.
+ *   --create --value <token>  Write OPENAI_API_KEY=<value> to .env.
+ *                             Errors if a credential already exists unless
+ *                             --force is passed.
  *
  * Credentials are stored in .clawbridge/.env and injected at container spawn
  * time by container-runner.ts. The token value is never logged.
  */
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { log } from '../src/log.js';
@@ -58,7 +62,8 @@ function parseArgs(args: string[]): Args {
   return { mode, value, force };
 }
 
-const ENV_KEYS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'] as const;
+const ENV_KEY = 'OPENAI_API_KEY' as const;
+const CODEX_AUTH_PATH = path.join(os.homedir(), '.codex', 'auth.json');
 
 function readEnvFile(envFile: string): Record<string, string> {
   if (!fs.existsSync(envFile)) return {};
@@ -88,46 +93,43 @@ function writeEnvKey(envFile: string, key: string, value: string): void {
   fs.writeFileSync(envFile, content, { mode: 0o600 });
 }
 
-function detectCredentialKey(value: string): 'CLAUDE_CODE_OAUTH_TOKEN' | 'ANTHROPIC_API_KEY' {
-  return value.startsWith('sk-ant-oat') ? 'CLAUDE_CODE_OAUTH_TOKEN' : 'ANTHROPIC_API_KEY';
-}
-
 export async function run(args: string[]): Promise<void> {
   const { mode, value, force } = parseArgs(args);
 
   const envFile = path.join(process.cwd(), '.env');
   const env = readEnvFile(envFile);
-  const existingKey = ENV_KEYS.find((k) => env[k]);
+  const hasApiKey = !!env[ENV_KEY];
+  const hasCodexLogin = fs.existsSync(CODEX_AUTH_PATH);
+  const hasCredential = hasApiKey || hasCodexLogin;
 
   if (mode === 'check') {
     emitStatus('AUTH', {
-      SECRET_PRESENT: !!existingKey,
-      ANTHROPIC_OK: !!existingKey,
-      STATUS: existingKey ? 'success' : 'missing',
-      ...(existingKey ? { ENV_KEY: existingKey } : {}),
+      SECRET_PRESENT: hasCredential,
+      OPENAI_OK: hasCredential,
+      STATUS: hasCredential ? 'success' : 'missing',
+      ...(hasApiKey ? { ENV_KEY } : {}),
+      ...(hasCodexLogin && !hasApiKey ? { SOURCE: 'codex_login' } : {}),
       LOG: 'logs/setup.log',
     });
     return;
   }
 
   // mode === 'create'
-  if (existingKey && !force) {
+  if (hasCredential && !force) {
     emitStatus('AUTH', {
       SECRET_PRESENT: true,
       STATUS: 'skipped',
       REASON: 'credential_already_exists',
-      ENV_KEY: existingKey,
+      ...(hasApiKey ? { ENV_KEY } : { SOURCE: 'codex_login' }),
       HINT: 'Re-run with --force to replace.',
       LOG: 'logs/setup.log',
     });
     return;
   }
 
-  const credKey = detectCredentialKey(value!);
-
   try {
-    writeEnvKey(envFile, credKey, value!);
-    log.info('Wrote credential to .env', { key: credKey });
+    writeEnvKey(envFile, ENV_KEY, value!);
+    log.info('Wrote credential to .env', { key: ENV_KEY });
   } catch (err) {
     const e = err as { message?: string };
     log.error('Failed to write credential to .env', { err });
@@ -142,14 +144,14 @@ export async function run(args: string[]): Promise<void> {
 
   // Re-verify
   const updated = readEnvFile(envFile);
-  const ok = ENV_KEYS.some((k) => updated[k]);
+  const ok = !!updated[ENV_KEY];
 
   emitStatus('AUTH', {
     SECRET_PRESENT: ok,
-    ANTHROPIC_OK: ok,
+    OPENAI_OK: ok,
     CREATED: true,
     STATUS: ok ? 'success' : 'failed',
-    ENV_KEY: credKey,
+    ENV_KEY,
     LOG: 'logs/setup.log',
   });
 }

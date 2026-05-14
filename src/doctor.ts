@@ -457,7 +457,7 @@ function checkConfigFile(env: Map<string, string>): void {
   }
   pass('Config file', `~/.clawbridge/.env`);
 
-  const requiredKeys = ['CLAUDE_CODE_OAUTH_TOKEN', 'ASSISTANT_NAME'];
+  const requiredKeys = ['OPENAI_API_KEY', 'ASSISTANT_NAME'];
   for (const key of requiredKeys) {
     if (env.get(key)) {
       pass(key, dim('set'));

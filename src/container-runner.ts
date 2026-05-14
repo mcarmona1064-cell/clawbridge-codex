@@ -504,15 +504,12 @@ async function buildContainerArgs(
   }
 
   // Inject credentials directly from ~/.clawbridge/.env.
-  const creds = readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
-  if (creds['CLAUDE_CODE_OAUTH_TOKEN']) {
-    args.push('-e', `CLAUDE_CODE_OAUTH_TOKEN=${creds['CLAUDE_CODE_OAUTH_TOKEN']}`);
-    log.info('Injecting CLAUDE_CODE_OAUTH_TOKEN from .env', { containerName });
-  } else if (creds['ANTHROPIC_API_KEY']) {
-    args.push('-e', `ANTHROPIC_API_KEY=${creds['ANTHROPIC_API_KEY']}`);
-    log.info('Injecting ANTHROPIC_API_KEY from .env', { containerName });
+  const creds = readEnvFile(['OPENAI_API_KEY']);
+  if (creds['OPENAI_API_KEY']) {
+    args.push('-e', `OPENAI_API_KEY=${creds['OPENAI_API_KEY']}`);
+    log.info('Injecting OPENAI_API_KEY from .env', { containerName });
   } else {
-    log.warn('No credentials found in ~/.clawbridge/.env — container will have no credentials', { containerName });
+    log.warn('No OPENAI_API_KEY found in ~/.clawbridge/.env — container will rely on ~/.codex/auth.json (mounted from host)', { containerName });
   }
 
   // Per-group env vars from container.json — injected after credential vars.
