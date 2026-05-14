@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.0",
+    "openai": "^4.77.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.22.0"
   },

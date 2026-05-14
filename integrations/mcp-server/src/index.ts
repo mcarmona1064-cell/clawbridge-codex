@@ -6,25 +6,25 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 const integrationServerUrl = process.env.INTEGRATION_SERVER_URL ?? "http://localhost:3003";
 const integrationSecretKey = process.env.INTEGRATION_SECRET_KEY ?? "";
 
 // ---------------------------------------------------------------------------
-// Portal DB helper — fetch client Anthropic API key
+// Portal DB helper — fetch client OpenAI API key
 // ---------------------------------------------------------------------------
 
-async function getClientAnthropicKey(clientId: string): Promise<string> {
+async function getClientOpenAIKey(clientId: string): Promise<string> {
   const portalApiUrl = process.env.PORTAL_API_URL ?? "http://localhost:3010";
   const portalAdminToken = process.env.PORTAL_ADMIN_TOKEN ?? "";
-  const res = await fetch(`${portalApiUrl}/api/clients/${clientId}/anthropic-key`, {
+  const res = await fetch(`${portalApiUrl}/api/clients/${clientId}/openai-key`, {
     headers: { Authorization: `Bearer ${portalAdminToken}` },
   });
   if (!res.ok) {
-    const envKey = process.env.ANTHROPIC_API_KEY;
+    const envKey = process.env.OPENAI_API_KEY;
     if (envKey) return envKey;
-    throw new Error(`No Anthropic API key found for client "${clientId}". Store one via onboarding or set ANTHROPIC_API_KEY.`);
+    throw new Error(`No OpenAI API key found for client "${clientId}". Store one via onboarding or set OPENAI_API_KEY.`);
   }
   const data = await res.json() as { api_key: string };
   return data.api_key;
@@ -619,7 +619,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
-      // ---- Claude Vision ------------------------------------------------
+      // ---- OpenAI Vision -----------------------------------------------
 
       case "analyze_image": {
         const { client_id, image_url, question } = args as {
@@ -628,21 +628,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           question?: string;
         };
         try {
-          const apiKey = await getClientAnthropicKey(client_id);
-          const anthropic = new Anthropic({ apiKey });
-          const response = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+          const apiKey = await getClientOpenAIKey(client_id);
+          const openai = new OpenAI({ apiKey });
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
             max_tokens: 1024,
             messages: [{
               role: "user",
               content: [
-                { type: "image", source: { type: "url", url: image_url } },
+                { type: "image_url", image_url: { url: image_url } },
                 { type: "text", text: question ?? "Describe this image in detail." },
               ],
             }],
           });
-          const text = response.content.find((b: {type: string}) => b.type === "text");
-          return { content: [{ type: "text", text: text && "text" in text ? text.text : "No description returned." }] };
+          const text = response.choices[0]?.message?.content;
+          return { content: [{ type: "text", text: text ?? "No description returned." }] };
         } catch (e) {
           return { content: [{ type: "text", text: `Error analyzing image: ${wrapError(e)}` }], isError: true };
         }
@@ -651,21 +651,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "extract_text_from_image": {
         const { client_id, image_url } = args as { client_id: string; image_url: string };
         try {
-          const apiKey = await getClientAnthropicKey(client_id);
-          const anthropic = new Anthropic({ apiKey });
-          const response = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+          const apiKey = await getClientOpenAIKey(client_id);
+          const openai = new OpenAI({ apiKey });
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
             max_tokens: 2048,
             messages: [{
               role: "user",
               content: [
-                { type: "image", source: { type: "url", url: image_url } },
+                { type: "image_url", image_url: { url: image_url } },
                 { type: "text", text: "Extract all text visible in this image. Return only the extracted text, preserving layout where possible." },
               ],
             }],
           });
-          const text = response.content.find((b: {type: string}) => b.type === "text");
-          return { content: [{ type: "text", text: text && "text" in text ? text.text : "No text found." }] };
+          const text = response.choices[0]?.message?.content;
+          return { content: [{ type: "text", text: text ?? "No text found." }] };
         } catch (e) {
           return { content: [{ type: "text", text: `Error extracting text: ${wrapError(e)}` }], isError: true };
         }
@@ -678,22 +678,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           doc_type?: string;
         };
         try {
-          const apiKey = await getClientAnthropicKey(client_id);
-          const anthropic = new Anthropic({ apiKey });
+          const apiKey = await getClientOpenAIKey(client_id);
+          const openai = new OpenAI({ apiKey });
           const docHint = doc_type ? ` This is a ${doc_type}.` : "";
-          const response = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
             max_tokens: 2048,
             messages: [{
               role: "user",
               content: [
-                { type: "image", source: { type: "url", url: image_url } },
+                { type: "image_url", image_url: { url: image_url } },
                 { type: "text", text: `Analyze this document image.${docHint} Extract all key fields and return a structured JSON object with the document type, key-value pairs for all important fields, line items if applicable, totals, dates, and parties involved. Return only valid JSON.` },
               ],
             }],
           });
-          const text = response.content.find((b: {type: string}) => b.type === "text");
-          return { content: [{ type: "text", text: text && "text" in text ? text.text : "{}" }] };
+          const text = response.choices[0]?.message?.content;
+          return { content: [{ type: "text", text: text ?? "{}" }] };
         } catch (e) {
           return { content: [{ type: "text", text: `Error analyzing document: ${wrapError(e)}` }], isError: true };
         }
@@ -702,21 +702,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "describe_chart": {
         const { client_id, image_url } = args as { client_id: string; image_url: string };
         try {
-          const apiKey = await getClientAnthropicKey(client_id);
-          const anthropic = new Anthropic({ apiKey });
-          const response = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+          const apiKey = await getClientOpenAIKey(client_id);
+          const openai = new OpenAI({ apiKey });
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
             max_tokens: 1024,
             messages: [{
               role: "user",
               content: [
-                { type: "image", source: { type: "url", url: image_url } },
+                { type: "image_url", image_url: { url: image_url } },
                 { type: "text", text: "Analyze this chart or graph. Describe: (1) the type of chart, (2) what data is being visualized, (3) the key trends or insights, (4) any notable data points or anomalies, and (5) the main takeaway." },
               ],
             }],
           });
-          const text = response.content.find((b: {type: string}) => b.type === "text");
-          return { content: [{ type: "text", text: text && "text" in text ? text.text : "No insights returned." }] };
+          const text = response.choices[0]?.message?.content;
+          return { content: [{ type: "text", text: text ?? "No insights returned." }] };
         } catch (e) {
           return { content: [{ type: "text", text: `Error describing chart: ${wrapError(e)}` }], isError: true };
         }
