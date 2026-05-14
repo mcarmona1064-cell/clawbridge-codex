@@ -5,7 +5,7 @@
 #   source "$PROJECT_ROOT/setup/lib/install-slug.sh"
 #   label=$(launchd_label)        # com.clawbridge-v2-<slug>
 #   unit=$(systemd_unit)          # clawbridge-v2-<slug>
-#   image=$(container_image_base) # clawbridge-agent-v2-<slug>
+#   image=$(container_image_base) # clawbridge-codex-v2-<slug>
 #
 # Slug is sha1(PROJECT_ROOT)[:8] — must match the TS helper exactly so both
 # halves of setup name things consistently.
@@ -33,5 +33,5 @@ systemd_unit() {
 }
 
 container_image_base() {
-  printf 'clawbridge-agent-v2-%s' "$(_clawbridge_install_slug)"
+  printf 'clawbridge-codex-v2-%s' "$(_clawbridge_install_slug)"
 }

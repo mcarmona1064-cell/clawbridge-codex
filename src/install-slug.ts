@@ -1,7 +1,7 @@
 /**
  * Per-checkout install identifiers. Lets two ClawBridge installs coexist on
  * one host without clobbering each other's service registration or the
- * shared `clawbridge-agent:latest` docker image tag.
+ * shared `clawbridge-codex:latest` docker image tag.
  *
  * Slug is sha1(projectRoot)[:8] — deterministic per checkout path, stable
  * across re-runs, unique enough across installs.
@@ -22,9 +22,9 @@ export function getSystemdUnit(projectRoot?: string): string {
   return `clawbridge-v2-${getInstallSlug(projectRoot)}`;
 }
 
-/** Docker image base (no tag). e.g. `clawbridge-agent-v2-ab12cd34`. */
+/** Docker image base (no tag). e.g. `clawbridge-codex-v2-ab12cd34`. */
 export function getContainerImageBase(projectRoot?: string): string {
-  return `clawbridge-agent-v2-${getInstallSlug(projectRoot)}`;
+  return `clawbridge-codex-v2-${getInstallSlug(projectRoot)}`;
 }
 
 /** Default full container image reference with `:latest` tag. */

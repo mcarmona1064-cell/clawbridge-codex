@@ -207,7 +207,7 @@ function checkContainerImage(autoFix: boolean): void {
       }
     }
 
-    const imageTag = slug ? `clawbridge-agent-v2-${slug}:latest` : getDefaultContainerImage();
+    const imageTag = slug ? `clawbridge-codex-v2-${slug}:latest` : getDefaultContainerImage();
 
     const r = spawnSync('docker', ['image', 'inspect', imageTag], {
       encoding: 'utf-8',

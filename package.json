@@ -1,16 +1,16 @@
 {
-  "name": "clawbridge-agent",
+  "name": "clawbridge-codex",
   "version": "2.9.2",
-  "description": "AI agent platform for ClawBridge Agency. Self-hosted, secure, customizable.",
+  "description": "AI agent platform for ClawBridge Agency, powered by OpenAI Codex. Self-hosted, secure, customizable.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "main": "dist/index.js",
   "author": "ClawBridge",
   "repository": {
     "type": "git",
-    "url": "https://github.com/other2368-byte/clawbridge-agent.git"
+    "url": "https://github.com/mcarmona1064-cell/clawbridge-codex.git"
   },
-  "homepage": "https://github.com/other2368-byte/clawbridge-agent",
+  "homepage": "https://github.com/mcarmona1064-cell/clawbridge-codex",
   "files": [
     "dist",
     "container",
