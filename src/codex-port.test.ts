@@ -19,21 +19,26 @@ function walk(dir: string, files: string[] = []): string[] {
 }
 
 describe('Codex port regression checks', () => {
-  it('keeps runtime LLM calls on OpenAI-compatible endpoints', () => {
-    const runtimeFiles = [
+  it('keeps runtime LLM calls routed through configured runtime providers or Codex CLI OAuth', () => {
+    const codexSubscriptionFiles = [
+      'src/error-handler.ts',
       'src/memory/extractor.ts',
       'src/memory/reflection-agent.ts',
       'src/memory/cross-client.ts',
-      'src/error-handler.ts',
     ];
 
-    for (const rel of runtimeFiles) {
+    for (const rel of codexSubscriptionFiles) {
       const content = read(rel);
-      expect(content, rel).toContain('api.openai.com/v1/chat/completions');
+      expect(content, rel).toContain('runCodexPrompt');
       expect(content, rel).not.toMatch(
-        /api\.anthropic\.com|claude-(?:opus|haiku|sonnet)|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN/,
+        /OPENAI_API_KEY|api\.openai\.com\/v1\/chat\/completions|Authorization:\s*`Bearer/,
       );
     }
+
+    const codexCli = read('src/codex-cli.ts');
+    expect(codexCli).toMatch(/execFile\(\s*'codex'/);
+    expect(codexCli).toContain("'--sandbox', sandbox");
+    expect(codexCli).toContain("sandbox = 'read-only'");
   });
 
   it('setup auth requires Codex subscription OAuth and does not accept/create API-key runtime auth', () => {

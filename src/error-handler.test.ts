@@ -7,6 +7,10 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+const { execFileMock } = vi.hoisted(() => ({
+  execFileMock: vi.fn(),
+}));
+
 // We need to mock the env module before importing error-handler
 vi.mock('./env.js', () => ({
   readEnvFile: () => ({}),
@@ -22,6 +26,14 @@ vi.mock('./log.js', () => ({
   },
 }));
 
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: execFileMock,
+  };
+});
+
 const TEST_LOG_DIR = path.join(os.tmpdir(), `clawbridge-test-${process.pid}`);
 const TEST_LOG_FILE = path.join(TEST_LOG_DIR, 'errors.log');
 
@@ -35,11 +47,54 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env.HOME = originalHome;
+  delete process.env.OPENAI_API_KEY;
+  execFileMock.mockReset();
+  vi.restoreAllMocks();
   try {
     fs.rmSync(TEST_LOG_DIR, { recursive: true });
   } catch {
     /* ignore */
   }
+});
+
+describe('Codex subscription diagnosis', () => {
+  it('gets runtime diagnosis through Codex CLI OAuth instead of OpenAI API key billing', async () => {
+    process.env.OPENAI_API_KEY = 'should-not-be-used';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, 'Use the Codex subscription diagnosis.', '');
+    });
+
+    const { getDiagnosis } = await import('./error-handler.js');
+    const diagnosis = await getDiagnosis(new Error('boom'), '1 >>> throw new Error("boom")');
+
+    expect(diagnosis).toContain('Codex subscription diagnosis');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(execFileMock).toHaveBeenCalledTimes(1);
+    const [cmd, args, opts] = execFileMock.mock.calls[0];
+    expect(cmd).toBe('codex');
+    expect(args).toEqual(expect.arrayContaining(['exec', '--sandbox', 'read-only', '--skip-git-repo-check']));
+    expect(args.join(' ')).not.toContain('OPENAI_API_KEY');
+    expect(opts).toMatchObject({ cwd: process.cwd() });
+  });
+
+  it('reports Codex OAuth login requirement when CLI diagnosis cannot run', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(new Error('not logged in'), '', 'Please run codex login --device-auth');
+    });
+
+    const { getDiagnosis } = await import('./error-handler.js');
+    const diagnosis = await getDiagnosis(new Error('boom'), '(no source context)');
+
+    expect(diagnosis).toContain('Codex CLI diagnosis unavailable');
+    expect(diagnosis).toContain('codex login --device-auth');
+    expect(consoleError).toHaveBeenCalledWith(
+      '[error-handler] Failed to call Codex CLI for diagnosis:',
+      expect.any(Error),
+    );
+  });
 });
 
 describe('initErrorHandler', () => {

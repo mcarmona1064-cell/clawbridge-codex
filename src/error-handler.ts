@@ -3,8 +3,8 @@
  *
  * Call initErrorHandler() once at startup. It registers uncaughtException and
  * unhandledRejection handlers, logs errors to ~/.clawbridge/errors.log,
- * sends Telegram alerts, requests OpenAI diagnosis, and optionally watches for
- * a "fix it" reply.
+ * sends Telegram alerts, requests Codex CLI diagnosis through the local OAuth
+ * subscription session, and optionally watches for a "fix it" reply.
  */
 
 import fs from 'fs';
@@ -12,16 +12,11 @@ import path from 'path';
 import os from 'os';
 import { readEnvFile } from './env.js';
 import { log } from './log.js';
+import { runCodexPrompt } from './codex-cli.js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const envCfg = readEnvFile([
-  'TELEGRAM_BOT_TOKEN',
-  'TELEGRAM_CHAT_ID',
-  'TELEGRAM_ALERT_CHAT_ID',
-  'OPENAI_API_KEY',
-  'ERROR_AUTO_FIX',
-]);
+const envCfg = readEnvFile(['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'TELEGRAM_ALERT_CHAT_ID', 'ERROR_AUTO_FIX']);
 
 function cfg(key: string): string {
   return process.env[key] || envCfg[key] || '';
@@ -177,43 +172,24 @@ async function pollForFixIt(afterMessageId: number): Promise<boolean> {
   return false;
 }
 
-// ── OpenAI diagnosis ─────────────────────────────────────────────────────────
+// ── Codex CLI diagnosis ──────────────────────────────────────────────────────
 
-async function getDiagnosis(error: Error, fileContext: string): Promise<string> {
-  const apiKey = cfg('OPENAI_API_KEY');
-  if (!apiKey) return '(no OPENAI_API_KEY configured)';
-
+export async function getDiagnosis(error: Error, fileContext: string): Promise<string> {
   const prompt =
     `Error: ${error.message}\n` +
     `Stack: ${error.stack || '(no stack)'}\n\n` +
     `File content:\n${fileContext}\n\n` +
-    `Diagnose this error in 2-3 sentences. Suggest the specific fix.`;
+    `Diagnose this runtime error in 2-3 sentences. Suggest the specific minimal fix. ` +
+    `Use the local Codex CLI OAuth subscription session; do not require API-key billing.`;
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message: string };
-    };
-
-    if (data.error) return `(OpenAI API error: ${data.error.message})`;
-    const text = data.choices?.[0]?.message?.content;
-    return text || '(empty diagnosis)';
+    const text = await runCodexPrompt(prompt, { sandbox: 'read-only', timeout: 120_000 });
+    return text || '(empty Codex CLI diagnosis)';
   } catch (metaErr) {
-    console.error('[error-handler] Failed to call OpenAI API:', metaErr);
-    return '(diagnosis unavailable)';
+    const err = metaErr as Error & { stderr?: string };
+    const detail = (err.stderr || err.message || '').trim();
+    console.error('[error-handler] Failed to call Codex CLI for diagnosis:', metaErr);
+    return `Codex CLI diagnosis unavailable${detail ? `: ${detail}` : ''}. Run: codex login --device-auth`;
   }
 }
 
@@ -284,7 +260,7 @@ async function handleError(error: Error, context?: string): Promise<void> {
   // 4. Get file context
   const fileContext = fileInfo ? readFileContext(fileInfo.file, fileInfo.line) : '(no source context)';
 
-  // 5. Call OpenAI for diagnosis
+  // 5. Ask Codex CLI for diagnosis through its local OAuth/subscription session
   const diagnosis = await getDiagnosis(error, fileContext);
 
   // 6. Send diagnosis follow-up

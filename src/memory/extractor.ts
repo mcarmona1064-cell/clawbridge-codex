@@ -1,16 +1,8 @@
-import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
+import { runCodexPrompt } from '../codex-cli.js';
 import { deleteMemory, resolveConflicts, upsertMemory } from './db.js';
 import { SEGMENT_DEFAULTS } from './types.js';
 import type { Memory, MemorySegment } from './types.js';
-
-// ── Auth ─────────────────────────────────────────────────────────────────────
-
-const envCfg = readEnvFile(['OPENAI_API_KEY']);
-
-function getApiKey(): string | null {
-  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null;
-}
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -44,45 +36,15 @@ interface RawMemory {
 // ── Extractor ─────────────────────────────────────────────────────────────────
 
 export async function extractMemories(text: string, clientId: string): Promise<Memory[]> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    log.warn('[memory] No OPENAI_API_KEY — skipping extraction');
-    return [];
-  }
-
   let raw: RawMemory[];
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 1024,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: text },
-        ],
-      }),
-    });
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message: string };
-    };
-
-    if (data.error) {
-      log.error('[memory] OpenAI API error during extraction', { error: data.error.message });
-      return [];
-    }
-
-    const textBlock = data.choices?.[0]?.message?.content;
+    const textBlock = await runCodexPrompt(
+      `${SYSTEM_PROMPT}\n\nConversation or summary:\n${text}\n\nReturn JSON only.`,
+      { sandbox: 'read-only', timeout: 120_000 },
+    );
     if (!textBlock) return [];
 
-    // Strip markdown code fences if present (json_object mode shouldn't add them, but be tolerant)
+    // Strip markdown code fences if present.
     const json = textBlock
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/i, '')

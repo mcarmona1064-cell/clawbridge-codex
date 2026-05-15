@@ -2,17 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
+import { runCodexPrompt } from '../codex-cli.js';
 import { getMemories } from './db.js';
-
-// ── Auth ─────────────────────────────────────────────────────────────────────
-
-const envCfg = readEnvFile(['OPENAI_API_KEY']);
-
-function getApiKey(): string | null {
-  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null;
-}
 
 // ── Keyword overlap helper ────────────────────────────────────────────────────
 
@@ -90,20 +82,15 @@ function findCommonThemes(allMemoryContents: string[], minClients: number): Them
 // ── Report generation ─────────────────────────────────────────────────────────
 
 /**
- * Analyzes memories across all provided client IDs, finds common patterns,
- * calls OpenAI to generate an agency-level insight report, and saves it.
+ * analyzes memories across all provided client IDs, finds common patterns,
+ * calls Codex CLI through the local OAuth/subscription session to generate an
+ * agency-level insight report, and saves it.
  *
  * Returns the report as a markdown string.
  */
 export async function generateCrossClientReport(clientIds: string[]): Promise<string> {
   if (clientIds.length < 2) {
     log.debug('[memory:cross-client] Not enough clients for pattern analysis', { count: clientIds.length });
-    return '';
-  }
-
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    log.warn('[memory:cross-client] No OPENAI_API_KEY — skipping');
     return '';
   }
 
@@ -149,33 +136,10 @@ Format as markdown with bullet points. Max 300 words. Be specific and actionable
 
   let report: string;
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 600,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
+    report = await runCodexPrompt(`${systemPrompt}\n\n${userPrompt}\n\nReturn markdown only.`, {
+      sandbox: 'read-only',
+      timeout: 120_000,
     });
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message: string };
-    };
-
-    if (data.error) {
-      log.error('[memory:cross-client] OpenAI API error', { error: data.error.message });
-      return '';
-    }
-
-    report = data.choices?.[0]?.message?.content ?? '';
   } catch (err) {
     log.error('[memory:cross-client] Report generation failed', { err });
     return '';

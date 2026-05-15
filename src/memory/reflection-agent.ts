@@ -1,17 +1,9 @@
-import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
+import { runCodexPrompt } from '../codex-cli.js';
 import { upsertMemory } from './db.js';
 import { SEGMENT_DEFAULTS } from './types.js';
 import type { Memory } from './types.js';
 import { MemoryManager } from './manager.js';
-
-// ── Auth ─────────────────────────────────────────────────────────────────────
-
-const envCfg = readEnvFile(['OPENAI_API_KEY']);
-
-function getApiKey(): string | null {
-  return process.env['OPENAI_API_KEY'] || envCfg['OPENAI_API_KEY'] || null;
-}
 
 // ── Minimum memories needed to draw patterns ──────────────────────────────────
 
@@ -25,19 +17,13 @@ interface RawInsight {
 }
 
 /**
- * Reads all memories for a client, sends them to OpenAI, and stores
- * behavioral pattern insights back as 'behavioral' segment memories.
+ * Reads all memories for a client, sends them to Codex CLI using the local
+ * OAuth/subscription session, and stores behavioral pattern insights back as 'behavioral' segment memories.
  *
  * Returns the number of behavioral memories written.
  * Skips silently when fewer than MIN_MEMORIES_FOR_REFLECTION exist.
  */
 export async function runReflectionAgent(clientId: string): Promise<number> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    log.warn('[memory:reflection] No OPENAI_API_KEY — skipping');
-    return 0;
-  }
-
   const manager = new MemoryManager(clientId);
   const dump = await manager.dump();
 
@@ -65,34 +51,10 @@ Rules:
 
   let insights: RawInsight[];
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 512,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: dump },
-        ],
-      }),
+    const textBlock = await runCodexPrompt(`${systemPrompt}\n\nMemories:\n${dump}\n\nReturn JSON only.`, {
+      sandbox: 'read-only',
+      timeout: 120_000,
     });
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message: string };
-    };
-
-    if (data.error) {
-      log.error('[memory:reflection] OpenAI API error', { error: data.error.message });
-      return 0;
-    }
-
-    const textBlock = data.choices?.[0]?.message?.content;
     if (!textBlock) return 0;
 
     const json = textBlock
