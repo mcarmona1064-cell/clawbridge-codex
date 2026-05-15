@@ -274,7 +274,7 @@ function checkLaunchd(autoFix: boolean): void {
       .readdirSync(launchAgentsDir)
       .filter((f) => f.startsWith('com.clawbridge-v2-') && f.endsWith('.plist'));
     if (plists.length === 0) {
-      fail('LaunchD service', 'no com.clawbridge-v2-* plist found', 'run: clawbridge setup');
+      fail('LaunchD service', 'no com.clawbridge-v2-* plist found', 'run: clawbridge-codex');
       return;
     }
     const label = plists[0].replace(/\.plist$/, '');
@@ -372,7 +372,7 @@ async function checkSystemd(autoFix: boolean): Promise<void> {
       return fail(
         'Systemd service',
         'No ClawBridge systemd unit found',
-        'run: clawbridge setup to register the service',
+        'run: clawbridge-codex to register the service',
       );
     }
 
@@ -428,7 +428,11 @@ function checkDockerComposeSymlink(autoFix: boolean): void {
       const target = fs.readlinkSync(destPath);
       pass('docker-compose', `symlink → ${dim(target)}`);
     } else {
-      fail('docker-compose', 'exists but is NOT a symlink — compose drift risk', 'run: clawbridge upgrade to re-link');
+      fail(
+        'docker-compose',
+        'exists but is NOT a symlink — compose drift risk',
+        'run: clawbridge-codex upgrade to re-link',
+      );
     }
   } catch {
     if (autoFix) {
@@ -440,10 +444,10 @@ function checkDockerComposeSymlink(autoFix: boolean): void {
         fs.symlinkSync(composeSrc, composeDest);
         pass('docker-compose.yml symlink', 'created');
       } catch (e) {
-        fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge setup');
+        fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge-codex');
       }
     } else {
-      fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge setup');
+      fail('docker-compose', `${dim(destPath.replace(os.homedir(), '~'))} not found`, 'run: clawbridge-codex');
     }
   }
 }
@@ -452,12 +456,12 @@ function checkConfigFile(env: Map<string, string>): void {
   const envPath = path.join(os.homedir(), '.clawbridge', '.env');
   const exists = fs.existsSync(envPath);
   if (!exists) {
-    fail('Config file', `~/.clawbridge/.env not found`, 'run: clawbridge setup');
+    fail('Config file', `~/.clawbridge/.env not found`, 'run: clawbridge-codex');
     return;
   }
   pass('Config file', `~/.clawbridge/.env`);
 
-  const requiredKeys = ['OPENAI_API_KEY', 'ASSISTANT_NAME'];
+  const requiredKeys = ['ASSISTANT_NAME'];
   for (const key of requiredKeys) {
     if (env.get(key)) {
       pass(key, dim('set'));
@@ -744,7 +748,7 @@ async function checkChannels(env: Map<string, string>, autoFix: boolean): Promis
   ].some((k) => env.get(k));
 
   if (!hasAnyChannel) {
-    console.log(`  ${dim('No channels configured — run: clawbridge setup')}`);
+    console.log(`  ${dim('No channels configured — run: clawbridge-codex')}`);
     return;
   }
 
@@ -760,17 +764,16 @@ function checkProvider(env: Map<string, string>): void {
   // Report current provider
   pass('AGENT_PROVIDER', AGENT_PROVIDER);
 
-  // Codex is authenticated via `codex login` (writes ~/.codex/auth.json).
-  // Accept either the subscription auth file or an OPENAI_API_KEY env var.
+  // Codex is authenticated via `codex login --device-auth` (writes ~/.codex/auth.json).
+  // Subscription OAuth is required for the agent runtime; API keys are not
+  // treated as a passing provider check because the Codex subprocess strips
+  // OPENAI_API_KEY/CODEX_API_KEY to avoid accidental API billing.
   const codexAuthPath = path.join(os.homedir(), '.codex', 'auth.json');
   const hasCodexAuth = fs.existsSync(codexAuthPath);
-  const openaiKey = env.get('OPENAI_API_KEY') ?? process.env.OPENAI_API_KEY;
   if (hasCodexAuth) {
     pass('Codex auth', dim('~/.codex/auth.json present'));
-  } else if (openaiKey) {
-    pass('Codex auth', dim('OPENAI_API_KEY set'));
   } else {
-    fail('Codex auth', 'no ~/.codex/auth.json and no OPENAI_API_KEY', 'run: codex login');
+    fail('Codex auth', 'no ~/.codex/auth.json', 'run: codex login --device-auth');
   }
 
   // Auto-fix Hindsight LLM vars if HINDSIGHT_URL is set

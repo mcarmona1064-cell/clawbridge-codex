@@ -18,7 +18,7 @@
  *     global/           ← shared global memory (RO)
  *   /app/src/           ← shared agent-runner source (RO)
  *   /app/skills/        ← shared skills (RO)
- *   /home/node/.claude/ ← Claude SDK state + skill symlinks (RW)
+ *   /home/node/.codex/  ← Codex OAuth/session state + skill symlinks (RW)
  */
 
 import fs from 'fs';
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
 
   // Runtime-generated system-prompt addendum: agent identity (name) plus
   // the live destinations map. Everything else (capabilities, per-module
-  // instructions, per-channel formatting) is loaded by Claude Code from
+  // instructions, per-channel formatting) is loaded by Codex from
   // /workspace/agent/AGENTS.md — the composed entry inlines the shared
   // base and each enabled module's fragment. Per-group memory lives in
   // /workspace/agent/AGENTS.local.md (inlined at compose time).

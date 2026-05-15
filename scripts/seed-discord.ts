@@ -28,7 +28,7 @@ if (!getAgentGroup(AGENT_GROUP_ID)) {
     id: AGENT_GROUP_ID,
     name: 'Main',
     folder: 'main',
-    agent_provider: 'claude',
+    agent_provider: 'codex',
     created_at: new Date().toISOString(),
   });
   console.log('Created agent group:', AGENT_GROUP_ID);

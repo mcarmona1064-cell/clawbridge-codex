@@ -37,7 +37,7 @@ const DISCORD_API = 'https://discord.com/api/v10';
 
 // Send Messages (0x800) + Add Reactions (0x40) + Attach Files (0x8000)
 //   + Read Message History (0x10000) = 100416.
-// Matches the permissions set documented in .claude/skills/add-discord/SKILL.md.
+// Matches the permissions set documented in container/skills/add-discord/SKILL.md.
 const INVITE_PERMISSIONS = '100416';
 
 interface AppInfo {

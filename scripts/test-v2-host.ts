@@ -3,7 +3,7 @@
  *
  * 1. Init central DB with agent group + messaging group + wiring
  * 2. Route an inbound message (creates session, writes inbound.db, spawns container)
- * 3. Container runs v2 agent-runner, polls inbound.db, queries Claude, writes outbound.db
+ * 3. Container runs v2 agent-runner, polls inbound.db, queries Codex, writes outbound.db
  * 4. Poll outbound.db for messages_out response
  *
  * Usage: pnpm exec tsx scripts/test-v2-host.ts
@@ -37,7 +37,7 @@ createAgentGroup({
   id: 'ag-e2e',
   name: 'E2E Test Agent',
   folder: 'test-agent-e2e',
-  agent_provider: 'claude',
+  agent_provider: 'codex',
   created_at: new Date().toISOString(),
 });
 
@@ -102,7 +102,7 @@ console.log(`✓ Inbound DB: ${inDbPath}`);
 console.log(`✓ Outbound DB: ${outDbPath}`);
 
 // --- Step 3: Wait for response ---
-console.log('\n=== Step 3: Waiting for Claude response... ===');
+console.log('\n=== Step 3: Waiting for Codex response... ===');
 
 const startTime = Date.now();
 const TIMEOUT_MS = 120_000;

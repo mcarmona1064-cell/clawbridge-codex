@@ -23,7 +23,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# Keep in sync with .claude/skills/add-signal/SKILL.md.
+# Keep in sync with container/skills/add-signal/SKILL.md.
 QRCODE_VERSION="qrcode@1.5.4"
 QRCODE_TYPES_VERSION="@types/qrcode@1.5.6"
 

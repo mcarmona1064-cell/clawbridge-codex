@@ -9,7 +9,7 @@ Add apt and/or npm packages to your container image. On approval, the config is 
 ```
 install_packages({
   apt: ["ripgrep", "jq"],              // names only, no version specs or flags
-  npm: ["@anthropic-ai/sdk"],          // global install
+  npm: ["openai"],                    // global install
   reason: "need rg for fast code search"
 })
 ```

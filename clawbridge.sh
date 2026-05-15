@@ -17,16 +17,16 @@
 #
 # Config via env — passed through unchanged:
 #   CLAWBRIDGE_SKIP  comma-separated setup:auto step names to skip
-#   SECRET_NAME    OneCLI secret name (default: Anthropic)
-#   HOST_PATTERN   OneCLI host pattern (default: api.anthropic.com)
+#   SECRET_NAME    OneCLI secret name (default: OpenAI)
+#   HOST_PATTERN   OneCLI host pattern (default: api.openai.com)
 
 set -euo pipefail
 
 # ─── bootstrap: if running via bash <(curl ...) re-exec from a cloned copy ───
 if [[ "${BASH_SOURCE[0]}" == /dev/fd/* ]] || [[ ! -f "${BASH_SOURCE[0]%/*}/setup/lib/diagnostics.sh" ]]; then
-  CLONE_DIR="$(mktemp -d)/clawbridge-agent"
+  CLONE_DIR="$(mktemp -d)/clawbridge-codex"
   echo "Downloading ClawBridge..."
-  git clone --depth 1 --quiet https://github.com/other2368-byte/clawbridge-agent.git "$CLONE_DIR"
+  git clone --depth 1 --quiet https://github.com/mcarmona1064-cell/clawbridge-codex.git "$CLONE_DIR"
   exec bash "$CLONE_DIR/clawbridge.sh" "$@"
 fi
 

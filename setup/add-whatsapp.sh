@@ -15,7 +15,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# Keep in sync with .claude/skills/add-whatsapp/SKILL.md.
+# Keep in sync with container/skills/add-whatsapp/SKILL.md.
 BAILEYS_VERSION="@whiskeysockets/baileys@6.17.16"
 QRCODE_VERSION="qrcode@1.5.4"
 QRCODE_TYPES_VERSION="@types/qrcode@1.5.6"

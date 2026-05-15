@@ -52,7 +52,7 @@ services:
       HINDSIGHT_API_RERANKER_PROVIDER: local
       # Auth
       HINDSIGHT_API_TENANT_API_KEY: ${HINDSIGHT_API_KEY}
-      # MCP server (lets Claude Code/Desktop agents use memory as tools)
+      # MCP server (lets Codex/Desktop agents use memory as tools)
       HINDSIGHT_API_MCP_ENABLED: 'true'
       HINDSIGHT_API_LOG_LEVEL: info
 

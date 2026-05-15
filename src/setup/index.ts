@@ -2,7 +2,7 @@
 /**
  * ClawBridge interactive setup wizard.
  *
- * Entry point for `npx clawbridge-agent setup` and `pnpm run setup:wizard`.
+ * Entry point for `npx clawbridge-codex` and `pnpm run setup:wizard`.
  *
  * Three paths:
  *   1. Fresh install  — guided .env generation + docker compose up
@@ -38,20 +38,20 @@ import {
 import { checkForUpdate, runUpgrade } from '../updater.js';
 import { getLaunchdLabel, getSystemdUnit } from '../install-slug.js';
 
-// Handle "clawbridge doctor" command
+// Handle "clawbridge-codex doctor" command
 if (process.argv[2] === 'doctor') {
   const { runDoctor } = await import('../doctor.js');
   await runDoctor();
   process.exit(0);
 }
 
-// Handle "clawbridge upgrade" / "clawbridge update" command
+// Handle "clawbridge-codex upgrade" / "clawbridge-codex update" command
 if (process.argv[2] === 'upgrade' || process.argv[2] === 'update') {
   await runUpgrade();
   process.exit(0);
 }
 
-// Handle "clawbridge chat" command
+// Handle "clawbridge-codex chat" command
 if (process.argv[2] === 'chat') {
   const { main: startChat } = await import('../cli-chat.js');
   await startChat();
@@ -108,13 +108,6 @@ function printBanner(): void {
 }
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
-
-function validateOAuthToken(value: string | undefined): string | undefined {
-  const t = (value ?? '').trim();
-  if (!t) return 'Required';
-  if (!t.startsWith('sk-ant-oat')) return 'Should start with sk-ant-oat…';
-  return undefined;
-}
 
 function validateTelegramToken(value: string | undefined): string | undefined {
   const t = (value ?? '').trim();
@@ -608,7 +601,7 @@ async function runFreshInstall(): Promise<void> {
     } catch {
       /* */
     }
-    checks.push({ label: 'Agent image', ok: imageOk, fix: 'run: clawbridge build-image' });
+    checks.push({ label: 'Agent image', ok: imageOk, fix: 'run: clawbridge-codex build-image' });
 
     // Hindsight
     let hindsightOk = false;
@@ -628,7 +621,7 @@ async function runFreshInstall(): Promise<void> {
         encoding: 'utf-8',
         timeout: 3000,
       });
-      checks.push({ label: 'Launchd service', ok: launchCheck.status === 0, fix: 'run: clawbridge doctor' });
+      checks.push({ label: 'Launchd service', ok: launchCheck.status === 0, fix: 'run: clawbridge-codex doctor' });
     } else {
       const unit = getSystemdUnit(packageRootForCheck);
       const svcCheck = spawnSync('systemctl', ['--user', 'is-active', unit], {
@@ -636,7 +629,7 @@ async function runFreshInstall(): Promise<void> {
         encoding: 'utf-8',
         timeout: 3000,
       });
-      checks.push({ label: 'Systemd service', ok: svcCheck.status === 0, fix: 'run: clawbridge doctor' });
+      checks.push({ label: 'Systemd service', ok: svcCheck.status === 0, fix: 'run: clawbridge-codex doctor' });
     }
 
     hs.stop('Setup verification:');
@@ -937,7 +930,7 @@ async function runMigrationFlow(): Promise<void> {
     try {
       fs.symlinkSync(srcCompose, destCompose);
     } catch {
-      p.log.warn('docker-compose.yml symlink failed — run: clawbridge doctor --fix');
+      p.log.warn('docker-compose.yml symlink failed — run: clawbridge-codex doctor --fix');
     }
   }
 
@@ -1093,7 +1086,7 @@ async function buildContainerImageWithRetry(): Promise<boolean> {
         await p.confirm({ message: 'Docker Desktop started? Retry image build?', initialValue: true }),
       ) as boolean;
       if (!retry) {
-        p.log.warn('⚠️  Image not built — run: clawbridge build-image once Docker is running');
+        p.log.warn('⚠️  Image not built — run: clawbridge-codex build-image once Docker is running');
         return false;
       }
       continue;
@@ -1101,7 +1094,7 @@ async function buildContainerImageWithRetry(): Promise<boolean> {
 
     const retry = ensure(await p.confirm({ message: 'Image build failed. Retry?', initialValue: true })) as boolean;
     if (!retry) {
-      p.log.warn('⚠️  Image not built — run: clawbridge build-image to finish setup');
+      p.log.warn('⚠️  Image not built — run: clawbridge-codex build-image to finish setup');
       return false;
     }
   }
@@ -1136,7 +1129,7 @@ async function buildContainerImage(): Promise<boolean> {
       return false;
     }
   } catch (err) {
-    p.log.warn(`Image build error — run: clawbridge build-image
+    p.log.warn(`Image build error — run: clawbridge-codex build-image
 ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }

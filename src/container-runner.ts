@@ -228,9 +228,9 @@ async function spawnContainer(session: Session): Promise<void> {
         imageExists = false;
       }
       const hint = !imageExists
-        ? `Image "${imageTag}" not found — run: <code>clawbridge build-image</code>`
+        ? `Image "${imageTag}" not found — run: <code>clawbridge-codex build-image</code>`
         : !mountExists
-          ? `Mount path not found — reinstall: <code>npm install -g clawbridge-agent@latest</code>`
+          ? `Mount path not found — reinstall: <code>npm install -g clawbridge-codex@latest</code>`
           : 'Docker runtime error — check: <code>docker ps</code>';
       log.error('Container spawn failed (exit 125)', { hint });
       void sendContainerFailureAlert(hint);
@@ -319,7 +319,7 @@ function buildMounts(
   const sessDir = sessionDir(agentGroup.id, session.id);
   const groupDir = path.resolve(GROUPS_DIR, agentGroup.folder);
 
-  // Session folder at /workspace (contains inbound.db, outbound.db, outbox/, .claude/)
+  // Session folder at /workspace (contains inbound.db, outbound.db, outbox/, .codex/)
   mounts.push({ hostPath: sessDir, containerPath: '/workspace', readonly: false });
 
   // Agent group folder at /workspace/agent (RW for working files + AGENTS.local.md)
@@ -380,12 +380,12 @@ function buildMounts(
 }
 
 /**
- * Sync skill symlinks in .claude-shared/skills/ to match the container.json
+ * Sync skill symlinks in .codex-shared/skills/ to match the container.json
  * selection. Each symlink points to a container path (/app/skills/<name>)
  * so it's dangling on the host but valid inside the container.
  */
-function syncSkillSymlinks(claudeDir: string, containerConfig: import('./container-config.js').ContainerConfig): void {
-  const skillsDir = path.join(claudeDir, 'skills');
+function syncSkillSymlinks(codexDir: string, containerConfig: import('./container-config.js').ContainerConfig): void {
+  const skillsDir = path.join(codexDir, 'skills');
   if (!fs.existsSync(skillsDir)) {
     fs.mkdirSync(skillsDir, { recursive: true });
   }
@@ -490,17 +490,9 @@ async function buildContainerArgs(
     }
   }
 
-  // Inject credentials directly from ~/.clawbridge/.env.
-  const creds = readEnvFile(['OPENAI_API_KEY']);
-  if (creds['OPENAI_API_KEY']) {
-    args.push('-e', `OPENAI_API_KEY=${creds['OPENAI_API_KEY']}`);
-    log.info('Injecting OPENAI_API_KEY from .env', { containerName });
-  } else {
-    log.warn(
-      'No OPENAI_API_KEY found in ~/.clawbridge/.env — container will rely on ~/.codex/auth.json (mounted from host)',
-      { containerName },
-    );
-  }
+  // Codex uses subscription OAuth from /home/node/.codex/auth.json.
+  // Do not inject OPENAI_API_KEY/CODEX_API_KEY here; the container provider
+  // deliberately keeps the runtime on subscription auth to avoid API billing.
 
   // Per-group env vars from container.json — injected after credential vars.
   // Values may contain ${VAR} or ${VAR:-default} references to ~/.clawbridge/.env.

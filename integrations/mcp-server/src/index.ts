@@ -281,10 +281,10 @@ const TOOLS = [
       required: ["client_id", "parent_page_id", "title", "content"],
     },
   },
-  // Claude Vision
+  // OpenAI vision
   {
     name: "analyze_image",
-    description: "Analyze an image/photo using Claude vision and return a description",
+    description: "Analyze an image/photo using OpenAI vision and return a description",
     inputSchema: {
       type: "object",
       properties: {

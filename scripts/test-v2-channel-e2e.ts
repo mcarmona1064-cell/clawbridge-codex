@@ -2,7 +2,7 @@
  * End-to-end test of v2 channel adapter pipeline:
  *
  * Mock adapter → onInbound → router → session DB → Docker container →
- * agent-runner → Claude → messages_out → delivery → mock adapter.deliver()
+ * agent-runner → Codex → messages_out → delivery → mock adapter.deliver()
  *
  * Usage: pnpm exec tsx scripts/test-v2-channel-e2e.ts
  */
@@ -35,7 +35,7 @@ createAgentGroup({
   id: 'ag-chan',
   name: 'Channel E2E Agent',
   folder: 'test-channel-e2e',
-  agent_provider: 'claude',
+  agent_provider: 'codex',
   created_at: new Date().toISOString(),
 });
 

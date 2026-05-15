@@ -6,6 +6,10 @@ import os from 'os';
 import path from 'path';
 import readline from 'readline';
 
+const PACKAGE_NAME = 'clawbridge-codex';
+const CLI_NAME = 'clawbridge-codex';
+const REGISTRY_LATEST_URL = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
+
 export async function checkForUpdate(): Promise<void> {
   try {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -14,7 +18,7 @@ export async function checkForUpdate(): Promise<void> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const res = await fetch(`https://registry.npmjs.org/clawbridge-agent/latest`, {
+    const res = await fetch(REGISTRY_LATEST_URL, {
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -25,7 +29,7 @@ export async function checkForUpdate(): Promise<void> {
 
     if (latestVersion !== currentVersion) {
       console.log(`\n⚡ ClawBridge update available: ${currentVersion} → ${latestVersion}`);
-      console.log(`   Run: clawbridge upgrade\n`);
+      console.log(`   Run: clawbridge-codex upgrade\n`);
     }
   } catch {
     // Silently ignore — no network, npm down, etc.
@@ -51,7 +55,7 @@ function reconcileDockerComposeSymlink(): void {
       return;
     }
     const globalRoot = npmRootResult.stdout.trim();
-    const newComposeSrc = path.join(globalRoot, 'clawbridge-agent', 'integrations', 'docker-compose.yml');
+    const newComposeSrc = path.join(globalRoot, PACKAGE_NAME, 'integrations', 'docker-compose.yml');
     if (!fs.existsSync(newComposeSrc)) {
       console.log(`  ⚠  ${newComposeSrc} not found — skipping symlink update.`);
       return;
@@ -77,7 +81,7 @@ function rebuildContainerImage(): boolean {
       return false;
     }
     const globalRoot = npmRootResult.stdout.trim();
-    const buildScript = path.join(globalRoot, 'clawbridge-agent', 'container', 'build.sh');
+    const buildScript = path.join(globalRoot, PACKAGE_NAME, 'container', 'build.sh');
     if (!fs.existsSync(buildScript)) {
       console.log(`  ⚠  build.sh not found at ${buildScript} — skipping container rebuild.`);
       return false;
@@ -92,7 +96,7 @@ function rebuildContainerImage(): boolean {
       timeout: 5 * 60 * 1000, // 5 minutes
     });
     if (result.status !== 0) {
-      console.log('  \u26a0  Container image build failed. Run manually: clawbridge build-image');
+      console.log('  \u26a0  Container image build failed. Run manually: clawbridge-codex build-image');
       return false;
     }
     return true;
@@ -149,7 +153,7 @@ function restartLaunchdService(label: string): void {
 }
 
 export async function runUpgrade(): Promise<void> {
-  console.log('🔄 Upgrading ClawBridge Agent…\n');
+  console.log('🔄 Upgrading ClawBridge Codex…\n');
 
   // Check current version
   let pkg: { version: string };
@@ -167,7 +171,7 @@ export async function runUpgrade(): Promise<void> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch('https://registry.npmjs.org/clawbridge-agent/latest', { signal: controller.signal });
+    const res = await fetch(REGISTRY_LATEST_URL, { signal: controller.signal });
     clearTimeout(timeout);
     const data = (await res.json()) as { version: string };
     latestVersion = data.version;
@@ -243,13 +247,13 @@ export async function runUpgrade(): Promise<void> {
     if (npmRootForClean.status === 0) {
       const globalRoot = npmRootForClean.stdout.trim();
       try {
-        fs.rmSync(path.join(globalRoot, 'clawbridge-agent'), { recursive: true, force: true });
+        fs.rmSync(path.join(globalRoot, PACKAGE_NAME), { recursive: true, force: true });
       } catch {
         /* ignore */
       }
       try {
         for (const entry of fs.readdirSync(globalRoot)) {
-          if (entry.startsWith('.clawbridge-agent-')) {
+          if (entry.startsWith(`.${PACKAGE_NAME}-`)) {
             fs.rmSync(path.join(globalRoot, entry), { recursive: true, force: true });
           }
         }
@@ -265,7 +269,7 @@ export async function runUpgrade(): Promise<void> {
 
   // Install
   console.log('\nInstalling…');
-  const installResult = spawnSync('npm', ['install', '-g', 'clawbridge-agent@latest'], {
+  const installResult = spawnSync('npm', ['install', '-g', `${PACKAGE_NAME}@latest`], {
     stdio: 'inherit',
     encoding: 'utf-8',
   });
@@ -284,7 +288,7 @@ export async function runUpgrade(): Promise<void> {
         restartSystemdService(systemdUnit, systemdScope);
       }
     }
-    console.error('\n✗ Upgrade failed. Try manually: npm install -g clawbridge-agent@latest');
+    console.error('\n✗ Upgrade failed. Try manually: npm install -g clawbridge-codex@latest');
     process.exit(1);
   }
 
@@ -322,7 +326,7 @@ export async function runUpgrade(): Promise<void> {
     const { runDoctor } = await import('./doctor.js');
     await runDoctor();
   } catch {
-    console.log('  ⚠  Could not run health check — run `clawbridge doctor` manually.');
+    console.log('  ⚠  Could not run health check — run `clawbridge-codex doctor` manually.');
   }
 
   console.log(`\n✓ ClawBridge upgraded: ${currentVersion} → ${latestVersion}`);

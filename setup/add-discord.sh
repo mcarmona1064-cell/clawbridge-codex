@@ -14,7 +14,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# Keep in sync with .claude/skills/add-discord/SKILL.md.
+# Keep in sync with container/skills/add-discord/SKILL.md.
 ADAPTER_VERSION="@chat-adapter/discord@4.26.0"
 
 # Resolve which remote carries the channels branch — handles forks where

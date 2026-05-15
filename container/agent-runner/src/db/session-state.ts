@@ -4,8 +4,7 @@
  *
  * Primary use: remember each provider's opaque continuation id so the
  * agent's conversation resumes across container restarts. Keyed per
- * provider because continuations are provider-private — a Claude
- * continuation id is private to the provider that created it.
+ * provider because continuations are provider-private — a continuation id is private to the provider that created it.
  */
 import { getOutboundDb } from './connection.js';
 

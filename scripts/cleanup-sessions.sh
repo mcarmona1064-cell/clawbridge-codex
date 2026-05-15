@@ -6,7 +6,7 @@
 # Usage:  ./scripts/cleanup-sessions.sh [--dry-run]
 #
 # Retention:
-#   Session JSONLs + tool-results:  7 days  (active session always kept)
+#   Codex session artifacts:  7 days  (active session always kept)
 #   Debug logs:                     3 days
 #   Todo files:                     3 days
 #   Telemetry:                      7 days
@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 STORE_DB="$PROJECT_ROOT/store/messages.db"
-SESSIONS_DIR="$PROJECT_ROOT/data/sessions"
+SESSIONS_DIR="$PROJECT_ROOT/data/v2-sessions"
 GROUPS_DIR="$PROJECT_ROOT/groups"
 
 DRY_RUN=false
@@ -65,11 +65,11 @@ is_active() {
   echo "$ACTIVE_IDS" | grep -qF "$1"
 }
 
-# --- Prune session JSONLs and tool-results dirs ---
+# --- Prune session Codex session artifacts ---
 
 for group_dir in "$SESSIONS_DIR"/*/; do
   [ -d "$group_dir" ] || continue
-  jsonl_dir="$group_dir/.claude/projects/-workspace-group"
+  jsonl_dir="$group_dir/.codex-shared/sessions"
   [ -d "$jsonl_dir" ] || continue
 
   for jsonl in "$jsonl_dir"/*.jsonl; do
@@ -93,7 +93,7 @@ done
 # --- Prune debug logs (>3 days, skip files named after active sessions) ---
 
 for group_dir in "$SESSIONS_DIR"/*/; do
-  debug_dir="$group_dir/.claude/debug"
+  debug_dir="$group_dir/.codex-shared/debug"
   [ -d "$debug_dir" ] || continue
   while IFS= read -r -d '' f; do
     fname=$(basename "$f" .txt)
@@ -105,7 +105,7 @@ done
 # --- Prune todo files (>3 days, skip files named after active sessions) ---
 
 for group_dir in "$SESSIONS_DIR"/*/; do
-  todos_dir="$group_dir/.claude/todos"
+  todos_dir="$group_dir/.codex-shared/todos"
   [ -d "$todos_dir" ] || continue
   while IFS= read -r -d '' f; do
     fname=$(basename "$f" .json)
@@ -122,7 +122,7 @@ done
 # --- Prune telemetry (>7 days, skip files named after active sessions) ---
 
 for group_dir in "$SESSIONS_DIR"/*/; do
-  telem_dir="$group_dir/.claude/telemetry"
+  telem_dir="$group_dir/.codex-shared/telemetry"
   [ -d "$telem_dir" ] || continue
   while IFS= read -r -d '' f; do
     fname=$(basename "$f")

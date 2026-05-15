@@ -557,7 +557,7 @@ async function finishWithHandoff(
       'src/router.ts',
       'src/db/messaging-groups.ts',
       'logs/clawbridge.log',
-      '.claude/skills/manage-channels/SKILL.md',
+      'container/skills/manage-channels/SKILL.md',
     ],
   });
 }

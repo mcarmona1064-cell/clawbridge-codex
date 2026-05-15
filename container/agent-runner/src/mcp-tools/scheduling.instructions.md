@@ -12,7 +12,7 @@ Frequent recurring scheduled tasks — more than a few times a day — consume A
 2. When the task fires, the script runs first
 3. Script returns: `{ "wakeAgent": true/false, "data": {...} }`
 4. If `wakeAgent: false` — nothing happens, task waits for next run
-5. If `wakeAgent: true` — claude receives the script's data + prompt and handles
+5. If `wakeAgent: true` — Codex receives the script's data + prompt and handles
 
 ### Always test your script first
 

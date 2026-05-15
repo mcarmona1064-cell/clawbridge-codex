@@ -37,13 +37,13 @@ describe('Codex port regression checks', () => {
   });
 
   it('uses Codex/OpenAI auth keys in setup and doctor code', () => {
-    for (const rel of ['setup/auth.ts', 'src/doctor.ts', 'setup/register.ts', 'setup/probe.sh']) {
+    for (const rel of ['setup/auth.ts', 'src/doctor.ts', 'setup/register.ts', 'setup/probe.sh', 'src/setup/index.ts']) {
       const content = read(rel);
-      expect(content, rel).not.toMatch(/ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|claude setup-token/);
+      expect(content, rel).not.toMatch(/ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|claude setup-token|sk-ant/);
     }
 
     expect(read('setup/auth.ts')).toContain('OPENAI_API_KEY');
-    expect(read('src/doctor.ts')).toContain("'OPENAI_API_KEY'");
+    expect(read('src/doctor.ts')).toContain('~/.codex/auth.json');
     expect(read('setup/register.ts')).toContain('AGENTS.local.md');
   });
 
@@ -71,7 +71,7 @@ describe('Codex port regression checks', () => {
       path.join(ROOT, 'src/codex-port.test.ts'), // this test contains the forbidden strings as regex fixtures
     ]);
     const forbidden =
-      /api\.anthropic\.com|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|claude-opus|claude-haiku|Claude Code SDK|CLAUDE_CODE_/;
+      /api\.anthropic\.com|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|sk-ant|claude-opus|claude-haiku|Claude Code SDK|CLAUDE_CODE_/;
 
     const offenders = scannedRoots
       .flatMap((root) => walk(root))
@@ -81,5 +81,12 @@ describe('Codex port regression checks', () => {
       .map((file) => path.relative(ROOT, file));
 
     expect(offenders).toEqual([]);
+  });
+
+  it('keeps upgrade/update pointed at the codex package', () => {
+    const updater = read('src/updater.ts');
+    expect(updater).toContain("PACKAGE_NAME = 'clawbridge-codex'");
+    expect(updater).toContain("CLI_NAME = 'clawbridge-codex'");
+    expect(updater).not.toMatch(/clawbridge-agent\/latest|clawbridge-agent@latest|globalRoot, 'clawbridge-agent'/);
   });
 });

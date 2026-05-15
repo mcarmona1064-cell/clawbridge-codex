@@ -48,9 +48,9 @@ export interface PollLoopConfig {
 export async function runPollLoop(config: PollLoopConfig): Promise<void> {
   // Resume the agent's prior session from a previous container run if one
   // was persisted. The continuation is opaque to the poll-loop — the
-  // provider decides how to use it (Claude resumes a .jsonl transcript,
+  // provider decides how to use it (Codex resumes its own session state,
   // other providers may reload a thread ID, etc.). Keyed per-provider so
-  // keyed by provider so continuations are not mixed across providers.
+  // continuations are not mixed across providers.
   let continuation: string | undefined = migrateLegacyContinuation(config.providerName);
 
   if (continuation) {
@@ -209,7 +209,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 
 /**
  * Format messages, handling passthrough commands differently.
- * When the provider handles slash commands natively (Claude Code),
+ * When the provider handles slash commands natively (Codex),
  * passthrough commands are sent raw (no XML wrapping) so the SDK can
  * dispatch them. Otherwise they fall through to standard XML formatting.
  */
@@ -299,7 +299,7 @@ async function processQuery(
         // was only written after the full stream completed — if the
         // container died between `init` and `result`, the SDK session was
         // effectively orphaned and the next message started a blank
-        // Claude session with no prior context.
+        // Codex session with no prior context.
         setContinuation(providerName, event.continuation);
       } else if (event.type === 'result') {
         // A result — with or without text — means the turn is done. Mark

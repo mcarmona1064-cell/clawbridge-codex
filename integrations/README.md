@@ -63,7 +63,7 @@ cd integrations/mcp-server && npm install && npm run dev
 
 ## How the MCP Server Connects to the Agent
 
-1. The MCP server runs as a **stdio** process — the agent (Claude Code or any MCP client) spawns it.
+1. The MCP server runs as a **stdio** process — the agent (Codex or any MCP client) spawns it.
 2. Each tool call includes a `client_id` — this maps to a `connection_id`, identifying which client's tokens to use.
 3. The integration server injects the OAuth access token and proxies the request to the upstream API.
 4. The MCP server returns raw API JSON to the agent.

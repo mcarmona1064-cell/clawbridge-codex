@@ -19,7 +19,7 @@ export interface McpServerConfig {
   args?: string[];
   env?: Record<string, string>;
   // Optional always-in-context guidance. When set, the host writes the
-  // content to `.claude-fragments/mcp-<name>.md` at spawn and imports it
+  // content to `.agent-fragments/mcp-<name>.md` at spawn and imports it
   // into the composed AGENTS.md.
   instructions?: string;
 }
@@ -37,7 +37,7 @@ export interface ContainerConfig {
   additionalMounts: AdditionalMountConfig[];
   /** Which skills to enable — array of skill names or "all" (default). */
   skills: string[] | 'all';
-  /** Agent provider name. Default: "claude". */
+  /** Agent provider name. Default: "codex". */
   provider?: string;
   /** Agent group display name (used in transcript archiving). */
   groupName?: string;
