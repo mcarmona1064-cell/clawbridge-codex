@@ -135,8 +135,16 @@ export async function detectInstall(): Promise<MigrationSource | null> {
   for (const { paths, type } of CANDIDATE_PATHS) {
     for (const candidate of paths) {
       if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
-        const detected = identifyType(candidate) ?? type;
-        return { type: detected, path: candidate };
+        const detected = identifyType(candidate);
+        if (detected) return { type: detected, path: candidate };
+
+        // Most candidate paths are type-signaling by directory name, but
+        // ~/.clawbridge is also the destination data dir for clawbridge-codex.
+        // Do not treat it as a legacy clawbridge-agent source unless
+        // identifyType() confirmed a non-codex AGENT_PROVIDER.
+        if (type === 'clawbridge') continue;
+
+        return { type, path: candidate };
       }
     }
   }

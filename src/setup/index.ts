@@ -1214,31 +1214,82 @@ async function registerSystemd(assistantName: string): Promise<void> {
       .replace(/\{\{CONTAINER_IMAGE_BASE\}\}/g, getContainerImageBase(packageRoot))
       .replace(/\{\{CONTAINER_IMAGE\}\}/g, getDefaultContainerImage(packageRoot));
 
-    const systemdUserDir = path.join(home, '.config', 'systemd', 'user');
-    fs.mkdirSync(systemdUserDir, { recursive: true });
     fs.mkdirSync(path.join(home, '.clawbridge', 'logs'), { recursive: true });
-    const unitPath = path.join(systemdUserDir, `${unit}.service`);
+
+    const runningAsRoot = process.getuid?.() === 0;
+    const systemctlPrefix = runningAsRoot ? 'systemctl' : 'systemctl --user';
+    const unitPath = runningAsRoot
+      ? path.join('/etc/systemd/system', `${unit}.service`)
+      : path.join(home, '.config', 'systemd', 'user', `${unit}.service`);
+
+    fs.mkdirSync(path.dirname(unitPath), { recursive: true });
     fs.writeFileSync(unitPath, serviceContent);
-    p.log.success(`systemd unit written to ~/.config/systemd/user/${unit}.service`);
+    p.log.success(
+      runningAsRoot
+        ? `systemd unit written to /etc/systemd/system/${unit}.service`
+        : `systemd unit written to ~/.config/systemd/user/${unit}.service`,
+    );
 
     try {
-      execSync('systemctl --user daemon-reload', { encoding: 'utf-8' });
-      execSync(`systemctl --user enable --now ${unit}`, { encoding: 'utf-8' });
+      execSync(`${systemctlPrefix} daemon-reload`, { encoding: 'utf-8' });
+      execSync(`${systemctlPrefix} enable --now ${unit}`, { encoding: 'utf-8' });
       p.log.success('ClawBridge agent registered with systemd and will start automatically.');
     } catch (err) {
       p.log.warn(`systemctl failed: ${err instanceof Error ? err.message : String(err)}`);
-      p.log.info(`To register manually: systemctl --user enable --now ${unit}`);
+      p.log.info(`To register manually: ${systemctlPrefix} enable --now ${unit}`);
+      if (!runningAsRoot) await registerNohup();
     }
   } catch (err) {
     p.log.warn(`systemd registration failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
+function hasSystemd(): boolean {
+  if (process.platform !== 'linux') return false;
+  try {
+    return fs.readFileSync('/proc/1/comm', 'utf-8').trim() === 'systemd';
+  } catch {
+    return false;
+  }
+}
+
+async function registerNohup(): Promise<void> {
+  try {
+    const packageRoot = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+    fs.mkdirSync(path.join(packageRoot, 'logs'), { recursive: true });
+    const nodePath = (() => {
+      try {
+        const which = spawnSync('which', ['node'], { encoding: 'utf-8' });
+        return which.status === 0 && which.stdout.trim() ? which.stdout.trim() : process.execPath;
+      } catch {
+        return process.execPath;
+      }
+    })();
+    const wrapperPath = path.join(packageRoot, 'start-clawbridge.sh');
+    const pidFile = path.join(packageRoot, 'clawbridge.pid');
+    const wrapper = `#!/bin/bash
+set -euo pipefail
+cd ${JSON.stringify(packageRoot)}
+nohup ${JSON.stringify(nodePath)} ${JSON.stringify(path.join(packageRoot, 'dist', 'index.js'))} >> ${JSON.stringify(path.join(packageRoot, 'logs', 'clawbridge.log'))} 2>> ${JSON.stringify(path.join(packageRoot, 'logs', 'clawbridge.error.log'))} &
+echo $! > ${JSON.stringify(pidFile)}
+`;
+    fs.writeFileSync(wrapperPath, wrapper, { mode: 0o755 });
+    p.log.warn('No usable systemd session detected — wrote nohup fallback wrapper.');
+    p.log.info(`Start manually with: ${wrapperPath}`);
+  } catch (err) {
+    p.log.warn(`nohup fallback registration failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 async function registerService(assistantName: string): Promise<void> {
   if (process.platform === 'darwin') {
     await registerLaunchd(assistantName);
-  } else {
+  } else if (process.platform === 'linux' && hasSystemd()) {
     await registerSystemd(assistantName);
+  } else if (process.platform === 'linux') {
+    await registerNohup();
+  } else {
+    p.log.warn(`Unsupported platform for automatic service registration: ${process.platform}`);
   }
 }
 

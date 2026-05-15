@@ -120,6 +120,23 @@ describe('Codex port regression checks', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('setup service registration detects macOS, Linux systemd, root systemd, and nohup fallback', () => {
+    const setupWizard = read('src/setup/index.ts');
+    expect(setupWizard).toContain("process.platform === 'darwin'");
+    expect(setupWizard).toContain("process.platform === 'linux' && hasSystemd()");
+    expect(setupWizard).toContain('process.getuid?.() === 0');
+    expect(setupWizard).toContain("'/etc/systemd/system'");
+    expect(setupWizard).toContain('systemctl --user');
+    expect(setupWizard).toContain('registerNohup');
+    expect(setupWizard).toContain('nohup');
+  });
+
+  it('migration only treats ~/.clawbridge as legacy clawbridge-agent when provider is non-codex', () => {
+    const migrate = read('src/setup/migrate.ts');
+    expect(migrate).toContain("provider && provider !== 'codex'");
+    expect(migrate).toContain("if (type === 'clawbridge') continue");
+  });
+
   it('keeps container active runtime free of Anthropic/Claude runtime artifacts', () => {
     const activeContainerFiles = [
       ...walk(path.join(ROOT, 'container', 'agent-runner', 'src')),
