@@ -758,10 +758,7 @@ export async function runMigration(
       }
       fs.writeFileSync(envPath, envContent, 'utf-8');
     }
-    emit(
-      'provider-swap',
-      'Done. Re-run `clawbridge-codex setup:auto` (or restart the service) to pick up the codex image.',
-    );
+    emit('provider-swap', 'Done. Re-run `clawbridge-codex setup` (or restart the service) to pick up the codex image.');
     return result;
   }
 

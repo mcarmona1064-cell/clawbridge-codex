@@ -225,13 +225,13 @@ ls -la ~/.clawbridge/.env
 **Keep ClawBridge updated:**
 
 ```bash
-npx clawbridge-agent upgrade
+npx clawbridge-codex upgrade
 ```
 
 Or if using git:
 
 ```bash
-cd ~/clawbridge-agent && git pull && pnpm install
+cd ~/clawbridge-codex && git pull && pnpm install
 ```
 
 **Audit mounted paths.** Containers only have access to what's explicitly mounted. Review mounts for any group you add — especially groups with `additionalMounts`:

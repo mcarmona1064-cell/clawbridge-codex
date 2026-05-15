@@ -39,7 +39,7 @@ flowchart TB
   end
 
   subgraph Groups["Agent Group Filesystem (groups/*)"]
-    Folder["CLAUDE.md<br/>memory<br/>per-group skills<br/>container_config"]
+    Folder["AGENTS.md<br/>memory<br/>per-group skills<br/>container_config"]
   end
 
   P1 & P2 & P3 & P4 & P5 --> Bridge

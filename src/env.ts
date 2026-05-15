@@ -20,7 +20,7 @@ export function readEnvFile(keys: string[]): Record<string, string> {
   try {
     content = fs.readFileSync(envFile, 'utf-8');
   } catch (err) {
-    if (!fs.existsSync(envFile) && !process.env['OPENAI_API_KEY']) {
+    if (!fs.existsSync(envFile)) {
       log.warn('Warning: .env not found and no environment variables set. Run the setup wizard first.');
     } else {
       log.debug('.env file not found, using defaults', { err });

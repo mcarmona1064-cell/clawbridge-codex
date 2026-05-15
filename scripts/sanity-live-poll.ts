@@ -22,11 +22,12 @@
  * Keep this around. It ran for ~20 minutes once to map the failure modes
  * and it takes about 60s to run — cheap insurance.
  *
- * Requires: Docker Desktop running, clawbridge-agent:latest image built.
+ * Requires: Docker Desktop running and the ClawBridge Codex image built.
  */
 
 import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { getDefaultContainerImage } from "../src/install-slug.js";
 import { mkdirSync, rmSync } from "node:fs";
 import Database from "better-sqlite3";
 
@@ -34,6 +35,7 @@ const dbDir = join("/tmp", `clawbridge-live-${Date.now()}`);
 mkdirSync(dbDir, { recursive: true });
 spawnSync("chmod", ["777", dbDir]);
 const dbPath = join(dbDir, "live.db");
+const image = process.env.CONTAINER_IMAGE || getDefaultContainerImage();
 
 for (const journalMode of ["DELETE", "WAL"]) {
   console.log(`\n=== ${journalMode} ===`);
@@ -53,7 +55,7 @@ for (const journalMode of ["DELETE", "WAL"]) {
     "run", "--rm", "-w", "/app",
     "-v", `${dbDir}:/workspace`,
     "--entrypoint", "node",
-    "clawbridge-agent:latest",
+    image,
     "-e",
     `const Database = require('better-sqlite3');
      const db = new Database('/workspace/live.db', { readonly: true });

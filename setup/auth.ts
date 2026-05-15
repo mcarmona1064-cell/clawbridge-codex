@@ -1,157 +1,60 @@
 /**
- * Step: auth — Verify or write an OpenAI/Codex credential.
+ * Step: auth — verify Codex subscription OAuth for the agent runtime.
  *
- * Modes:
- *   --check                   (default) Verify a credential is available.
- *                             Considers ~/.codex/auth.json (subscription
- *                             login) OR OPENAI_API_KEY in .env.
- *   --create --value <token>  Write OPENAI_API_KEY=<value> to .env.
- *                             Errors if a credential already exists unless
- *                             --force is passed.
+ * ClawBridge Codex runs the `codex` CLI in subscription/OAuth mode. Runtime
+ * auth is the host login file created by `codex login --device-auth`:
+ *   ~/.codex/auth.json
  *
- * Credentials are stored in .clawbridge/.env and injected at container spawn
- * time by container-runner.ts. The token value is never logged.
+ * API-key billing env vars are intentionally not accepted here. The container
+ * provider strips API-key env vars before spawning Codex so setup cannot pass
+ * while runtime later fails or accidentally bills a key-based account.
  */
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
-import { log } from '../src/log.js';
 import { emitStatus } from './status.js';
 
 interface Args {
-  mode: 'check' | 'create';
-  value?: string;
-  force: boolean;
+  mode: 'check';
 }
 
-function parseArgs(args: string[]): Args {
-  let mode: 'check' | 'create' = 'check';
-  let value: string | undefined;
-  let force = false;
+const CODEX_AUTH_PATH = path.join(os.homedir(), '.codex', 'auth.json');
 
+function parseArgs(args: string[]): Args {
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
-    const val = args[i + 1];
     switch (key) {
       case '--check':
-        mode = 'check';
         break;
       case '--create':
-        mode = 'create';
-        break;
       case '--value':
-        value = val;
-        i++;
-        break;
       case '--force':
-        force = true;
+        emitStatus('AUTH', {
+          STATUS: 'failed',
+          ERROR: 'api_key_auth_not_supported',
+          HINT: 'Run: codex login --device-auth',
+          LOG: 'logs/setup.log',
+        });
+        process.exit(2);
         break;
     }
   }
 
-  if (mode === 'create' && !value) {
-    emitStatus('AUTH', {
-      STATUS: 'failed',
-      ERROR: 'missing_value_for_create',
-      LOG: 'logs/setup.log',
-    });
-    process.exit(2);
-  }
-
-  return { mode, value, force };
-}
-
-const ENV_KEY = 'OPENAI_API_KEY' as const;
-const CODEX_AUTH_PATH = path.join(os.homedir(), '.codex', 'auth.json');
-
-function readEnvFile(envFile: string): Record<string, string> {
-  if (!fs.existsSync(envFile)) return {};
-  const content = fs.readFileSync(envFile, 'utf-8');
-  const result: Record<string, string> = {};
-  for (const line of content.split('\n')) {
-    const m = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
-    if (m) result[m[1]] = m[2];
-  }
-  return result;
-}
-
-function writeEnvKey(envFile: string, key: string, value: string): void {
-  let content = '';
-  if (fs.existsSync(envFile)) {
-    content = fs.readFileSync(envFile, 'utf-8');
-  }
-  const lineRegex = new RegExp(`^${key}=.*$`, 'm');
-  const newLine = `${key}=${value}`;
-  if (lineRegex.test(content)) {
-    content = content.replace(lineRegex, newLine);
-  } else {
-    const sep = content && !content.endsWith('\n') ? '\n' : '';
-    content = content + sep + newLine + '\n';
-  }
-  fs.mkdirSync(path.dirname(envFile), { recursive: true });
-  fs.writeFileSync(envFile, content, { mode: 0o600 });
+  return { mode: 'check' };
 }
 
 export async function run(args: string[]): Promise<void> {
-  const { mode, value, force } = parseArgs(args);
+  parseArgs(args);
 
-  const envFile = path.join(process.cwd(), '.env');
-  const env = readEnvFile(envFile);
-  const hasApiKey = !!env[ENV_KEY];
   const hasCodexLogin = fs.existsSync(CODEX_AUTH_PATH);
-  const hasCredential = hasApiKey || hasCodexLogin;
-
-  if (mode === 'check') {
-    emitStatus('AUTH', {
-      SECRET_PRESENT: hasCredential,
-      OPENAI_OK: hasCredential,
-      STATUS: hasCredential ? 'success' : 'missing',
-      ...(hasApiKey ? { ENV_KEY } : {}),
-      ...(hasCodexLogin && !hasApiKey ? { SOURCE: 'codex_login' } : {}),
-      LOG: 'logs/setup.log',
-    });
-    return;
-  }
-
-  // mode === 'create'
-  if (hasCredential && !force) {
-    emitStatus('AUTH', {
-      SECRET_PRESENT: true,
-      STATUS: 'skipped',
-      REASON: 'credential_already_exists',
-      ...(hasApiKey ? { ENV_KEY } : { SOURCE: 'codex_login' }),
-      HINT: 'Re-run with --force to replace.',
-      LOG: 'logs/setup.log',
-    });
-    return;
-  }
-
-  try {
-    writeEnvKey(envFile, ENV_KEY, value!);
-    log.info('Wrote credential to .env', { key: ENV_KEY });
-  } catch (err) {
-    const e = err as { message?: string };
-    log.error('Failed to write credential to .env', { err });
-    emitStatus('AUTH', {
-      STATUS: 'failed',
-      ERROR: 'env_write_failed',
-      DETAIL: e.message ?? String(err),
-      LOG: 'logs/setup.log',
-    });
-    process.exit(1);
-  }
-
-  // Re-verify
-  const updated = readEnvFile(envFile);
-  const ok = !!updated[ENV_KEY];
 
   emitStatus('AUTH', {
-    SECRET_PRESENT: ok,
-    OPENAI_OK: ok,
-    CREATED: true,
-    STATUS: ok ? 'success' : 'failed',
-    ENV_KEY,
+    SECRET_PRESENT: hasCodexLogin,
+    CODEX_OAUTH_OK: hasCodexLogin,
+    STATUS: hasCodexLogin ? 'success' : 'missing',
+    SOURCE: hasCodexLogin ? 'codex_login' : 'missing_codex_login',
+    HINT: hasCodexLogin ? '~/.codex/auth.json present' : 'Run: codex login --device-auth',
     LOG: 'logs/setup.log',
   });
 }

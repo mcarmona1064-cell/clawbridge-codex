@@ -60,7 +60,7 @@
     "setup:auto": "tsx setup/auto.ts",
     "migrate": "tsx src/setup/migrate.ts",
     "chat": "tsx scripts/chat.ts",
-    "auth": "tsx src/whatsapp-auth.ts",
+    "auth": "tsx setup/whatsapp-auth.ts",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",

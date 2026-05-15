@@ -11,20 +11,20 @@ Host (macOS / Windows WSL)
     │   ├── Channel adapters (WhatsApp, Telegram, etc.)
     │   └── Container spawner → nested Docker daemon
     └── Docker-in-Docker
-        └── clawbridge-agent containers
-            └── Claude Agent SDK
+        └── clawbridge-codex containers
+            └── Codex CLI
 ```
 
 Each agent runs in its own container, inside a micro VM that is fully isolated from your host. Two layers of isolation: per-agent containers + the VM boundary.
 
-The sandbox provides a MITM proxy at `host.docker.internal:3128` that handles network access and injects your Anthropic API key automatically.
+The sandbox provides a MITM proxy at `host.docker.internal:3128` that handles network access and injects your OpenAI API key automatically.
 
 > **Note:** This guide is based on a validated setup running on macOS (Apple Silicon) with WhatsApp. Other channels (Telegram, Slack, etc.) and environments (Windows WSL) may require additional proxy patches for their specific HTTP/WebSocket clients. The core patches (container runner, credential proxy, Dockerfile) apply universally — channel-specific proxy configuration varies.
 
 ## Prerequisites
 
 - **Docker Desktop v4.40+** with Sandbox support
-- **Anthropic API key** (the sandbox proxy manages injection)
+- **OpenAI API key** (the sandbox proxy manages injection)
 - For **Telegram**: a bot token from [@BotFather](https://t.me/BotFather) and your chat ID
 - For **WhatsApp**: a phone with WhatsApp installed
 
@@ -77,7 +77,7 @@ ClawBridge must live inside the workspace directory — Docker-in-Docker can onl
 ```bash
 # Clone to home first (virtiofs can corrupt git pack files during clone)
 cd ~
-git clone https://github.com/other2368-byte/clawbridge-agent.git
+git clone https://github.com/mcarmona1064-cell/clawbridge-codex.git
 
 # Replace with YOUR workspace path (the host path you passed to `docker sandbox create`)
 WORKSPACE=/Users/you/clawbridge-workspace
@@ -195,7 +195,7 @@ bash container/build.sh
 
 ```bash
 # Apply the Telegram skill
-pnpm exec tsx scripts/apply-skill.ts .claude/skills/add-telegram
+pnpm exec tsx scripts/apply-skill.ts skills/add-telegram
 
 # Rebuild after applying the skill
 pnpm run build
@@ -204,7 +204,7 @@ pnpm run build
 cat > .env << EOF
 TELEGRAM_BOT_TOKEN=<your-token-from-botfather>
 ASSISTANT_NAME=clawbridge
-ANTHROPIC_API_KEY=proxy-managed
+OPENAI_API_KEY=proxy-managed
 EOF
 mkdir -p data/env && cp .env data/env/env
 
@@ -235,7 +235,7 @@ Make sure you configured proxy bypass in [Step 1](#step-1-create-the-sandbox) fi
 
 ```bash
 # Apply the WhatsApp skill
-pnpm exec tsx scripts/apply-skill.ts .claude/skills/add-whatsapp
+pnpm exec tsx scripts/apply-skill.ts skills/add-whatsapp
 
 # Rebuild
 pnpm run build
@@ -243,17 +243,17 @@ pnpm run build
 # Configure .env
 cat > .env << EOF
 ASSISTANT_NAME=clawbridge
-ANTHROPIC_API_KEY=proxy-managed
+OPENAI_API_KEY=proxy-managed
 EOF
 mkdir -p data/env && cp .env data/env/env
 
 # Authenticate (choose one):
 
 # QR code — scan with WhatsApp camera:
-pnpm exec tsx src/whatsapp-auth.ts
+pnpm exec tsx setup/whatsapp-auth.ts
 
 # OR pairing code — enter code in WhatsApp > Linked Devices > Link with phone number:
-pnpm exec tsx src/whatsapp-auth.ts --pairing-code --phone <phone-number-no-plus>
+pnpm exec tsx setup/whatsapp-auth.ts --pairing-code --phone <phone-number-no-plus>
 
 # Register your chat (JID = your phone number + @s.whatsapp.net)
 pnpm exec tsx setup/index.ts --step register \
@@ -267,7 +267,7 @@ pnpm exec tsx setup/index.ts --step register \
   --no-trigger-required
 ```
 
-**Important:** The WhatsApp skill files (`src/channels/whatsapp.ts` and `src/whatsapp-auth.ts`) also need proxy patches — add `HttpsProxyAgent` for WebSocket connections and a proxy-aware version fetch. Then rebuild.
+**Important:** The WhatsApp skill files (`src/channels/whatsapp.ts` and `setup/whatsapp-auth.ts`) also need proxy patches — add `HttpsProxyAgent` for WebSocket connections and a proxy-aware version fetch. Then rebuild.
 
 ### Both Channels
 
@@ -279,7 +279,7 @@ Apply both skills, patch both for proxy support, combine the `.env` variables, a
 pnpm start
 ```
 
-You don't need to set `ANTHROPIC_API_KEY` manually. The sandbox proxy intercepts requests and replaces `proxy-managed` with your real key automatically.
+You don't need to set a real `OPENAI_API_KEY` manually in sandbox proxy mode. The sandbox proxy intercepts requests and replaces `proxy-managed` with your real key automatically.
 
 ## Networking Details
 
@@ -288,7 +288,7 @@ You don't need to set `ANTHROPIC_API_KEY` manually. The sandbox proxy intercepts
 All traffic from the sandbox routes through the host proxy at `host.docker.internal:3128`:
 
 ```
-Agent container → DinD bridge → Sandbox VM → host.docker.internal:3128 → Host proxy → api.anthropic.com
+Agent container → DinD bridge → Sandbox VM → host.docker.internal:3128 → Host proxy → api.openai.com
 ```
 
 **"Bypass" does not mean traffic skips the proxy.** It means the proxy passes traffic through without MITM inspection. Node.js doesn't automatically use `HTTP_PROXY` env vars — you need explicit `HttpsProxyAgent` configuration in every HTTP/WebSocket client.
@@ -316,7 +316,7 @@ npm config set strict-ssl false
 docker build \
   --build-arg http_proxy=$http_proxy \
   --build-arg https_proxy=$https_proxy \
-  -t clawbridge-agent:latest container/
+  -t clawbridge-codex:latest container/
 ```
 
 ### Agent containers fail with "path not shared"
@@ -325,7 +325,7 @@ All bind-mounted paths must be under the workspace directory. Check:
 - Is the CA cert copied to the project root?
 - Has the empty `.env` shadow file been created?
 
-### Agent containers can't reach Anthropic API
+### Agent containers can't reach OpenAI API
 Verify proxy env vars are forwarded to agent containers. Check container logs for `HTTP_PROXY=http://host.docker.internal:3128`.
 
 ### WhatsApp error 405
@@ -347,7 +347,7 @@ docker sandbox network proxy <sandbox-name> \
 ### Git clone fails with "inflate: data stream error"
 Clone to a non-workspace path first, then move:
 ```bash
-cd ~ && git clone https://github.com/other2368-byte/clawbridge-agent.git && mv clawbridge /path/to/workspace/clawbridge
+cd ~ && git clone https://github.com/mcarmona1064-cell/clawbridge-codex.git && mv clawbridge-codex /path/to/workspace/clawbridge-codex
 ```
 
 ### WhatsApp QR code doesn't display
@@ -355,5 +355,5 @@ Run the auth command interactively inside the sandbox (not piped through `docker
 ```bash
 docker sandbox run shell-clawbridge-workspace
 # Then inside:
-pnpm exec tsx src/whatsapp-auth.ts
+pnpm exec tsx setup/whatsapp-auth.ts
 ```

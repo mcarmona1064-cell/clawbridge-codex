@@ -1,7 +1,7 @@
 # Setup flow
 
 This document is the contract for ClawBridge's end-to-end scripted setup
-(`bash clawbridge.sh` → `pnpm run setup:auto`). Read it before adding a new
+(`bash clawbridge.sh` → `pnpm run setup:wizard`). Read it before adding a new
 step, fixing a regression, or changing how output is rendered.
 
 ## The three output levels
@@ -36,7 +36,7 @@ stranger on day one.
 
 Rules:
 - **No discontinuity.** Every sub-step belongs to the same visual flow.
-  The only exception is Anthropic credential registration (see below).
+  The only exception is OpenAI credential registration (see below).
 - **No raw child output.** Never `stdio: 'inherit'` a child whose output
   wasn't written by us. Capture it and show it on failure only.
 - **No debug-style prefixes** (`[add-telegram] …`, `INFO …`, timestamps).
@@ -69,7 +69,7 @@ Entry format:
 
 === [2026-04-22T22:15:00Z] container [92.4s] → success ===
   runtime: docker
-  image: clawbridge-agent:latest
+  image: clawbridge-codex:latest
   build_ok: true
   raw: logs/setup-steps/03-container.log
 ```
@@ -101,7 +101,7 @@ The log opens with a header block identifying the run, and closes with
 a completion block:
 
 ```
-## 2026-04-22T22:14:12Z · setup:auto started
+## 2026-04-22T22:14:12Z · setup:wizard started
   user: exedev
   cwd: /home/exedev/clawbridge
   branch: branded-setup
@@ -160,39 +160,28 @@ installer invoked from `auto.ts`), it must:
 The driver handles the rest: spinner in level 1, structured append to
 level 2, raw capture to level 3.
 
-## The Anthropic exception
+## The Codex authentication handoff
 
-Anthropic credential registration (`setup/register-claude-token.sh`) is
-the **one** permitted break in the visual flow. Why:
+Codex subscription authentication is handled by the official CLI:
 
-- `claude setup-token` opens a browser, runs its own OAuth prompt, and
-  prints the token. It owns the TTY via `script(1)`.
-- We don't want to re-implement the OAuth device flow ourselves.
-- We don't want to intercept / mirror the token (it appears in the
-  user's terminal already — mirroring it adds attack surface).
+```bash
+codex login --device-auth
+```
 
-So during this step:
-- The clack flow explicitly pauses (a `p.log.step` marker says "this
-  part is interactive, you're handing off to Anthropic").
-- The child inherits stdio fully.
-- When control returns, clack resumes on the next line with a success
-  marker.
+The setup flow may pause so the user can complete the device-auth login in a browser. The resulting `~/.codex/auth.json` stays on the host and is mounted read-only into runtime containers; setup must not mirror tokens or convert the login into API-key env vars.
 
-The level-2 log still gets an entry (`auth [interactive] → success`
-with the method — subscription / oauth-token / api-key). Level-3 captures
-are optional here; mirroring `script -q` output is tricky and the risk of
-leaking the token to disk outweighs the debugging value.
+The level-2 log should record the auth check as `auth → success|missing` with the method `codex_login`. Level-3 captures should avoid writing credential file contents to disk.
 
 ## File reference
 
 | File | Role |
 |---|---|
-| `clawbridge.sh` | Top-level wrapper. Phase 1 (bootstrap) and phase 2 (setup:auto) orchestration. Writes bootstrap's raw log + progression entry. |
+| `clawbridge.sh` | Top-level wrapper. Phase 1 (bootstrap) and phase 2 (setup:wizard) orchestration. Writes bootstrap's raw log + progression entry. |
 | `setup.sh` | Phase 1 bootstrap: Node, pnpm, native-module verify. Emits its own `BOOTSTRAP` status block (historically printed to stdout; now goes to the bootstrap raw log). |
-| `setup/auto.ts` | Phase 2 driver. Orchestrates the clack UI, step execution, user prompts, and writes to all three log levels for every step it spawns. |
+| `src/setup/index.ts` | Phase 2 interactive wizard. Orchestrates the clack UI, step execution, user prompts, and writes to all three log levels for every step it spawns. |
 | `setup/logs.ts` | The logging primitives (`logStep`, `logUserInput`, `logComplete`, `stepRawLog`, `initSetupLog`). Single source of truth for level 2/3 formatting and file paths. |
 | `setup/<step>.ts` | Individual step implementations. Must emit one terminal status block; must not write directly to the terminal. |
-| `setup/register-claude-token.sh` | The Anthropic exception. Inherits stdio, prints its own UI, returns a status to the driver. |
+| `setup/register-claude-token.sh` | The OpenAI exception. Inherits stdio, prints its own UI, returns a status to the driver. |
 | `setup/add-telegram.sh` | Non-interactive adapter installer. Reads `TELEGRAM_BOT_TOKEN` from env; never prompts. User-facing bits live in `auto.ts`. |
 | `setup/pair-telegram.ts` | Emits `PAIR_TELEGRAM_CODE` / `PAIR_TELEGRAM_ATTEMPT` / `PAIR_TELEGRAM` status blocks. Never prints UI. The driver renders it via clack notes. |
 
@@ -205,7 +194,7 @@ leaking the token to disk outweighs the debugging value.
   It breaks the clack flow — the spinner line gets torn. Use
   `log.info` / `log.error` from `src/log.ts` (writes to the raw log)
   instead.
-- **`stdio: 'inherit'` for a non-exception child.** See Anthropic above.
+- **`stdio: 'inherit'` for a non-exception child.** See OpenAI above.
   Anything else needs `pipe` + explicit capture.
 - **Tee-ing to stderr.** Clack's spinner owns the terminal during a step.
   Even stderr writes tear the frame. Pipe everything, then choose what

@@ -30,7 +30,7 @@ Before spinning up an agent container for a new message, the host process querie
 ```
 host receives message
   → recall(query=message, bank=client-{agentGroupId})
-  → inject top-k results into container's CLAUDE.md context
+  → inject top-k results into container's AGENTS.md context
   → wake container
 ```
 
@@ -72,11 +72,11 @@ Model used: **claude-sonnet** (higher quality — runs once per night, not per t
 
 ## Authentication
 
-Hindsight uses the `claude-code` provider, which reads `CLAUDE_CODE_OAUTH_TOKEN` from the environment.
+Hindsight uses the `claude-code` provider, which reads `HINDSIGHT_LLM_API_KEY` from the environment.
 
-**This is not a bare Anthropic API key.** It is the long-lived OAuth token issued by `claude setup-token` (starts with `sk-ant-oat`).
+**This is not a bare OpenAI API key.** It is the long-lived OAuth token issued by `configure HINDSIGHT_LLM_API_KEY` (starts with `sk-ant-oat`).
 
-If you have a separate API budget for Hindsight LLM operations, set `HINDSIGHT_LLM_API_KEY` in `~/.clawbridge/.env`. If unset, Hindsight falls back to `CLAUDE_CODE_OAUTH_TOKEN`.
+If you have a separate API budget for Hindsight LLM operations, set `HINDSIGHT_LLM_API_KEY` in `~/.clawbridge/.env`. If unset, Hindsight falls back to `HINDSIGHT_LLM_API_KEY`.
 
 ---
 
@@ -120,7 +120,7 @@ docker logs hindsight-db --tail 20
 ```
 
 **reflect returns 401:**
-The `reflect` call is being made with a wrong or expired token. Check that `CLAUDE_CODE_OAUTH_TOKEN` (or `HINDSIGHT_LLM_API_KEY` if set) is a valid long-lived OAuth token — not a short-lived keychain credential. Regenerate with `claude setup-token`.
+The `reflect` call is being made with a wrong or expired token. Check that `HINDSIGHT_LLM_API_KEY` (or `HINDSIGHT_LLM_API_KEY` if set) is a valid long-lived OAuth token — not a short-lived keychain credential. Regenerate with `configure HINDSIGHT_LLM_API_KEY`.
 
 **Hindsight not healthy after `clawbridge upgrade`:**
 The Docker image may need pulling. Run:

@@ -46,7 +46,7 @@ The main group's project root is mounted read-only. Writable paths the agent nee
 
 ### 3. Session Isolation
 
-Each group has isolated Claude sessions at `data/sessions/{group}/.claude/`:
+Each group has isolated Codex sessions at `data/sessions/{group}/.claude/`:
 - Groups cannot see other groups' conversation history
 - Session data includes full message history and file contents read
 - Prevents cross-group information disclosure
@@ -140,7 +140,7 @@ This should be rare. When a zero-day fix or critical dependency requires an imme
      some-package: "1.2.3"  # Approved by @user, 2026-04-14 — CVE-XXXX-YYYY fix
    ```
 3. The exclusion should be removed once the version ages past the threshold (i.e. after 3 days)
-4. Automated agents (Claude, CI bots) must never add exclusions without human sign-off
+4. Automated agents (Codex, CI bots) must never add exclusions without human sign-off
 
 ### Build Script Allowlist
 

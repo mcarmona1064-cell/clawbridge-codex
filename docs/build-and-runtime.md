@@ -15,7 +15,7 @@ Host and container each have their own package tree:
   pnpm-workspace.yaml         minimumReleaseAge + onlyBuiltDependencies policy
 
 /container/agent-runner/      Bun 1.3+
-  bun.lock                    agent-runner runtime deps (Claude Agent SDK, MCP SDK, zod, etc.)
+  bun.lock                    agent-runner runtime deps (Codex CLI, MCP SDK, zod, etc.)
   package.json                @types/bun, typescript devDeps for type-checking
 ```
 

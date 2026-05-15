@@ -36,7 +36,7 @@ import {
 } from './migrate.js';
 
 import { checkForUpdate, runUpgrade } from '../updater.js';
-import { getLaunchdLabel, getSystemdUnit } from '../install-slug.js';
+import { getContainerImageBase, getDefaultContainerImage, getLaunchdLabel, getSystemdUnit } from '../install-slug.js';
 
 // Handle "clawbridge-codex doctor" command
 if (process.argv[2] === 'doctor') {
@@ -498,9 +498,9 @@ async function runFreshInstall(): Promise<void> {
     const existingForHindsight = parseEnvFile(envPath);
     const hindsightLines: string[] = [''];
     const hindsightProviderVars = {
-      HINDSIGHT_API_LLM_PROVIDER: 'openai',
-      HINDSIGHT_API_LLM_MODEL: 'gpt-4o-mini',
+      HINDSIGHT_LLM_PROVIDER: 'openai',
       HINDSIGHT_API_RETAIN_LLM_MODEL: 'gpt-4o-mini',
+      HINDSIGHT_API_CONSOLIDATION_LLM_MODEL: 'gpt-4o-mini',
       HINDSIGHT_API_REFLECT_LLM_MODEL: 'gpt-4o',
     };
     for (const [key, value] of Object.entries(hindsightProviderVars)) {
@@ -583,13 +583,14 @@ async function runFreshInstall(): Promise<void> {
     hs.start('Running setup verification…');
     const checks: Array<{ label: string; ok: boolean; fix?: string }> = [];
 
+    const packageRootForCheck = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
+
     // Docker daemon
     const dockerCheck = spawnSync('docker', ['info'], { stdio: 'pipe', encoding: 'utf-8', timeout: 5000 });
     checks.push({ label: 'Docker daemon', ok: dockerCheck.status === 0 });
 
     // Container image
-    const { getDefaultContainerImage } = await import('../install-slug.js');
-    const imageTag = getDefaultContainerImage();
+    const imageTag = getDefaultContainerImage(packageRootForCheck);
     let imageOk = false;
     try {
       const ir = spawnSync('docker', ['image', 'inspect', imageTag], {
@@ -614,9 +615,8 @@ async function runFreshInstall(): Promise<void> {
     checks.push({ label: 'Hindsight memory', ok: hindsightOk, fix: 'run: docker compose up -d' });
 
     // Service registration
-    const packageRootForCheck = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../..');
     if (process.platform === 'darwin') {
-      const launchCheck = spawnSync('launchctl', ['list', cfg.agentName.toLowerCase()], {
+      const launchCheck = spawnSync('launchctl', ['list', getLaunchdLabel(packageRootForCheck)], {
         stdio: 'pipe',
         encoding: 'utf-8',
         timeout: 3000,
@@ -1110,6 +1110,7 @@ async function buildContainerImage(): Promise<boolean> {
     }
 
     const buildArgs: string[] = [];
+    const imageBase = getContainerImageBase(packageRoot);
 
     const s = p.spinner();
     s.start(`Building container image (this takes 1–2 min on first run)…`);
@@ -1118,6 +1119,7 @@ async function buildContainerImage(): Promise<boolean> {
       encoding: 'utf-8',
       cwd: path.join(packageRoot, 'container'),
       timeout: 300_000, // 5 min max
+      env: { ...process.env, CONTAINER_IMAGE_BASE: imageBase },
     });
     if (result.status === 0) {
       s.stop(k.green('Container image built.'));
@@ -1125,7 +1127,7 @@ async function buildContainerImage(): Promise<boolean> {
     } else {
       s.stop(k.red('Image build failed.'));
       if (result.stderr) console.error(result.stderr);
-      p.log.warn('To retry: clawbridge build-image');
+      p.log.warn('To retry: clawbridge-codex build-image');
       return false;
     }
   } catch (err) {
@@ -1160,7 +1162,9 @@ async function registerLaunchd(assistantName: string): Promise<void> {
       .replace(/\{\{SLUG\}\}/g, slug)
       .replace(/\{\{HOME\}\}/g, home)
       .replace(/\{\{NODE_PATH\}\}/g, nodePath)
-      .replace(/\{\{PROJECT_ROOT\}\}/g, packageRoot);
+      .replace(/\{\{PROJECT_ROOT\}\}/g, packageRoot)
+      .replace(/\{\{CONTAINER_IMAGE_BASE\}\}/g, getContainerImageBase(packageRoot))
+      .replace(/\{\{CONTAINER_IMAGE\}\}/g, getDefaultContainerImage(packageRoot));
 
     const launchAgentsDir = path.join(home, 'Library', 'LaunchAgents');
     fs.mkdirSync(launchAgentsDir, { recursive: true });
@@ -1206,7 +1210,9 @@ async function registerSystemd(assistantName: string): Promise<void> {
       .replace(/\{\{SLUG\}\}/g, unit)
       .replace(/\{\{HOME\}\}/g, home)
       .replace(/\{\{NODE_PATH\}\}/g, nodePath)
-      .replace(/\{\{PROJECT_ROOT\}\}/g, packageRoot);
+      .replace(/\{\{PROJECT_ROOT\}\}/g, packageRoot)
+      .replace(/\{\{CONTAINER_IMAGE_BASE\}\}/g, getContainerImageBase(packageRoot))
+      .replace(/\{\{CONTAINER_IMAGE\}\}/g, getDefaultContainerImage(packageRoot));
 
     const systemdUserDir = path.join(home, '.config', 'systemd', 'user');
     fs.mkdirSync(systemdUserDir, { recursive: true });

@@ -14,7 +14,7 @@ Last updated: 2026-04-09
 - Container clears stale `processing_ack` entries on startup (crash recovery)
 - Files: `src/db/schema.ts` (INBOUND_SCHEMA + OUTBOUND_SCHEMA), `src/session-manager.ts`, `src/delivery.ts`, `src/host-sweep.ts`, `container/agent-runner/src/db/connection.ts`, `messages-in.ts`, `messages-out.ts`, `poll-loop.ts`, `mcp-tools/scheduling.ts`, `mcp-tools/interactive.ts`
 - Container image rebuilt with tsconfig (`container/agent-runner/tsconfig.json`)
-- E2E verified: host → Docker container → Claude responds → "E2E works!" ✓
+- E2E verified: host → Docker container → Codex responds → "E2E works!" ✓
 
 ### Credential Injection
 - Credentials are read from `~/.clawbridge/.env` in `src/container-runner.ts` and passed directly to `docker run` via `-e`

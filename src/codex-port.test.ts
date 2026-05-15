@@ -36,15 +36,52 @@ describe('Codex port regression checks', () => {
     }
   });
 
-  it('uses Codex/OpenAI auth keys in setup and doctor code', () => {
-    for (const rel of ['setup/auth.ts', 'src/doctor.ts', 'setup/register.ts', 'setup/probe.sh', 'src/setup/index.ts']) {
+  it('setup auth requires Codex subscription OAuth and does not accept/create API-key runtime auth', () => {
+    const auth = read('setup/auth.ts');
+
+    expect(auth).toMatch(/\.codex['"],\s*['"]auth\.json/);
+    expect(auth).toContain('codex login --device-auth');
+    expect(auth).not.toMatch(/OPENAI_API_KEY/);
+    expect(auth).not.toMatch(/OPENAI_OK/);
+    expect(auth).not.toMatch(/hasApiKey/);
+    expect(auth).not.toMatch(/writeEnvKey/);
+    expect(auth).not.toMatch(/CREATED:\s*true/);
+
+    for (const rel of ['src/doctor.ts', 'setup/register.ts', 'setup/probe.sh', 'src/setup/index.ts']) {
       const content = read(rel);
       expect(content, rel).not.toMatch(/ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|claude setup-token|sk-ant/);
     }
 
-    expect(read('setup/auth.ts')).toContain('OPENAI_API_KEY');
     expect(read('src/doctor.ts')).toContain('~/.codex/auth.json');
     expect(read('setup/register.ts')).toContain('AGENTS.local.md');
+  });
+
+  it('quick-start hands off to durable interactive setup, not setup:auto', () => {
+    const quickStart = read('clawbridge.sh');
+    expect(quickStart).not.toMatch(/pnpm\s+(?:--silent\s+)?run\s+setup:auto\b/);
+    expect(quickStart).toMatch(/exec\s+pnpm\s+(?:--silent\s+)?run\s+setup:wizard\b/);
+    expect(quickStart).toContain('$HOME/.local/share/clawbridge-codex/source');
+  });
+
+  it('keeps active command hints on clawbridge-codex names', () => {
+    const activeHintFiles = [
+      'src/doctor.ts',
+      'src/container-runner.ts',
+      'src/updater.ts',
+      'src/setup/index.ts',
+      'setup/index.ts',
+      'setup/service.ts',
+      'setup/verify.ts',
+      'clawbridge.sh',
+    ];
+
+    const forbiddenHint =
+      /(?:run:\s*|Run:\s*|retry:\s*|reinstall:\s*|npm install -g\s+)(?:npx\s+)?(?:clawbridge-agent(?:@latest)?|clawbridge\b(?!-codex))/;
+
+    for (const rel of activeHintFiles) {
+      const content = read(rel);
+      expect(content, rel).not.toMatch(forbiddenHint);
+    }
   });
 
   it('writes and mounts AGENTS.md instead of Claude Code persona files', () => {
@@ -77,6 +114,23 @@ describe('Codex port regression checks', () => {
       .flatMap((root) => walk(root))
       .filter((file) => /\.(ts|tsx|js|sh|md|ya?ml)$/.test(file))
       .filter((file) => !allowedLegacyFiles.has(file))
+      .filter((file) => forbidden.test(fs.readFileSync(file, 'utf8')))
+      .map((file) => path.relative(ROOT, file));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps container active runtime free of Anthropic/Claude runtime artifacts', () => {
+    const activeContainerFiles = [
+      ...walk(path.join(ROOT, 'container', 'agent-runner', 'src')),
+      path.join(ROOT, 'container', 'agent-runner', 'package.json'),
+      path.join(ROOT, 'container', 'Dockerfile'),
+    ].filter((file) => fs.existsSync(file));
+
+    const forbidden =
+      /@anthropic-ai|api\.anthropic\.com|ANTHROPIC_[A-Z0-9_]*|CLAUDE_CODE_[A-Z0-9_]*|Claude Code|claude-code/i;
+    const offenders = activeContainerFiles
+      .filter((file) => /\.(ts|tsx|js|json|md)$/.test(file) || path.basename(file) === 'Dockerfile')
       .filter((file) => forbidden.test(fs.readFileSync(file, 'utf8')))
       .map((file) => path.relative(ROOT, file));
 

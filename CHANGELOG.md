@@ -30,14 +30,10 @@ All features from clawbridge-agent v2.9.2 are preserved: multi-channel
 adapters (Telegram, WhatsApp, Discord, Slack), Hindsight memory, scheduling,
 host-exec, OpenClaw migration, unified transcription, attachment forwarding.
 
-### Known follow-ups
-- The container-side composition pipeline still uses `CLAUDE.md` /
-  `CLAUDE.local.md` filenames. A follow-up commit will rename these to
-  `AGENTS.md` / `AGENTS.local.md` so Codex picks up agent persona files
-  by default. Until then, the runtime continues to read `CLAUDE.local.md`.
-- The container Dockerfile still installs the Claude binary alongside
-  Codex. To be removed in a follow-up once the runtime composition switch
-  lands.
+### Codex port hardening
+- Agent persona files are now composed as `AGENTS.md` / `AGENTS.local.md` for Codex.
+- Container images install and run Codex only; Claude-era runtime packages and token paths were removed.
+- Setup and doctor checks require host `~/.codex/auth.json` from `codex login --device-auth`; API-key env vars are not accepted as runtime auth.
 
 ---
 
@@ -58,7 +54,7 @@ host-exec, OpenClaw migration, unified transcription, attachment forwarding.
 ## v2.1.0 — 2026-04-27
 ### Breaking Change
 - feat: remove OneCLI dependency — credentials now injected from ~/.clawbridge/.env directly
-- If you had `ONECLI_URL` / `ONECLI_API_KEY` in your .env, they are no longer used. Ensure `CLAUDE_CODE_OAUTH_TOKEN` is set instead.
+- If you had `ONECLI_URL` / `ONECLI_API_KEY` in your .env, they are no longer used. Run `codex login --device-auth` so `~/.codex/auth.json` is present instead.
 
 ## v2.0.32 — 2026-04-27
 - fix: integration server port mapping 3003→8080

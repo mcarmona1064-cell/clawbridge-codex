@@ -182,17 +182,15 @@ HOST_DEPS=$(probe_host_deps)
 probe_docker
 SERVICE_STATUS=$(probe_service_status "$OS")
 
-# Check for credentials in .env
-probe_openai_env() {
-  local envfile="$PROJECT_ROOT/.env"
-  [[ -f "$envfile" ]] || { echo "false"; return; }
-  if grep -qE '^(OPENAI_API_KEY)=.+' "$envfile" 2>/dev/null || [ -f "$HOME/.codex/auth.json" ]; then
+# Check for Codex subscription OAuth. API-key env vars are not runtime auth.
+probe_codex_auth() {
+  if [ -f "$HOME/.codex/auth.json" ]; then
     echo "true"
   else
     echo "false"
   fi
 }
-OPENAI_SECRET=$(probe_openai_env)
+OPENAI_SECRET=$(probe_codex_auth)
 DISPLAY_NAME=$(probe_display_name "$OS")
 
 END_S=$(date +%s)

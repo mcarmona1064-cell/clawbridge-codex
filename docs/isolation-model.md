@@ -8,7 +8,7 @@ ClawBridge decouples messaging channels from agent groups. When you connect a ch
 
 Multiple channels feed into the same conversation. The agent sees all messages from all channels in one thread.
 
-**What's shared:** Everything — workspace, memory, CLAUDE.md, and the conversation itself. A GitHub PR comment and a Slack message appear side by side in the agent's context.
+**What's shared:** Everything — workspace, memory, AGENTS.md, and the conversation itself. A GitHub PR comment and a Slack message appear side by side in the agent's context.
 
 **Example:** A Slack channel paired with GitHub webhooks. The agent receives PR review requests via GitHub and discusses them in Slack — all in one session. When someone comments on a PR, the agent can reference the earlier Slack discussion about that feature.
 
@@ -22,7 +22,7 @@ Multiple channels feed into the same conversation. The agent sees all messages f
 
 Multiple channels share the same agent (same workspace, memory, personality) but have independent conversations.
 
-**What's shared:** Workspace, memory, CLAUDE.md, and all persistent state. If you tell the agent something in one session, it can save that to memory and recall it in another. The agent's personality, knowledge, and tools are identical across sessions.
+**What's shared:** Workspace, memory, AGENTS.md, and all persistent state. If you tell the agent something in one session, it can save that to memory and recall it in another. The agent's personality, knowledge, and tools are identical across sessions.
 
 **What's separate:** The conversation thread. Messages from one channel don't appear in the other channel's session. Each channel has its own context window and conversation history.
 
@@ -38,7 +38,7 @@ Multiple channels share the same agent (same workspace, memory, personality) but
 
 Each channel gets its own agent with its own workspace, memory, and personality. Nothing is shared.
 
-**What's shared:** Nothing. The agents don't know about each other. Different CLAUDE.md, different memory, different workspace, different conversation history.
+**What's shared:** Nothing. The agents don't know about each other. Different AGENTS.md, different memory, different workspace, different conversation history.
 
 **Example:** You have a Telegram group with a friend and a Discord server for a team project. The friend shouldn't know what you discuss with your team, and vice versa. Each gets its own agent with its own memory and personality.
 
@@ -76,7 +76,7 @@ If different people are involved → separate agent groups. Information will cro
 ## Entity Model
 
 ```
-agent_groups (workspace, memory, CLAUDE.md, personality)
+agent_groups (workspace, memory, AGENTS.md, personality)
     ↕ many-to-many
 messaging_groups (a specific channel/chat/group on a platform)
     via

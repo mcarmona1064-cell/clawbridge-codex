@@ -77,26 +77,26 @@ type ProviderEvent =
 ### What the interface does NOT include
 
 - **Message formatting** — the agent-runner formats messages before passing to the provider. The provider receives a ready-to-send prompt string.
-- **Hooks** — Claude-specific. The Claude provider registers hooks internally (PreCompact, PreToolUse, etc.). Other providers don't need them.
-- **Tool allowlists** — Claude uses `allowedTools`, configured internally to allow everything without prompting.
-- **Session persistence** — Claude persists sessions to disk automatically. The agent-runner passes `sessionId` and `resumeAt`.
+- **Hooks** — Codex-specific. The Codex provider registers hooks internally (PreCompact, PreToolUse, etc.). Other providers don't need them.
+- **Tool allowlists** — Codex uses `allowedTools`, configured internally to allow everything without prompting.
+- **Session persistence** — Codex persists sessions to disk automatically. The agent-runner passes `sessionId` and `resumeAt`.
 - **Sandbox configuration** — provider-specific. Each provider configures its own sandbox internally.
 
 ### Provider event semantics
 
 - **`init`** — emitted once per query when the provider establishes or resumes a session. The agent-runner captures `sessionId` for future resume.
-- **`result`** — emitted when the agent produces a complete response. May be emitted multiple times per query (e.g., Claude's multi-turn with subagents). The agent-runner writes each result to messages_out.
+- **`result`** — emitted when the agent produces a complete response. May be emitted multiple times per query (e.g., Codex's multi-turn with subagents). The agent-runner writes each result to messages_out.
 - **`error`** — emitted on failure. `retryable` indicates whether the agent-runner should retry. `classification` is optional detail (e.g., 'quota', 'auth', 'transport').
 - **`progress`** — optional, for logging. The agent-runner logs these but doesn't act on them.
 
 ## Provider Implementations
 
-### Claude Provider
+### Codex Provider
 
 Wraps `@anthropic-ai/claude-agent-sdk`'s `query()`.
 
 ```typescript
-class ClaudeProvider implements AgentProvider {
+class CodexProvider implements AgentProvider {
   query(input: QueryInput): AgentQuery {
     const stream = new MessageStream();  // AsyncIterable<SDKUserMessage>
     stream.push(input.prompt);
@@ -127,13 +127,13 @@ class ClaudeProvider implements AgentProvider {
       push: (msg) => stream.push(msg),
       end: () => stream.end(),
       abort: () => sdkQuery.close(),
-      events: translateClaudeEvents(sdkQuery),
+      events: translateCodexEvents(sdkQuery),
     };
   }
 }
 ```
 
-`translateClaudeEvents` is an async generator that maps SDK messages to `ProviderEvent`:
+`translateCodexEvents` is an async generator that maps SDK messages to `ProviderEvent`:
 - `message.type === 'system' && message.subtype === 'init'` → `{ type: 'init', sessionId }`
 - `message.type === 'result'` → `{ type: 'result', text }`
 - `message.type === 'system' && message.subtype === 'api_retry'` → `{ type: 'error', retryable: true }`
@@ -141,7 +141,7 @@ class ClaudeProvider implements AgentProvider {
 - `message.type === 'system' && message.subtype === 'task_notification'` → `{ type: 'progress', message }`
 - Everything else → logged, not emitted
 
-**Claude-specific features preserved inside the provider:**
+**Codex-specific features preserved inside the provider:**
 - `MessageStream` for async iterable input (push-based)
 - `resumeSessionAt` for resume at specific message UUID
 - PreCompact hook for transcript archiving
@@ -191,7 +191,7 @@ Everything below is handled by the agent-runner, not the provider.
 - An `ask_user_question` tool call is pending (waiting for user response in messages_in)
 - The agent is actively working (tool calls in progress, subagents running)
 
-The agent-runner signals "busy" status to the host. The mechanism for this is provider-specific — for Claude, the query AsyncGenerator is still yielding events. For others, the agent-runner can write a heartbeat or status indicator to the session DB that the host checks before killing.
+The agent-runner signals "busy" status to the host. The mechanism for this is provider-specific — for Codex, the query AsyncGenerator is still yielding events. For others, the agent-runner can write a heartbeat or status indicator to the session DB that the host checks before killing.
 
 ### Message Formatting
 
@@ -215,7 +215,7 @@ The agent-runner transforms messages_in rows into a prompt string. The provider 
     [image: screenshot.png — https://signed-url...]
   </message>
   ```
-  Attachments are listed inline. Images/PDFs that Claude handles natively are passed as content blocks (see Media Handling below).
+  Attachments are listed inline. Images/PDFs that Codex handles natively are passed as content blocks (see Media Handling below).
 
 - **`task`** — task prompt, optionally with script output:
   ```
@@ -256,7 +256,7 @@ The agent-runner transforms messages_in rows into a prompt string. The provider 
 
 Mixed kinds (e.g., a chat message + a system response) are combined with clear delimiters. Each section is labeled by kind.
 
-**Command detection:** Messages starting with `/` are checked against a command list. Recognized commands bypass formatting and are passed raw to the provider (for Claude's slash command handling) or intercepted by the agent-runner (for ClawBridge-level commands like session reset).
+**Command detection:** Messages starting with `/` are checked against a command list. Recognized commands bypass formatting and are passed raw to the provider (for Codex's slash command handling) or intercepted by the agent-runner (for ClawBridge-level commands like session reset).
 
 ### Routing
 
@@ -372,7 +372,7 @@ Implementation:
 4. When found, return the `selectedOption` as the tool result
 5. If timeout expires, return a timeout error as the tool result
 
-The agent's execution is paused at this tool call. The provider's query keeps running (Claude holds the tool call open). The agent-runner polls for the response in a separate loop.
+The agent's execution is paused at this tool call. The provider's query keeps running (Codex holds the tool call open). The agent-runner polls for the response in a separate loop.
 
 #### edit_message
 
@@ -498,7 +498,7 @@ The agent-runner inspects attachments in chat/chat-sdk messages and handles them
 
 **Provider-native content blocks:**
 
-| Type | Claude |
+| Type | Codex |
 |------|--------|------------------|
 | Images (JPEG, PNG, GIF, WebP) | Native image content block | Save to disk |
 | PDFs | Native document content block | Save to disk |
@@ -518,7 +518,7 @@ The agent can use tools (Read, Bash) to access saved files.
 
 For channels where direct download isn't possible (e.g., WhatsApp buffered streams), the channel adapter serves the media via a local URL. The agent-runner downloads from that URL.
 
-**Content block construction (Claude):** The agent-runner builds multi-part `MessageParam` content: `[{ type: 'image', source: { type: 'base64', media_type, data } }, { type: 'text', text: '...' }]`. The prompt passed to the provider is not a plain string in this case — the `QueryInput.prompt` field needs to support structured content for Claude. The provider's `query()` method handles the format-specific construction.
+**Content block construction (Codex):** The agent-runner builds multi-part `MessageParam` content: `[{ type: 'image', source: { type: 'base64', media_type, data } }, { type: 'text', text: '...' }]`. The prompt passed to the provider is not a plain string in this case — the `QueryInput.prompt` field needs to support structured content for Codex. The provider's `query()` method handles the format-specific construction.
 
 #### Outbound (agent → messages_out)
 
@@ -536,7 +536,7 @@ For `task` kind messages with a `script` field in the content:
 
 ### Transcript Archiving
 
-The agent-runner archives conversation transcripts before context compaction. For Claude, this is handled via the PreCompact hook (provider-internal). For other providers that don't have hooks, the agent-runner archives after each query completes based on the provider's output.
+The agent-runner archives conversation transcripts before context compaction. For Codex, this is handled via the PreCompact hook (provider-internal). For other providers that don't have hooks, the agent-runner archives after each query completes based on the provider's output.
 
 Archive location: `/workspace/agent/conversations/{date}-{summary}.md`
 
@@ -545,7 +545,7 @@ Archive location: `/workspace/agent/conversations/{date}-{summary}.md`
 The agent-runner tracks `sessionId` and `resumeAt` across queries:
 
 - `sessionId` — captured from `ProviderEvent { type: 'init' }`. Passed back to `QueryInput.sessionId` on the next query.
-- `resumeAt` — Claude-specific (last assistant message UUID). Stored by the agent-runner, passed to `QueryInput.resumeAt`. Providers that don't support this ignore it.
+- `resumeAt` — Codex-specific (last assistant message UUID). Stored by the agent-runner, passed to `QueryInput.resumeAt`. Providers that don't support this ignore it.
 
 These are ephemeral to the container's lifetime. When the container is killed and restarted, the host passes the stored `sessionId` from the central DB's sessions table. `resumeAt` is lost on container restart (the provider resumes from the end of the session).
 
@@ -554,7 +554,7 @@ These are ephemeral to the container's lifetime. When the container is killed an
 The agent-runner receives configuration via:
 
 - **Environment variables:** `AGENT_PROVIDER` (default: codex), `CLAWBRIDGE_ADMIN_USER_ID`, provider-specific vars (API keys, model overrides), `TZ`
-- **Fixed mount paths:** Session DB at `/workspace/session.db`. Agent group folder at `/workspace/agent/`. System prompt from `/workspace/agent/CLAUDE.md` and `/workspace/global/CLAUDE.md`.
+- **Fixed mount paths:** Session DB at `/workspace/session.db`. Agent group folder at `/workspace/agent/`. System prompt from `/workspace/agent/AGENTS.md` and `/workspace/global/AGENTS.md`.
 - **Optional startup config:** Some config may be passed as a JSON file at a fixed path (e.g., `/workspace/config.json`) for things like the session ID to resume, assistant name, and admin user ID. This avoids overloading environment variables.
 
 The agent-runner reads config, creates the provider, and enters the poll loop. No stdin, no initial prompt — messages are already in the session DB.
@@ -580,7 +580,7 @@ The provider name comes from the container's environment (`AGENT_PROVIDER` env v
 
 - MCP server is a separate Node process spawned by the provider (via `mcpServers` config)
 - The MCP server binary is shared across providers — same tools, same DB access
-- CLAUDE.md loading (global + per-group) — agent-runner reads and passes as `systemPrompt`
+- AGENTS.md loading (global + per-group) — agent-runner reads and passes as `systemPrompt`
 - Additional directories discovery (`/workspace/extra/*`)
 - Logging via stderr (`[agent-runner] ...`)
 

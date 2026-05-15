@@ -2,7 +2,7 @@
 
 ## Structure
 
-**`other2368-byte/clawbridge-agent`** (upstream) — core engine with skill definitions (`.claude/skills/`). No channel code on `main`.
+**`mcarmona1064-cell/clawbridge-codex`** (upstream) — core engine with skill definitions (`skills/`). No channel code on `main`.
 
 **Channel forks** (`clawbridge-whatsapp`, `clawbridge-telegram`, `clawbridge-slack`, etc.) — each fork = upstream + one channel's code applied. Users clone upstream, then merge a fork into their clone to add a channel.
 
@@ -65,7 +65,7 @@ Source code changes (e.g. `src/types.ts`, `src/index.ts`) usually auto-merge cle
 
 ## When to merge forward
 
-After any main change that touches shared files (`package.json`, `src/index.ts`, `CLAUDE.md`, etc.). Small frequent merges = trivial conflicts. Large infrequent merges = painful.
+After any main change that touches shared files (`package.json`, `src/index.ts`, `AGENTS.md`, etc.). Small frequent merges = trivial conflicts. Large infrequent merges = painful.
 
 ## Fork setup
 

@@ -134,14 +134,12 @@ export async function run(_args: string[]): Promise<void> {
     // Docker not running
   }
 
-  // 3. Check credentials
+  // 3. Check Codex subscription OAuth. Runtime auth is intentionally not
+  // satisfied by API-key env vars because the Codex provider strips them.
   let credentials = 'missing';
-  const envFile = path.join(projectRoot, '.env');
-  if (fs.existsSync(envFile)) {
-    const envContent = fs.readFileSync(envFile, 'utf-8');
-    if (/^(OPENAI_API_KEY|ONECLI_URL)=/m.test(envContent)) {
-      credentials = 'configured';
-    }
+  const codexAuthPath = path.join(os.homedir(), '.codex', 'auth.json');
+  if (fs.existsSync(codexAuthPath)) {
+    credentials = 'configured';
   }
 
   // 4. Check channel auth (detect configured channels by credentials)

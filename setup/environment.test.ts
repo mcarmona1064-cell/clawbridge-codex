@@ -79,24 +79,22 @@ describe('detectRegisteredGroups', () => {
   });
 });
 
-describe('credentials detection', () => {
-  it('detects OPENAI_API_KEY in env content', () => {
-    const content =
-      'SOME_KEY=value\nOPENAI_API_KEY=sk-proj-test123\nOTHER=foo';
-    const hasCredentials = /^OPENAI_API_KEY=/m.test(content);
-    expect(hasCredentials).toBe(true);
+describe('Codex credentials detection', () => {
+  it('does not treat API-key env content as runtime auth', () => {
+    const content = 'SOME_KEY=value\nOPENAI_API_KEY=sk-test\nOTHER=foo';
+    const hasRuntimeCredential = /^CODEX_AUTH_JSON=/m.test(content);
+    expect(hasRuntimeCredential).toBe(false);
   });
 
-  it('detects OPENAI_API_KEY across multiple lines', () => {
-    const content = 'OPENAI_API_KEY=token123';
-    const hasCredentials = /^OPENAI_API_KEY=/m.test(content);
-    expect(hasCredentials).toBe(true);
+  it('uses Codex auth.json as the runtime credential source', () => {
+    const authPath = path.join('/tmp/example-home', '.codex', 'auth.json');
+    expect(authPath).toContain(path.join('.codex', 'auth.json'));
   });
 
-  it('returns false when no credentials', () => {
+  it('returns false when no Codex login marker is present', () => {
     const content = 'ASSISTANT_NAME="Andy"\nOTHER=foo';
-    const hasCredentials = /^OPENAI_API_KEY=/m.test(content);
-    expect(hasCredentials).toBe(false);
+    const hasRuntimeCredential = /^CODEX_AUTH_JSON=/m.test(content);
+    expect(hasRuntimeCredential).toBe(false);
   });
 });
 

@@ -15,14 +15,14 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 # Derive the image name from the project root so two ClawBridge installs on the
-# same host don't overwrite each other's `clawbridge-agent:latest` tag. Matches
+# same host don't overwrite each other's `clawbridge-codex:latest` tag. Matches
 # setup/lib/install-slug.sh + src/install-slug.ts.
 # shellcheck source=../setup/lib/install-slug.sh
 source "$PROJECT_ROOT/setup/lib/install-slug.sh"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 
 DOCKERFILE="Dockerfile"
-IMAGE_BASE="$(container_image_base)"
+IMAGE_BASE="${CONTAINER_IMAGE_BASE:-$(container_image_base)}"
 IMAGE_NAME="${IMAGE_BASE}"
 TAG="${1:-latest}"
 

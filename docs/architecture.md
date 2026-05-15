@@ -19,7 +19,7 @@ Each agent session has a mounted SQLite DB. The DB is the one and only IO mechan
 
 ## Agent Groups vs Sessions
 
-An agent group has its own filesystem — folder, CLAUDE.md, skills, container config. Multiple sessions can share the same agent group (same filesystem, same skills) but each session gets its own DB mounted at a known path. Each session = a separate container with the same agent group's filesystem but a different session DB.
+An agent group has its own filesystem — folder, AGENTS.md, skills, container config. Multiple sessions can share the same agent group (same filesystem, same skills) but each session gets its own DB mounted at a known path. Each session = a separate container with the same agent group's filesystem but a different session DB.
 
 ## Message Flow
 
@@ -32,7 +32,7 @@ Platform event
   → Host calls wakeUpAgent(session)
   → Container spins up (or is already running)
   → Agent-runner polls its session DB, finds new messages
-  → Agent-runner processes with Claude
+  → Agent-runner processes with Codex
   → Agent-runner writes response to session DB
   → Host polls active session DBs for responses
   → Host reads response, looks up conversation, delivers through channel adapter
@@ -147,7 +147,7 @@ The agent-runner detects file types and passes supported types as native content
 
 "Save to disk" means downloaded to `/workspace/downloads/{messageId}/` and referenced in the prompt text as an available file path. The agent can use tools (Read, Bash) to access it.
 
-The agent-runner builds the prompt per provider. For Claude, it constructs multi-part `MessageParam` content with image/document blocks.
+The agent-runner builds the prompt per provider. For Codex, it constructs multi-part `MessageParam` content with image/document blocks.
 
 ### Outbound
 
@@ -386,7 +386,7 @@ This is documented as a pattern, not a built-in feature.
 ## Core Properties
 - Container isolation via filesystem mounts
 - Credential injection from ~/.clawbridge/.env at container spawn time
-- Per-agent-group workspace (folder, CLAUDE.md, skills)
+- Per-agent-group workspace (folder, AGENTS.md, skills)
 - Polling-based (not event-driven)
 - Per-agent-group agent-runner recompilation on container startup (agent can modify its own source, request rebuild/restart, changes persist across teardowns)
 - Host ↔ container IO through mounted session DBs (`messages_in` / `messages_out`) — no stdin piping, no IPC files
@@ -401,22 +401,22 @@ This is documented as a pattern, not a built-in feature.
 
 ## Design Decisions
 
-**Session DB location:** Not in the agent group folder. Separate directory (e.g., `sessions/{session_id}/`). Each session gets its own folder containing `session.db` and the Claude SDK's `.claude/` directory. The session identity IS the folder — no need to track Claude SDK session IDs.
+**Session DB location:** Not in the agent group folder. Separate directory (e.g., `sessions/{session_id}/`). Each session gets its own folder containing `session.db` and the Codex SDK's `.claude/` directory. The session identity IS the folder — no need to track Codex SDK session IDs.
 
 **Container mount structure:**
 
 ```
 /workspace/                 ← mount: session folder (read-write)
-  .claude/                  ← Claude SDK session data (auto-created)
+  .claude/                  ← Codex SDK session data (auto-created)
   session.db                ← session SQLite DB
   outbox/                   ← agent-runner writes outbound files here
   agent/                    ← mount: agent group folder (nested, read-write)
-    CLAUDE.md               ← agent instructions
+    AGENTS.md               ← agent instructions
     skills/                 ← agent skills
     ... working files
 ```
 
-Two directory mounts: session folder at `/workspace`, agent group folder at `/workspace/agent/`. The agent-runner CDs into `/workspace/agent/` to run the agent. Claude SDK writes `.claude/` at `/workspace/.claude/` (root of the workspace). The session DB is at `/workspace/session.db`.
+Two directory mounts: session folder at `/workspace`, agent group folder at `/workspace/agent/`. The agent-runner CDs into `/workspace/agent/` to run the agent. Codex SDK writes `.claude/` at `/workspace/.claude/` (root of the workspace). The session DB is at `/workspace/session.db`.
 
 This works on both Docker (nested bind mounts) and Apple Container (directory mounts only — no file-level mounts, but nested directory mounts are supported).
 
@@ -431,7 +431,7 @@ This works on both Docker (nested bind mounts) and Apple Container (directory mo
 3. More messages arrive before container starts → host finds the existing session, writes to the same session DB
 4. Container starts, mounts the folder, agent-runner finds messages waiting
 
-The central DB session row creation is the serialization point. No Claude SDK session ID to coordinate — the SDK discovers its own session data in `.claude/` when the agent runs.
+The central DB session row creation is the serialization point. No Codex SDK session ID to coordinate — the SDK discovers its own session data in `.claude/` when the agent runs.
 
 **System actions:** The agent uses MCP tools (register group, reset session, schedule task, etc.). The agent-runner handles these tool calls and writes a structured, deterministic messages_out row with `kind: 'system'`. This is not natural language — it's a programmatic, structured payload that the host processes deterministically. Host validates permissions, executes, and writes the result back as a `system` messages_in row.
 
@@ -441,7 +441,7 @@ The central DB session row creation is the serialization point. No Claude SDK se
 
 ### Output Delivery
 
-ClawBridge does not stream tokens to users. The Claude Agent SDK's `query()` yields complete results. The agent-runner writes one complete message to messages_out per result. The host delivers complete messages to channels.
+ClawBridge does not stream tokens to users. The Codex CLI's `query()` yields complete results. The agent-runner writes one complete message to messages_out per result. The host delivers complete messages to channels.
 
 Message editing is supported as an explicit operation (agent calls an `edit_message` tool), not as a streaming mechanism.
 
@@ -603,7 +603,7 @@ These are the building blocks. None require special abstractions — they fall o
 
 1. **Multiple agent groups on the same channel with content-based routing.** Different messages in the same thread can route to different agent groups based on content (e.g., @mention routes to supervisor, normal messages route to worker). The channel adapter's routing logic — custom code — decides.
 
-2. **Per-thread sessions from a shared agent group.** Multiple sessions share the same agent group (filesystem, skills, CLAUDE.md) but each gets its own session DB. Standard for worker pools.
+2. **Per-thread sessions from a shared agent group.** Multiple sessions share the same agent group (filesystem, skills, AGENTS.md) but each gets its own session DB. Standard for worker pools.
 
 3. **Session reset and replay.** Create a new session for the same thread. Mark old messages as unhandled so the poll picks them up again. Old output stays visible in the platform (e.g., Discord thread) for comparison. This is an action an agent can request — not automatic.
 
@@ -650,7 +650,7 @@ Three agent groups, one Discord channel (PR Factory), plus an admin channel:
 The central DB handles routing and entity management. All content and execution state lives in per-session DBs.
 
 ```sql
--- Agent workspaces: folder, skills, CLAUDE.md, container config
+-- Agent workspaces: folder, skills, AGENTS.md, container config
 CREATE TABLE agent_groups (
   id               TEXT PRIMARY KEY,
   name             TEXT NOT NULL,
@@ -783,7 +783,7 @@ stopped → running → idle → stopped
 
 ## Agent-Runner Architecture
 
-The agent-runner is the process inside the container. It mediates between the session DB and the Claude SDK — polling for work, formatting messages for the agent, translating tool calls into DB rows, and managing the agent lifecycle.
+The agent-runner is the process inside the container. It mediates between the session DB and the Codex SDK — polling for work, formatting messages for the agent, translating tool calls into DB rows, and managing the agent lifecycle.
 
 ### IO Model
 
@@ -799,7 +799,7 @@ All IO goes through the session DB. No stdin, no stdout markers, no IPC files.
 1. Query `messages_in WHERE status = 'pending' AND (process_after IS NULL OR process_after <= now())`
 2. If rows found: set `status = 'processing'`, `status_changed = now()` on each
 3. Batch messages into a single prompt (strip routing fields, format by kind)
-4. Push into Claude SDK's MessageStream
+4. Push into Codex SDK's MessageStream
 5. Process agent output → write `messages_out` rows
 6. Set processed messages to `status = 'completed'`
 7. Back to step 1. If no messages found, sleep briefly and re-poll (container stays warm for idle timeout)
@@ -856,7 +856,7 @@ See [agent-runner-details.md](agent-runner-details.md) for full MCP tool paramet
 Messages starting with `/` are checked against three lists:
 
 **Whitelisted commands (pass-through to agent):**
-- Standard slash commands that the agent provider handles natively (e.g., Claude's built-in commands)
+- Standard slash commands that the agent provider handles natively (e.g., Codex's built-in commands)
 - Passed raw, no `<messages>` XML wrapping
 
 **Admin-only commands (require admin sender):**
@@ -875,7 +875,7 @@ The command lists are hardcoded in the agent-runner. Admin verification happens 
 
 The agent-runner processes recurring task messages like any other messages_in row. After the agent-runner marks a recurring message as `completed`, the **host** handles inserting the next occurrence (new messages_in row with `process_after` advanced to next cron time). The agent-runner doesn't manage recurrence — it just processes what it finds.
 
-Pre-scripts: if a task message has a `script` field, run it first. If `wakeAgent = false`, mark completed without invoking Claude.
+Pre-scripts: if a task message has a `script` field, run it first. If `wakeAgent = false`, mark completed without invoking Codex.
 
 ### Agent-to-Agent Messaging
 
@@ -887,15 +887,15 @@ Pre-scripts: if a task message has a `script` field, run it first. If `wakeAgent
 
 - AgentProvider interface wraps SDK-specific query logic (trunk ships the `claude` provider; additional providers install via `/add-<provider>` skills)
 - Session resume via provider-specific mechanisms
-- System prompt loading from CLAUDE.md files
-- PreCompact hook for transcript archiving (Claude provider)
+- System prompt loading from AGENTS.md files
+- PreCompact hook for transcript archiving (Codex provider)
 - Script execution for task-kind messages
 
 ## Open Questions
 
 - **Approval routing** — how does the host find the admin's DM conversation? What if no DM channel exists? Is the approval list configurable per agent group or global?
 - **MCP server lifecycle** — does the MCP server process persist across multiple queries in the same container, or restart each time?
-- **Container startup config** — what config (if any) is passed to the container at launch beyond env vars? The session DB is at a fixed mount path. System prompt comes from CLAUDE.md. Provider name comes from env. What else?
+- **Container startup config** — what config (if any) is passed to the container at launch beyond env vars? The session DB is at a fixed mount path. System prompt comes from AGENTS.md. Provider name comes from env. What else?
 - **Idle detection with pending questions** — when `ask_user_question` is waiting for a response, the container should not be considered idle. Also need to detect when the agent is still working (active tool calls, subagents) and avoid killing the container even if no messages_out have been written recently.
 
 ## Related Documents

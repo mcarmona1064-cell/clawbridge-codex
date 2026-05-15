@@ -34,7 +34,7 @@ data/
   v2.db                                   ← CENTRAL (host ↔ host)
   v2-sessions/
     <agent_group_id>/
-      .claude-shared/                     ← shared Claude state for the agent group
+      .claude-shared/                     ← shared Codex state for the agent group
       agent-runner-src/                   ← per-group agent-runner overlay
       <session_id>/
         inbound.db                        ← host writes, container reads

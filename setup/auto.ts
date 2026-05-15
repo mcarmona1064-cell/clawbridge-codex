@@ -1,5 +1,6 @@
-// TODO: This scripted path is incomplete — use `clawbridge-agent setup` (interactive wizard) instead.
-// See Bug 6 in diagnostic report 2026-04-27.
+// Legacy scripted setup path. The public quick-start now hands off to the
+// supported interactive wizard (`clawbridge-codex setup`). Keep this file only
+// for explicit internal step orchestration until it is fully retired.
 /**
  * Non-interactive setup driver — the step sequencer for `pnpm run setup:auto`.
  *

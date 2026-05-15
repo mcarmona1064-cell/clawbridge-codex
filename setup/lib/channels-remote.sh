@@ -2,14 +2,14 @@
 # branch. Source this file and call `resolve_channels_remote`; echoes the
 # remote name (e.g. `origin` or `upstream`).
 #
-# Typical fork setups keep the upstream clawbridge repo under a remote named
+# Typical fork setups keep the upstream clawbridge-codex repo under a remote named
 # `upstream`, with `origin` pointing at the user's fork. The channels branch
 # only lives upstream, so a hardcoded `git fetch origin channels` fails for
 # forks. This helper walks `git remote -v`, picks the remote whose URL points
-# at other2368-byte/clawbridge-agent, and prints its name.
+# at mcarmona1064-cell/clawbridge-codex, and prints its name.
 #
 # Fallback: if no existing remote matches, add `upstream` pointing at
-# github.com/other2368-byte/clawbridge-agent and return that — keeps forks without an
+# github.com/mcarmona1064-cell/clawbridge-codex and return that — keeps forks without an
 # explicit upstream configured working on the first try.
 #
 # Explicit override: set CLAWBRIDGE_CHANNELS_REMOTE=<name> to skip detection.
@@ -23,7 +23,7 @@ resolve_channels_remote() {
   local remote url
   while IFS=$'\t' read -r remote url; do
     case "$url" in
-      *other2368-byte/clawbridge-agent*)
+      *mcarmona1064-cell/clawbridge-codex*)
         printf '%s' "$remote"
         return 0
         ;;
@@ -33,6 +33,6 @@ resolve_channels_remote() {
   # No matching remote — add `upstream` and use it. Silent on failure so
   # callers see the eventual `git fetch` error rather than a cryptic
   # remote-add failure.
-  git remote add upstream https://github.com/other2368-byte/clawbridge-agent.git 2>/dev/null || true
+  git remote add upstream https://github.com/mcarmona1064-cell/clawbridge-codex.git 2>/dev/null || true
   printf '%s' "upstream"
 }

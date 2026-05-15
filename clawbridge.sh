@@ -4,11 +4,9 @@
 #
 # Runs two parts from the user's perspective as one continuous flow:
 #   - bash-side: install the basics (Node + pnpm + native modules) under a
-#     bash-rendered clack-alike spinner. Can't use setup/auto.ts here since
-#     tsx isn't available until pnpm install completes.
-#   - hand off to `pnpm run setup:auto`, which renders the rest with
-#     @clack/prompts. The wordmark is printed once here so setup:auto can
-#     skip it and the flow reads as a single sequence.
+#     bash-rendered clack-alike spinner.
+#   - hand off to the durable interactive setup wizard. The wordmark is printed
+#     once here so the flow reads as a single sequence.
 #
 # Obeys the three-level output contract (see docs/setup-flow.md):
 #   1. User-facing       — concise status line with elapsed time
@@ -16,17 +14,25 @@
 #   3. Raw per-step log  — logs/setup-steps/NN-name.log (full verbatim output)
 #
 # Config via env — passed through unchanged:
-#   CLAWBRIDGE_SKIP  comma-separated setup:auto step names to skip
+#   CLAWBRIDGE_SKIP  comma-separated setup wizard step names to skip
+#   CLAWBRIDGE_SOURCE_DIR durable checkout dir for curl installs
 #   SECRET_NAME    OneCLI secret name (default: OpenAI)
 #   HOST_PATTERN   OneCLI host pattern (default: api.openai.com)
 
 set -euo pipefail
 
-# ─── bootstrap: if running via bash <(curl ...) re-exec from a cloned copy ───
+# ─── bootstrap: if running via bash <(curl ...) re-exec from a durable clone ───
 if [[ "${BASH_SOURCE[0]}" == /dev/fd/* ]] || [[ ! -f "${BASH_SOURCE[0]%/*}/setup/lib/diagnostics.sh" ]]; then
-  CLONE_DIR="$(mktemp -d)/clawbridge-codex"
+  CLONE_DIR="${CLAWBRIDGE_SOURCE_DIR:-$HOME/.local/share/clawbridge-codex/source}"
   echo "Downloading ClawBridge..."
-  git clone --depth 1 --quiet https://github.com/mcarmona1064-cell/clawbridge-codex.git "$CLONE_DIR"
+  if [ -d "$CLONE_DIR/.git" ]; then
+    git -C "$CLONE_DIR" fetch --depth 1 origin main --quiet
+    git -C "$CLONE_DIR" reset --hard FETCH_HEAD --quiet
+  else
+    rm -rf "$CLONE_DIR"
+    mkdir -p "$(dirname "$CLONE_DIR")"
+    git clone --depth 1 --quiet https://github.com/mcarmona1064-cell/clawbridge-codex.git "$CLONE_DIR"
+  fi
   exec bash "$CLONE_DIR/clawbridge.sh" "$@"
 fi
 
@@ -56,7 +62,7 @@ write_header() {
   branch=$(git branch --show-current 2>/dev/null || echo unknown)
   commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
   {
-    echo "## ${ts} · setup:auto started"
+    echo "## ${ts} · setup:wizard started"
     echo "  invocation: clawbridge.sh"
     echo "  user: $(whoami)"
     echo "  cwd: ${PROJECT_ROOT}"
@@ -137,7 +143,7 @@ rm -f  "$PROGRESS_LOG"
 mkdir -p "$STEPS_DIR" "$LOGS_DIR"
 write_header
 
-# ClawBridge wordmark + subtitle — setup:auto will see CLAWBRIDGE_BOOTSTRAPPED=1
+# ClawBridge wordmark + subtitle — setup wizard will see CLAWBRIDGE_BOOTSTRAPPED=1
 # and skip printing these again, so the flow stays visually continuous.
 printf '\n  %s%s\n' "$(bold 'Claw')" "$(brand_bold 'Bridge')"
 printf '  %s\n\n' "$(dim 'Setting up your personal AI assistant')"
@@ -246,11 +252,10 @@ else
   exit 1
 fi
 
-# ─── hand off to setup:auto ────────────────────────────────────────────
+# ─── hand off to setup:wizard ───────────────────────────────────────────
 
-# CLAWBRIDGE_BOOTSTRAPPED=1 tells setup/auto.ts to skip the wordmark (we
-# already printed it) and to append to the progression log rather than
-# wipe it.
+# CLAWBRIDGE_BOOTSTRAPPED=1 tells the setup wizard to skip duplicate bootstrap
+# framing where supported and to append to the progression log.
 export CLAWBRIDGE_BOOTSTRAPPED=1
 
 # setup.sh may have just installed pnpm via npm into a prefix that's not on
@@ -264,7 +269,7 @@ if ! command -v pnpm >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
   fi
 fi
 
-# --silent suppresses pnpm's `> clawbridge@2.0.0 setup:auto / > tsx setup/auto.ts`
-# preamble so the flow continues visually from "Basics installed" straight
-# into setup:auto's spinner. exec so signals (Ctrl-C) propagate directly.
-exec pnpm --silent run setup:auto
+# --silent suppresses pnpm's script preamble so the flow continues visually from
+# "Basics installed" straight into the setup wizard. exec so signals (Ctrl-C)
+# propagate directly.
+exec pnpm --silent run setup:wizard

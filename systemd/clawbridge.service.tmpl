@@ -12,6 +12,9 @@ StandardOutput=append:{{HOME}}/.clawbridge/logs/out.log
 StandardError=append:{{HOME}}/.clawbridge/logs/err.log
 Environment="HOME={{HOME}}"
 Environment="PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin"
+Environment="CONTAINER_IMAGE_BASE={{CONTAINER_IMAGE_BASE}}"
+Environment="CONTAINER_IMAGE={{CONTAINER_IMAGE}}"
+EnvironmentFile=-{{HOME}}/.clawbridge/.env
 
 [Install]
 WantedBy=default.target

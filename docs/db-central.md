@@ -10,7 +10,7 @@ Access layer: `src/db/`. Authoritative schema reference: `src/db/schema.ts` (com
 
 ### 1.1 `agent_groups`
 
-Agent workspaces. Each maps 1:1 to a `groups/<folder>/` directory containing `CLAUDE.md`, skills, and `container.json`. Container config lives on disk, not in the DB.
+Agent workspaces. Each maps 1:1 to a `groups/<folder>/` directory containing `AGENTS.md`, skills, and `container.json`. Container config lives on disk, not in the DB.
 
 ```sql
 CREATE TABLE agent_groups (
