@@ -1,6 +1,6 @@
 {
   "name": "clawbridge-codex",
-  "version": "2.9.3",
+  "version": "2.9.4",
   "description": "AI agent platform for ClawBridge Agency, powered by OpenAI Codex. Self-hosted, secure, customizable.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
