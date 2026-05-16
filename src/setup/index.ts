@@ -7,7 +7,7 @@
  * Three paths:
  *   1. Fresh install  — guided .env generation + docker compose up
  *   2. Migrate from OpenClaw
- *   3. Migrate from NanoClaw
+ *   3. Migrate from ClawBridge (Claude)
  */
 import { spawnSync, execSync } from 'child_process';
 import fs from 'fs';
@@ -32,6 +32,7 @@ import {
   type MigrationResult,
   type MigrationSelection,
   type MigrationSource,
+  type MigrationSourceType,
   type VerificationCheck,
 } from './migrate.js';
 
@@ -666,7 +667,7 @@ function printAuditReport(source: MigrationSource, audit: MigrationAudit): void 
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
-    clawbridge: 'clawbridge-agent',
+    clawbridge: 'ClawBridge (Claude)',
   };
   const label = typeLabel[source.type] ?? source.type;
   const rows: Array<[string, string]> = [
@@ -683,19 +684,23 @@ function printAuditReport(source: MigrationSource, audit: MigrationAudit): void 
 
 // ─── Migration flow ───────────────────────────────────────────────────────────
 
-async function runMigrationFlow(): Promise<void> {
+async function runMigrationFlow(preferredType?: MigrationSourceType): Promise<void> {
   checkDockerPrerequisites();
   checkNodePrerequisites();
   const typeLabel: Record<string, string> = {
     openclaw: 'OpenClaw',
     nanoclaw: 'NanoClaw',
-    clawbridge: 'clawbridge-agent',
+    clawbridge: 'ClawBridge (Claude)',
   };
 
   // 1. Detect install
   const s = p.spinner();
-  s.start('Scanning for existing installs…');
-  const detected = await detectInstall();
+  s.start(
+    preferredType
+      ? `Scanning for ${typeLabel[preferredType] ?? preferredType} installs…`
+      : 'Scanning for existing installs…',
+  );
+  const detected = await detectInstall(preferredType);
   s.stop(
     detected
       ? k.green(`Found ${typeLabel[detected.type] ?? detected.type} at ${detected.path}`)
@@ -1305,15 +1310,15 @@ async function main(): Promise<void> {
       options: [
         { value: 'fresh', label: 'Fresh install' },
         { value: 'openclaw', label: 'Migrate from OpenClaw' },
-        { value: 'nanoclaw', label: 'Migrate from NanoClaw' },
+        { value: 'clawbridge', label: 'Migrate from ClawBridge (Claude)' },
       ],
     }),
-  ) as 'fresh' | 'openclaw' | 'nanoclaw';
+  ) as 'fresh' | 'openclaw' | 'clawbridge';
 
   if (mode === 'fresh') {
     await runFreshInstall();
   } else {
-    await runMigrationFlow();
+    await runMigrationFlow(mode);
   }
 }
 

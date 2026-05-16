@@ -131,8 +131,9 @@ function identifyType(dir: string): MigrationSourceType | null {
   return null;
 }
 
-export async function detectInstall(): Promise<MigrationSource | null> {
+export async function detectInstall(preferredType?: MigrationSourceType): Promise<MigrationSource | null> {
   for (const { paths, type } of CANDIDATE_PATHS) {
+    if (preferredType && type !== preferredType) continue;
     for (const candidate of paths) {
       if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
         const detected = identifyType(candidate);

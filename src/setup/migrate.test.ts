@@ -54,4 +54,22 @@ describe('clawbridge-codex migration detection', () => {
       path: path.join(home, '.clawbridge'),
     });
   });
+
+  it('honors the requested migration source type when multiple installs exist', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cb-multi-home-'));
+    fs.mkdirSync(path.join(home, '.openclaw'), { recursive: true });
+    fs.mkdirSync(path.join(home, '.clawbridge'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.clawbridge', '.env'), 'AGENT_PROVIDER=claude\nTELEGRAM_BOT_TOKEN=x\n');
+
+    const { detectInstall } = await loadMigrateWithHome(home);
+
+    await expect(detectInstall('clawbridge')).resolves.toEqual({
+      type: 'clawbridge',
+      path: path.join(home, '.clawbridge'),
+    });
+    await expect(detectInstall('openclaw')).resolves.toEqual({
+      type: 'openclaw',
+      path: path.join(home, '.openclaw'),
+    });
+  });
 });

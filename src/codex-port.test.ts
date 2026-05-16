@@ -89,6 +89,13 @@ describe('Codex port regression checks', () => {
     }
   });
 
+  it('shows ClawBridge Claude migration in setup instead of NanoClaw', () => {
+    const setupWizard = read('src/setup/index.ts');
+    expect(setupWizard).toContain('Migrate from ClawBridge (Claude)');
+    expect(setupWizard).not.toContain("label: 'Migrate from NanoClaw'");
+    expect(setupWizard).toContain("value: 'clawbridge'");
+  });
+
   it('writes and mounts AGENTS.md instead of Claude Code persona files', () => {
     expect(read('src/group-init.ts')).toContain('AGENTS.local.md');
     expect(read('src/group-init.ts')).not.toMatch(/CLAUDE_CODE_|settings\.json/);
